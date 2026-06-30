@@ -5,6 +5,10 @@ import {
   ShortTermSchedule,
   TravelTimeRule,
 } from "@/types/assistant-core";
+import {
+  readLocalStorageArray,
+  writeLocalStorageArray,
+} from "@/lib/localStorageRepository";
 
 const KEYS = {
   places: "my-assistant-places",
@@ -14,65 +18,47 @@ const KEYS = {
   tasks: "my-assistant-tasks",
 };
 
-function readArray<T>(key: string): T[] {
-  if (typeof window === "undefined") return [];
-
-  const raw = window.localStorage.getItem(key);
-  if (!raw) return [];
-
-  try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeArray<T>(key: string, value: T[]) {
-  window.localStorage.setItem(key, JSON.stringify(value));
-}
-
 export function getPlaces() {
-  return readArray<Place>(KEYS.places);
+  return readLocalStorageArray<Place>(KEYS.places);
 }
 
 export function savePlace(place: Place) {
-  writeArray(KEYS.places, [place, ...getPlaces()]);
+  writeLocalStorageArray(KEYS.places, [place, ...getPlaces()]);
 }
 
 export function getRoutineSchedules() {
-  return readArray<RoutineSchedule>(KEYS.routines);
+  return readLocalStorageArray<RoutineSchedule>(KEYS.routines);
 }
 
 export function saveRoutineSchedule(routine: RoutineSchedule) {
-  writeArray(KEYS.routines, [routine, ...getRoutineSchedules()]);
+  writeLocalStorageArray(KEYS.routines, [routine, ...getRoutineSchedules()]);
 }
 
 export function getShortTermSchedules() {
-  return readArray<ShortTermSchedule>(KEYS.shortTermSchedules);
+  return readLocalStorageArray<ShortTermSchedule>(KEYS.shortTermSchedules);
 }
 
 export function saveShortTermSchedule(schedule: ShortTermSchedule) {
-  writeArray(KEYS.shortTermSchedules, [
+  writeLocalStorageArray(KEYS.shortTermSchedules, [
     schedule,
     ...getShortTermSchedules(),
   ]);
 }
 
 export function getTravelTimeRules() {
-  return readArray<TravelTimeRule>(KEYS.travelRules);
+  return readLocalStorageArray<TravelTimeRule>(KEYS.travelRules);
 }
 
 export function saveTravelTimeRule(rule: TravelTimeRule) {
-  writeArray(KEYS.travelRules, [rule, ...getTravelTimeRules()]);
+  writeLocalStorageArray(KEYS.travelRules, [rule, ...getTravelTimeRules()]);
 }
 
 export function getTasks() {
-  return readArray<AssistantTask>(KEYS.tasks);
+  return readLocalStorageArray<AssistantTask>(KEYS.tasks);
 }
 
 export function saveTask(task: AssistantTask) {
-  writeArray(KEYS.tasks, [task, ...getTasks()]);
+  writeLocalStorageArray(KEYS.tasks, [task, ...getTasks()]);
 }
 
 export function updateTask(updatedTask: AssistantTask) {
@@ -80,10 +66,10 @@ export function updateTask(updatedTask: AssistantTask) {
     task.id === updatedTask.id ? updatedTask : task
   );
 
-  writeArray(KEYS.tasks, nextTasks);
+  writeLocalStorageArray(KEYS.tasks, nextTasks);
 }
 
 export function deleteTask(id: string) {
   const nextTasks = getTasks().filter((task) => task.id !== id);
-  writeArray(KEYS.tasks, nextTasks);
+  writeLocalStorageArray(KEYS.tasks, nextTasks);
 }

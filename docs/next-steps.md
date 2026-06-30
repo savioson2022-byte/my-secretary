@@ -6,6 +6,8 @@
 
 목표: 현재 브라우저 저장소에 직접 붙어 있는 함수들을 나중에 DB 구현으로 바꾸기 쉬운 형태로 정리한다.
 
+진행 상태: `src/lib/localStorageRepository.ts`에 공통 localStorage 배열 저장소 유틸을 추가했고, 현재 사용하는 기록/정기 일정/단기 일정 저장 함수는 기존 공개 함수명을 유지한 채 이 공통 레이어를 사용한다.
+
 권장 작업:
 
 - `storage.ts`, `routineStorage.ts`, `singleScheduleStorage.ts`, `coreStorage.ts`의 역할을 정리한다.

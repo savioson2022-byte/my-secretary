@@ -1,11 +1,13 @@
 import { SingleSchedule } from "@/types/calendar";
+import {
+  createLocalStorageRepository,
+  isBrowser,
+} from "@/lib/localStorageRepository";
 
 const SINGLE_SCHEDULE_STORAGE_KEY = "my-assistant-single-schedules";
 const SINGLE_SCHEDULE_UPDATED_EVENT = "single-schedules-updated";
-
-function isBrowser() {
-  return typeof window !== "undefined";
-}
+const singleScheduleRepository =
+  createLocalStorageRepository<SingleSchedule>(SINGLE_SCHEDULE_STORAGE_KEY);
 
 function notifySingleSchedulesUpdated() {
   if (!isBrowser()) {
@@ -20,27 +22,7 @@ export function getSingleScheduleUpdatedEventName() {
 }
 
 export function getSingleSchedules(): SingleSchedule[] {
-  if (!isBrowser()) {
-    return [];
-  }
-
-  const rawData = localStorage.getItem(SINGLE_SCHEDULE_STORAGE_KEY);
-
-  if (!rawData) {
-    return [];
-  }
-
-  try {
-    const parsedData = JSON.parse(rawData);
-
-    if (!Array.isArray(parsedData)) {
-      return [];
-    }
-
-    return parsedData;
-  } catch {
-    return [];
-  }
+  return singleScheduleRepository.list();
 }
 
 export function saveSingleSchedule(schedule: SingleSchedule) {
@@ -61,12 +43,7 @@ export function saveSingleSchedule(schedule: SingleSchedule) {
     return;
   }
 
-  const nextSchedules = [schedule, ...schedules];
-
-  localStorage.setItem(
-    SINGLE_SCHEDULE_STORAGE_KEY,
-    JSON.stringify(nextSchedules)
-  );
+  singleScheduleRepository.create(schedule);
 
   notifySingleSchedulesUpdated();
 }
@@ -76,20 +53,7 @@ export function updateSingleSchedule(updatedSchedule: SingleSchedule) {
     return;
   }
 
-  const schedules = getSingleSchedules();
-
-  const nextSchedules = schedules.map((schedule) => {
-    if (schedule.id === updatedSchedule.id) {
-      return updatedSchedule;
-    }
-
-    return schedule;
-  });
-
-  localStorage.setItem(
-    SINGLE_SCHEDULE_STORAGE_KEY,
-    JSON.stringify(nextSchedules)
-  );
+  singleScheduleRepository.update(updatedSchedule);
 
   notifySingleSchedulesUpdated();
 }
@@ -99,14 +63,7 @@ export function deleteSingleSchedule(id: string) {
     return;
   }
 
-  const schedules = getSingleSchedules();
-
-  const nextSchedules = schedules.filter((schedule) => schedule.id !== id);
-
-  localStorage.setItem(
-    SINGLE_SCHEDULE_STORAGE_KEY,
-    JSON.stringify(nextSchedules)
-  );
+  singleScheduleRepository.delete(id);
 
   notifySingleSchedulesUpdated();
 }

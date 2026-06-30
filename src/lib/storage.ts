@@ -1,37 +1,22 @@
 import { AssistantItem } from "@/types/assistant";
+import { createLocalStorageRepository } from "@/lib/localStorageRepository";
 
 const STORAGE_KEY = "my-assistant-items";
+const assistantItemRepository =
+  createLocalStorageRepository<AssistantItem>(STORAGE_KEY);
 
 export function getItems(): AssistantItem[] {
-  if (typeof window === "undefined") return [];
-
-  const rawItems = window.localStorage.getItem(STORAGE_KEY);
-  if (!rawItems) return [];
-
-  try {
-    const parsed = JSON.parse(rawItems);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
+  return assistantItemRepository.list();
 }
 
 export function saveItem(item: AssistantItem) {
-  const items = getItems();
-  const nextItems = [item, ...items];
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextItems));
+  assistantItemRepository.create(item);
 }
 
 export function updateItem(updatedItem: AssistantItem) {
-  const items = getItems();
-  const nextItems = items.map((item) =>
-    item.id === updatedItem.id ? updatedItem : item
-  );
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextItems));
+  assistantItemRepository.update(updatedItem);
 }
 
 export function deleteItem(id: string) {
-  const items = getItems();
-  const nextItems = items.filter((item) => item.id !== id);
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextItems));
+  assistantItemRepository.delete(id);
 }

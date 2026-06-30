@@ -96,6 +96,8 @@
 
 현재 저장소 함수는 여러 파일로 분리되어 있다.
 
+공통 localStorage 접근은 `src/lib/localStorageRepository.ts`에 모여 있다. 화면과 기존 저장소 모듈은 여전히 `getItems`, `saveItem`, `getRoutineSchedules`, `getSingleSchedules` 같은 기존 함수명을 사용하므로 현재 기능 흐름은 유지된다.
+
 ### `my-assistant-items`
 
 파일: `src/lib/storage.ts`
