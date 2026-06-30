@@ -26,6 +26,9 @@
 - 정기 일정의 시작일, 종료일, 활성 여부 기반 표시
 - 정기 일정과 단기 일정을 제외한 빈 시간 계산
 - 시간작업을 빈 시간에 배치하는 추천
+- 장소 저장
+- 이동수단별 장소 간 이동시간 규칙 저장
+- 이번 주 일정 사이 이동 가능성 계산
 - `.ics` 캘린더 파일 생성 유틸리티
 - 홈 화면 마이크 버튼을 통한 음성 입력
 - `/?voice=1` 음성 입력 진입 링크
@@ -89,6 +92,30 @@
 - `dayOfWeek`: 정기 일정 요일
 - `startTime`, `endTime`: 바쁜 시간 범위
 
+### SavedPlace
+
+파일: `src/types/calendar.ts`
+
+사용자가 자주 쓰는 장소를 저장하기 위한 타입이다.
+
+- `name`: 앱 안에서 일정 위치와 매칭할 장소 이름
+- `address`: 실제 주소 또는 위치 설명
+- `memo`: 사용자가 남긴 장소 메모
+- `id`, `createdAt`, `updatedAt`: 식별자와 시각
+
+### TravelTimeRule
+
+파일: `src/types/calendar.ts`
+
+두 장소 사이의 이동시간을 이동수단별로 저장하는 타입이다. 현재 MVP에서는 실시간 지도 API 대신 사용자가 직접 입력한 규칙을 기준으로 계산한다.
+
+- `fromPlaceName`: 출발 장소 이름
+- `toPlaceName`: 도착 장소 이름
+- `mode`: `car`, `transit`, `walk`, `bike`
+- `minutes`: 예상 이동 시간
+- `memo`: 평일 오후 기준, 환승 포함 등 계산 기준 메모
+- `id`, `createdAt`, `updatedAt`: 식별자와 시각
+
 ### Assistant Core 타입
 
 파일: `src/types/assistant-core.ts`
@@ -128,6 +155,24 @@
 - 사용 위치: 월간 캘린더, 주간 캘린더, 단기 일정 페이지, 빈 시간 계산, 시간작업 추천
 - 주요 함수: `getSingleSchedules`, `saveSingleSchedule`, `updateSingleSchedule`, `deleteSingleSchedule`, `getSingleSchedulesByDate`
 - 변경 이벤트: `single-schedules-updated`
+
+### `my-assistant-saved-places`
+
+파일: `src/lib/placeStorage.ts`
+
+장소 `SavedPlace[]`를 저장한다.
+
+- 사용 위치: 주간 캘린더의 장소와 이동시간 영역
+- 주요 함수: `getSavedPlaces`, `saveSavedPlace`, `updateSavedPlace`, `deleteSavedPlace`
+
+### `my-assistant-travel-time-rules`
+
+파일: `src/lib/travelTimeStorage.ts`
+
+장소 간 이동시간 규칙 `TravelTimeRule[]`를 저장한다.
+
+- 사용 위치: 주간 캘린더의 이동 가능성 계산
+- 주요 함수: `getTravelTimeRules`, `saveTravelTimeRule`, `updateTravelTimeRule`, `deleteTravelTimeRule`
 
 ### `coreStorage.ts`의 준비용 키
 
@@ -239,6 +284,21 @@ OpenAI API를 사용해 입력을 JSON Schema에 맞게 분류한다. `OPENAI_AP
 6. 예상 소요 시간 이상인 첫 번째 빈 시간 블록을 찾는다.
 7. 찾으면 시작 시간을 빈 시간의 시작으로 잡고, 종료 시간은 예상 소요 시간을 더해 계산한다.
 8. 추천 사유에는 정기 일정과 단기 일정을 모두 제외한 추천이라는 설명이 포함된다.
+
+## 이동시간 계산 흐름
+
+파일: `src/lib/travelTime.ts`
+
+1. 기준 주의 월요일부터 일요일까지 날짜를 만든다.
+2. 각 날짜에 해당하는 정기 일정과 단기 일정을 모은다.
+3. 일정들을 시작 시간 기준으로 정렬한다.
+4. 앞 일정의 종료 시간과 다음 일정의 시작 시간 사이 여유 시간을 계산한다.
+5. 두 일정의 장소가 같으면 이동시간 0분으로 처리한다.
+6. 장소가 다르면 선택된 이동수단의 `TravelTimeRule`을 찾는다.
+7. 규칙이 없으면 `규칙 필요` 상태로 표시한다.
+8. 규칙이 있으면 여유 시간과 필요 이동시간을 비교해 `이동 가능`, `빠듯함`, `이동 어려움`으로 표시한다.
+
+현재 계산은 사용자가 저장한 수동 이동시간 규칙을 사용한다. 출발시각별 예상 도착 시간, 실시간 교통, 대중교통 환승 정보는 이후 지도 API 연결 단계에서 추가한다.
 
 ## 음성 입력 흐름
 

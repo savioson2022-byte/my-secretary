@@ -1,7 +1,9 @@
 "use client";
 
 import TimeTaskSuggestionView from "@/components/TimeTaskSuggestionView";
+import TravelTimePlanner from "@/components/TravelTimePlanner";
 import WeeklyAvailabilityView from "@/components/WeeklyAvailabilityView";
+import { getSavedPlaces } from "@/lib/placeStorage";
 import {
   deleteRoutineSchedule,
   getRoutineSchedules,
@@ -11,8 +13,9 @@ import {
   getSingleScheduleUpdatedEventName,
   getSingleSchedules,
 } from "@/lib/singleScheduleStorage";
+import { getTravelTimeRules } from "@/lib/travelTimeStorage";
 import { AssistantItem } from "@/types/assistant";
-import { SingleSchedule } from "@/types/calendar";
+import { SavedPlace, SingleSchedule, TravelTimeRule } from "@/types/calendar";
 import { DayOfWeek, RoutineSchedule } from "@/types/routine";
 import { useEffect, useMemo, useState } from "react";
 import type { FormEvent, MouseEvent } from "react";
@@ -181,6 +184,8 @@ function isRoutineActiveOnDate(routine: RoutineSchedule, dateText: string) {
 function RoutineScheduleManager({ items }: RoutineScheduleManagerProps) {
   const [routines, setRoutines] = useState<RoutineSchedule[]>([]);
   const [singleSchedules, setSingleSchedules] = useState<SingleSchedule[]>([]);
+  const [savedPlaces, setSavedPlaces] = useState<SavedPlace[]>([]);
+  const [travelTimeRules, setTravelTimeRules] = useState<TravelTimeRule[]>([]);
 
   const [title, setTitle] = useState("");
   const [dayOfWeek, setDayOfWeek] = useState<DayOfWeek>("월");
@@ -201,6 +206,8 @@ function RoutineScheduleManager({ items }: RoutineScheduleManagerProps) {
     function refreshSchedules() {
       setRoutines(getRoutineSchedules());
       setSingleSchedules(getSingleSchedules());
+      setSavedPlaces(getSavedPlaces());
+      setTravelTimeRules(getTravelTimeRules());
     }
 
     refreshSchedules();
@@ -243,6 +250,35 @@ function RoutineScheduleManager({ items }: RoutineScheduleManagerProps) {
       return routine.isActive === false || isRoutineEnded(routine);
     });
   }, [routines]);
+
+  const placeNameOptions = useMemo(() => {
+    const names = new Set<string>();
+
+    savedPlaces.forEach((place) => {
+      if (place.name.trim()) {
+        names.add(place.name.trim());
+      }
+    });
+
+    routines.forEach((routine) => {
+      if (routine.placeName.trim()) {
+        names.add(routine.placeName.trim());
+      }
+    });
+
+    singleSchedules.forEach((schedule) => {
+      if (schedule.placeName.trim()) {
+        names.add(schedule.placeName.trim());
+      }
+    });
+
+    return Array.from(names).sort((a, b) => a.localeCompare(b, "ko"));
+  }, [routines, savedPlaces, singleSchedules]);
+
+  function refreshTravelData() {
+    setSavedPlaces(getSavedPlaces());
+    setTravelTimeRules(getTravelTimeRules());
+  }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -570,6 +606,14 @@ function RoutineScheduleManager({ items }: RoutineScheduleManagerProps) {
         singleSchedules={singleSchedules}
       />
 
+      <TravelTimePlanner
+        routines={routines}
+        singleSchedules={singleSchedules}
+        savedPlaces={savedPlaces}
+        travelTimeRules={travelTimeRules}
+        onChange={refreshTravelData}
+      />
+
       <section className="rounded-3xl bg-white p-5 shadow-soft ring-1 ring-slate-100">
         <div>
           <h2 className="text-lg font-black text-slate-900">정기 일정 입력</h2>
@@ -659,11 +703,17 @@ function RoutineScheduleManager({ items }: RoutineScheduleManagerProps) {
           <div>
             <label className="text-sm font-bold text-slate-700">위치</label>
             <input
+              list="routine-place-options"
               value={placeName}
               onChange={(event) => setPlaceName(event.target.value)}
               placeholder="예: 학교, 영어학원, 집, 수영장"
               className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-400"
             />
+            <datalist id="routine-place-options">
+              {placeNameOptions.map((name) => (
+                <option key={name} value={name} />
+              ))}
+            </datalist>
           </div>
 
           <div>

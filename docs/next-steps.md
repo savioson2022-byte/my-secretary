@@ -66,6 +66,8 @@
 - `assistant_items`
 - `routine_schedules`
 - `single_schedules`
+- `places`
+- `travel_time_rules`
 - `push_subscriptions`
 
 설계 원칙:
@@ -75,6 +77,8 @@
 - 날짜는 `date`, 시간은 `time` 타입 사용을 우선 검토한다.
 - 기존 TypeScript enum 값과 DB 체크 제약을 맞춘다.
 - `single_schedules.source_item_id`는 `assistant_items.id`를 참조할 수 있게 설계한다.
+- 장소는 처음에는 사용자가 직접 저장한 이름과 주소를 기준으로 두고, 나중에 지도 API의 place id, 위도, 경도 필드를 추가한다.
+- 이동시간은 현재 수동 규칙을 먼저 DB로 옮긴 뒤, 실제 길찾기 API 결과를 캐싱하는 구조로 확장한다.
 
 완료 기준:
 
@@ -128,6 +132,8 @@
 - `getItems`, `saveItem`, `updateItem`, `deleteItem`
 - `getRoutineSchedules`, `saveRoutineSchedule`, `deleteRoutineSchedule`
 - `getSingleSchedules`, `saveSingleSchedule`, `updateSingleSchedule`, `deleteSingleSchedule`
+- `getSavedPlaces`, `saveSavedPlace`, `updateSavedPlace`, `deleteSavedPlace`
+- `getTravelTimeRules`, `saveTravelTimeRule`, `updateTravelTimeRule`, `deleteTravelTimeRule`
 
 완료 기준:
 
@@ -135,6 +141,7 @@
 - 새로 저장한 단기 일정이 캘린더에 표시된다.
 - 정기 일정과 단기 일정을 함께 고려한 빈 시간 계산이 계속 동작한다.
 - 시간작업 추천이 DB에서 읽은 데이터로도 동일하게 동작한다.
+- 장소와 이동시간 규칙이 DB에서 읽힌 데이터로도 동일하게 동작한다.
 
 주의:
 
@@ -170,6 +177,30 @@
 
 - 음성 입력 진입 링크 `/?voice=1`을 홈 화면 아이콘, iPhone 단축어, 동작 버튼, 뒷면 탭과 연결할 수 있게 유지한다.
 - 브라우저 정책상 마이크 자동 시작은 보장하지 않고, 사용자가 앱 안에서 마이크 버튼을 직접 누르는 흐름을 기본으로 둔다.
+
+## 지도 API 연결 단계
+
+목표: 사용자가 장소 이름만 입력해도 실제 좌표와 이동시간을 계산할 수 있게 만든다.
+
+권장 후보:
+
+- Kakao Mobility 또는 Kakao Maps API
+- Naver Maps Directions API
+- Google Maps Routes API
+
+권장 작업:
+
+- `places` 테이블에 `provider`, `provider_place_id`, `latitude`, `longitude` 필드를 추가한다.
+- 장소 저장 시 주소 검색 또는 장소 검색으로 실제 장소를 선택하게 한다.
+- `travel_time_rules`는 사용자가 직접 입력한 fallback 값으로 유지한다.
+- 실제 길찾기 API 결과는 `travel_time_estimates` 같은 캐시 테이블에 저장한다.
+- 출발 시각, 이동수단, 출발지, 도착지 조합별로 만료 시간을 둔다.
+- API 실패 또는 지원하지 않는 이동수단은 수동 규칙으로 fallback한다.
+
+주의:
+
+- 실시간 출발시각 기반 이동시간은 외부 API 키, 요금, 호출 제한, 약관 확인이 필요하다.
+- Apple Watch는 웹앱이 직접 위치 기반 네비게이션을 제어하기보다, iPhone의 알림 미러링과 앱 진입 링크를 중심으로 설계한다.
 
 ## 6단계: Web Push 구독 저장
 

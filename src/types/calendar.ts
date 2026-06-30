@@ -66,3 +66,25 @@ export type CalendarBusyBlock = {
 
   placeName: string;
 };
+
+export type TravelMode = "car" | "transit" | "walk" | "bike";
+
+export type SavedPlace = {
+  id: string;
+  name: string;
+  address: string;
+  memo: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type TravelTimeRule = {
+  id: string;
+  fromPlaceName: string;
+  toPlaceName: string;
+  mode: TravelMode;
+  minutes: number;
+  memo: string;
+  createdAt: string;
+  updatedAt: string;
+};
