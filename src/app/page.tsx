@@ -88,9 +88,13 @@ export default function Home() {
   const [classificationSource, setClassificationSource] = useState<
     "ai" | "fallback" | null
   >(null);
+  const [voiceIntent, setVoiceIntent] = useState(false);
 
   useEffect(() => {
     setItems(getItems());
+
+    const searchParams = new URLSearchParams(window.location.search);
+    setVoiceIntent(searchParams.get("voice") === "1");
   }, []);
 
   const todayItems = useMemo(() => {
@@ -191,6 +195,15 @@ export default function Home() {
           알려드려요.
         </p>
 
+        <div className="mt-6 rounded-[28px] bg-white/78 p-4 shadow-soft ring-1 ring-slate-100">
+          <p className="text-sm font-black text-slate-900">빠른 음성 기록</p>
+          <p className="mt-2 text-sm leading-6 text-slate-500">
+            iPhone 단축어, 동작 버튼, 뒷면 탭에서 앱 주소 뒤에{" "}
+            <span className="font-black text-blue-600">?voice=1</span>을 붙여
+            열면 바로 음성 기록 화면으로 진입할 수 있습니다.
+          </p>
+        </div>
+
         <div className="mt-10 space-y-6">
           {[
             ["AI가 똑똑하게 정리해줘요", "복잡한 생각도 AI가 할 일, 일정, 아이디어로 알아서 분류해줘요."],
@@ -235,6 +248,7 @@ export default function Home() {
             value={inputText}
             onChange={setInputText}
             onClassify={handleClassify}
+            voiceIntent={voiceIntent}
           />
 
           {isClassifying && (
