@@ -145,6 +145,8 @@
 
 목표: 아이폰 홈 화면에 추가할 수 있는 설치형 웹앱 기반을 만든다.
 
+진행 상태: `public/manifest.webmanifest`, 홈 화면 아이콘, favicon, Next metadata 연결을 추가했다. 아직 service worker와 오프라인 캐싱은 넣지 않았다.
+
 권장 작업:
 
 - `public/manifest.webmanifest`를 추가한다.

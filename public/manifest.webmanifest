@@ -1,0 +1,61 @@
+{
+  "name": "나의 비서",
+  "short_name": "나의 비서",
+  "description": "떠오른 생각을 말하거나 입력하면 AI가 정리하고 일정과 기록으로 관리해주는 개인 비서 앱",
+  "lang": "ko-KR",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F8FBFF",
+  "theme_color": "#3182F6",
+  "categories": ["productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "음성 기록",
+      "short_name": "음성",
+      "description": "마이크로 떠오른 생각을 바로 입력합니다.",
+      "url": "/?voice=1",
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "주간 캘린더",
+      "short_name": "주간",
+      "description": "이번 주 일정과 빈 시간을 확인합니다.",
+      "url": "/calendar/weekly",
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
+  ]
+}
