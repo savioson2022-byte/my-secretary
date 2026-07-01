@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "check:supabase": "node --env-file=.env.local scripts/check-supabase-connection.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.0",
