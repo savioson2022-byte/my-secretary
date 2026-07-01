@@ -1,0 +1,69 @@
+# Supabase 설정 순서
+
+이 문서는 `나의 비서`를 여러 기기에서 같은 사용자로 쓰기 위한 Supabase 설정 절차다.
+
+## 1. Supabase 프로젝트 만들기
+
+1. Supabase Dashboard에 로그인한다.
+2. 새 프로젝트를 만든다.
+3. Region은 가까운 지역을 고른다.
+4. 프로젝트 생성이 끝날 때까지 기다린다.
+
+## 2. SQL 실행
+
+Supabase Dashboard의 SQL Editor에서 아래 migration 파일들을 순서대로 실행한다.
+
+1. `supabase/migrations/20260701000000_create_profiles_devices.sql`
+2. `supabase/migrations/20260701001000_create_user_app_data.sql`
+
+생성되는 주요 테이블:
+
+- `profiles`
+- `devices`
+- `assistant_items`
+- `routine_schedules`
+- `single_schedules`
+- `places`
+- `travel_time_rules`
+
+모든 사용자 데이터 테이블은 `user_id`를 기준으로 분리되고, Row Level Security 정책으로 자기 데이터만 읽고 쓸 수 있게 한다.
+
+## 3. API 키 확인
+
+Supabase Dashboard에서 Project Settings > API로 이동해 아래 값을 확인한다.
+
+- Project URL
+- anon public key
+
+## 4. 로컬 환경변수
+
+`.env.local`에 아래 값을 넣는다.
+
+```text
+NEXT_PUBLIC_SUPABASE_URL=프로젝트_URL
+NEXT_PUBLIC_SUPABASE_ANON_KEY=anon_public_key
+OPENAI_API_KEY=OpenAI_API_키
+```
+
+`OPENAI_API_KEY`는 AI 분류를 실제 OpenAI API로 사용하려면 필요하다. 없으면 규칙 기반 분류로 fallback된다.
+
+## 5. Vercel 환경변수
+
+Vercel 프로젝트의 Settings > Environment Variables에 같은 값을 추가한다.
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `OPENAI_API_KEY`
+
+추가 후 Production 재배포가 필요하다.
+
+## 6. 앱에서 테스트
+
+1. `/account` 페이지로 이동한다.
+2. 이메일 로그인 링크를 요청한다.
+3. 같은 기기에서 이메일 링크를 연다.
+4. 사용자 이름과 AI 분류 기준을 저장한다.
+5. 현재 기기를 연결한다.
+6. 아이폰에서도 같은 이메일로 로그인해 기기를 연결한다.
+
+이 단계가 끝나면 같은 사용자 아래에 여러 기기가 연결되는 구조가 준비된다. 실제 기록/일정 저장소를 DB 기반으로 교체하는 작업은 다음 단계다.

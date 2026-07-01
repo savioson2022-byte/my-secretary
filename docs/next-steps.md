@@ -116,6 +116,8 @@
 
 - `/account` 계정/기기 관리 화면을 추가했다.
 - `profiles`, `devices` 테이블용 SQL migration 초안을 추가했다.
+- `assistant_items`, `routine_schedules`, `single_schedules`, `places`, `travel_time_rules` 테이블용 SQL migration 초안을 추가했다.
+- `docs/supabase-setup.md`에 Supabase 프로젝트 생성, SQL 실행, Vercel 환경변수 설정 순서를 정리했다.
 - 환경변수가 없으면 기존 localStorage MVP가 계속 동작한다.
 
 주의:

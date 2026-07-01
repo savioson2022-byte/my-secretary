@@ -232,6 +232,9 @@ export default function AccountManager() {
             <p>NEXT_PUBLIC_SUPABASE_URL</p>
             <p>NEXT_PUBLIC_SUPABASE_ANON_KEY</p>
           </div>
+          <p className="mt-3 text-sm font-bold text-slate-500">
+            자세한 설정 순서는 docs/supabase-setup.md에 정리되어 있습니다.
+          </p>
         </section>
 
         <DeviceProfileCard profile={localProfile} onChange={setLocalProfile} />

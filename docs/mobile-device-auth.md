@@ -40,6 +40,7 @@ Supabase Auth 기반 계정/기기 관리로 전환을 시작했다.
 - `src/lib/supabase/client.ts`
 - `src/lib/supabase/config.ts`
 - `supabase/migrations/20260701000000_create_profiles_devices.sql`
+- `supabase/migrations/20260701001000_create_user_app_data.sql`
 - `.env.example`
 
 환경변수 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`가 없으면 앱은 기존처럼 동작하고, 계정 화면에서는 Supabase 연결이 필요하다는 안내와 로컬 임시 프로필을 보여준다.
