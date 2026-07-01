@@ -97,30 +97,35 @@ alter table public.single_schedules enable row level security;
 alter table public.places enable row level security;
 alter table public.travel_time_rules enable row level security;
 
+drop policy if exists "Users can manage own assistant items" on public.assistant_items;
 create policy "Users can manage own assistant items"
   on public.assistant_items
   for all
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
+drop policy if exists "Users can manage own routine schedules" on public.routine_schedules;
 create policy "Users can manage own routine schedules"
   on public.routine_schedules
   for all
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
+drop policy if exists "Users can manage own single schedules" on public.single_schedules;
 create policy "Users can manage own single schedules"
   on public.single_schedules
   for all
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
+drop policy if exists "Users can manage own places" on public.places;
 create policy "Users can manage own places"
   on public.places
   for all
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
+drop policy if exists "Users can manage own travel time rules" on public.travel_time_rules;
 create policy "Users can manage own travel time rules"
   on public.travel_time_rules
   for all
