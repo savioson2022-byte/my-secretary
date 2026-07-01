@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 type InputBoxProps = {
   value: string;
   onChange: (value: string) => void;
-  onClassify: () => void;
+  onClassify: (textOverride?: string) => void;
   voiceIntent?: boolean;
 };
 
@@ -73,6 +73,10 @@ function appendTranscript(currentText: string, transcript: string) {
   return `${trimmedCurrentText} ${trimmedTranscript}`;
 }
 
+type VoiceControlMode = "hold" | "toggle";
+
+const VOICE_MODE_STORAGE_KEY = "my-assistant-voice-control-mode";
+
 export default function InputBox({
   value,
   onChange,
@@ -82,18 +86,35 @@ export default function InputBox({
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const baseTextRef = useRef("");
   const finalTranscriptRef = useRef("");
+  const latestTextRef = useRef(value);
+  const shouldClassifyOnEndRef = useRef(false);
+  const pointerStartedVoiceRef = useRef(false);
   const [isListening, setIsListening] = useState(false);
   const [isSpeechSupported, setIsSpeechSupported] = useState(false);
   const [voiceMessage, setVoiceMessage] = useState<string | null>(null);
   const [interimTranscript, setInterimTranscript] = useState("");
+  const [voiceControlMode, setVoiceControlMode] =
+    useState<VoiceControlMode>("hold");
 
   useEffect(() => {
     setIsSpeechSupported(Boolean(getSpeechRecognitionConstructor()));
+
+    const savedVoiceMode = window.localStorage.getItem(
+      VOICE_MODE_STORAGE_KEY
+    );
+
+    if (savedVoiceMode === "hold" || savedVoiceMode === "toggle") {
+      setVoiceControlMode(savedVoiceMode);
+    }
 
     return () => {
       recognitionRef.current?.stop();
     };
   }, []);
+
+  useEffect(() => {
+    latestTextRef.current = value;
+  }, [value]);
 
   useEffect(() => {
     if (!voiceIntent) {
@@ -103,13 +124,19 @@ export default function InputBox({
     setVoiceMessage("마이크 버튼을 누르면 바로 음성 기록을 시작합니다.");
   }, [voiceIntent]);
 
-  function stopVoiceInput() {
+  function updateVoiceControlMode(nextMode: VoiceControlMode) {
+    setVoiceControlMode(nextMode);
+    window.localStorage.setItem(VOICE_MODE_STORAGE_KEY, nextMode);
+  }
+
+  function stopVoiceInput({ autoClassify = true } = {}) {
+    shouldClassifyOnEndRef.current = autoClassify;
     recognitionRef.current?.stop();
     setIsListening(false);
     setInterimTranscript("");
   }
 
-  function startVoiceInput() {
+  function startVoiceInput({ autoClassifyOnEnd = true } = {}) {
     const SpeechRecognition = getSpeechRecognitionConstructor();
 
     if (!SpeechRecognition) {
@@ -120,7 +147,9 @@ export default function InputBox({
     }
 
     if (isListening) {
-      stopVoiceInput();
+      stopVoiceInput({
+        autoClassify: autoClassifyOnEnd,
+      });
       return;
     }
 
@@ -139,6 +168,9 @@ export default function InputBox({
     };
 
     recognition.onend = () => {
+      const shouldClassify = shouldClassifyOnEndRef.current;
+      const nextText = latestTextRef.current.trim();
+
       setIsListening(false);
       setInterimTranscript("");
       setVoiceMessage((currentMessage) => {
@@ -147,12 +179,21 @@ export default function InputBox({
         }
 
         return finalTranscriptRef.current.trim()
-          ? "음성 기록이 입력창에 추가됐습니다. 필요하면 바로 분류하세요."
+          ? "음성 기록이 끝나서 자동 분류를 시작합니다."
           : "음성 인식이 종료됐습니다.";
       });
+
+      shouldClassifyOnEndRef.current = false;
+
+      if (shouldClassify && nextText) {
+        window.setTimeout(() => {
+          onClassify(nextText);
+        }, 120);
+      }
     };
 
     recognition.onerror = (event) => {
+      shouldClassifyOnEndRef.current = false;
       setIsListening(false);
       setInterimTranscript("");
 
@@ -192,12 +233,13 @@ export default function InputBox({
       }
 
       setInterimTranscript(interimText.trim());
-      onChange(
-        appendTranscript(
-          baseTextRef.current,
-          `${finalTranscriptRef.current} ${interimText}`.trim()
-        )
+      const nextText = appendTranscript(
+        baseTextRef.current,
+        `${finalTranscriptRef.current} ${interimText}`.trim()
       );
+
+      latestTextRef.current = nextText;
+      onChange(nextText);
     };
 
     recognitionRef.current = recognition;
@@ -207,6 +249,38 @@ export default function InputBox({
     } catch {
       setVoiceMessage("음성 인식을 시작하지 못했습니다. 잠시 후 다시 시도해주세요.");
     }
+  }
+
+  function handleVoiceButtonClick() {
+    if (voiceControlMode === "hold") {
+      return;
+    }
+
+    startVoiceInput({
+      autoClassifyOnEnd: true,
+    });
+  }
+
+  function handleVoicePointerDown() {
+    if (voiceControlMode !== "hold" || isListening) {
+      return;
+    }
+
+    pointerStartedVoiceRef.current = true;
+    startVoiceInput({
+      autoClassifyOnEnd: true,
+    });
+  }
+
+  function handleVoicePointerEnd() {
+    if (voiceControlMode !== "hold" || !pointerStartedVoiceRef.current) {
+      return;
+    }
+
+    pointerStartedVoiceRef.current = false;
+    stopVoiceInput({
+      autoClassify: true,
+    });
   }
 
   return (
@@ -234,6 +308,31 @@ export default function InputBox({
         </span>
       </div>
 
+      <div className="mt-3 grid grid-cols-2 rounded-2xl bg-slate-100 p-1 text-xs font-black text-slate-500">
+        <button
+          type="button"
+          onClick={() => updateVoiceControlMode("hold")}
+          className={`rounded-xl px-3 py-2 transition ${
+            voiceControlMode === "hold"
+              ? "bg-white text-blue-600 shadow-sm"
+              : "hover:text-slate-700"
+          }`}
+        >
+          길게 눌러 말하기
+        </button>
+        <button
+          type="button"
+          onClick={() => updateVoiceControlMode("toggle")}
+          className={`rounded-xl px-3 py-2 transition ${
+            voiceControlMode === "toggle"
+              ? "bg-white text-blue-600 shadow-sm"
+              : "hover:text-slate-700"
+          }`}
+        >
+          눌러 켜고 끄기
+        </button>
+      </div>
+
       <div className="mt-3 flex items-end gap-3 rounded-[22px] bg-slate-50 p-3 ring-1 ring-slate-100">
         <textarea
           value={value}
@@ -244,7 +343,11 @@ export default function InputBox({
 
         <button
           type="button"
-          onClick={startVoiceInput}
+          onClick={handleVoiceButtonClick}
+          onPointerDown={handleVoicePointerDown}
+          onPointerUp={handleVoicePointerEnd}
+          onPointerCancel={handleVoicePointerEnd}
+          onPointerLeave={handleVoicePointerEnd}
           aria-label={isListening ? "음성 입력 중지" : "음성 입력 시작"}
           className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl text-white shadow-[0_12px_24px_rgba(49,130,246,0.22)] transition ${
             isListening
@@ -271,7 +374,7 @@ export default function InputBox({
 
         <button
           type="button"
-          onClick={onClassify}
+          onClick={() => onClassify()}
           aria-label="분류하기"
           className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-blue-600 text-white shadow-[0_12px_24px_rgba(49,130,246,0.28)] transition hover:bg-blue-500"
         >
@@ -304,6 +407,9 @@ export default function InputBox({
           {voiceMessage && <p>{voiceMessage}</p>}
           {interimTranscript && (
             <p className="mt-1 text-blue-500">인식 중: {interimTranscript}</p>
+          )}
+          {voiceControlMode === "hold" && isListening && (
+            <p className="mt-1 text-blue-500">손을 떼면 자동으로 분류합니다.</p>
           )}
         </div>
       )}

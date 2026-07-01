@@ -8,7 +8,8 @@ export type AiClassifyInputResult = {
 };
 
 export async function aiClassifyInput(
-  text: string
+  text: string,
+  userContext?: string
 ): Promise<AiClassifyInputResult> {
   const response = await fetch("/api/classify", {
     method: "POST",
@@ -17,6 +18,7 @@ export async function aiClassifyInput(
     },
     body: JSON.stringify({
       text,
+      userContext,
     }),
   });
 

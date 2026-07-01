@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import BottomNavigation from "@/components/BottomNavigation";
 import ClassificationResult from "@/components/ClassificationResult";
+import DeviceProfileCard from "@/components/DeviceProfileCard";
 import FilterBar from "@/components/FilterBar";
 import InputBox from "@/components/InputBox";
 import ItemCard from "@/components/ItemCard";
@@ -12,11 +13,13 @@ import { classifyInput } from "@/lib/classifyInput";
 import { createSingleScheduleFromItem } from "@/lib/singleScheduleFromItem";
 import { saveSingleSchedule } from "@/lib/singleScheduleStorage";
 import { deleteItem, getItems, saveItem, updateItem } from "@/lib/storage";
+import { getUserProfile } from "@/lib/userProfileStorage";
 import {
   AssistantItem,
   AssistantItemWithoutId,
   FilterType,
 } from "@/types/assistant";
+import { UserProfile } from "@/types/userProfile";
 
 function createId() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -83,6 +86,7 @@ export default function Home() {
     useState<AssistantItemWithoutId | null>(null);
   const [items, setItems] = useState<AssistantItem[]>([]);
   const [selectedFilter, setSelectedFilter] = useState<FilterType>("전체");
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
   const [isClassifying, setIsClassifying] = useState(false);
   const [classificationSource, setClassificationSource] = useState<
@@ -92,6 +96,7 @@ export default function Home() {
 
   useEffect(() => {
     setItems(getItems());
+    setUserProfile(getUserProfile());
 
     const searchParams = new URLSearchParams(window.location.search);
     setVoiceIntent(searchParams.get("voice") === "1");
@@ -105,19 +110,27 @@ export default function Home() {
     return items.filter((item) => matchesFilter(item, selectedFilter));
   }, [items, selectedFilter]);
 
-  async function handleClassify() {
-    const trimmedText = inputText.trim();
+  async function handleClassify(textOverride?: string) {
+    const targetText = textOverride ?? inputText;
+    const trimmedText = targetText.trim();
 
     if (!trimmedText) {
       alert("먼저 기록할 내용을 입력해주세요.");
       return;
     }
 
+    if (textOverride !== undefined) {
+      setInputText(targetText);
+    }
+
     setIsClassifying(true);
     setClassificationSource(null);
 
     try {
-      const { result, source } = await aiClassifyInput(trimmedText);
+      const { result, source } = await aiClassifyInput(
+        trimmedText,
+        userProfile?.classificationPreference
+      );
 
       setClassificationResult(result);
       setClassificationSource(source);
@@ -176,8 +189,8 @@ export default function Home() {
   }
 
   return (
-    <main className="mx-auto grid min-h-screen max-w-7xl gap-10 px-5 py-8 lg:grid-cols-[0.8fr_430px_1fr] lg:items-center lg:px-10">
-      <section className="self-center lg:pr-4">
+    <main className="mx-auto min-h-screen max-w-7xl px-0 py-0 sm:px-5 sm:py-6 lg:grid lg:grid-cols-[0.8fr_430px_1fr] lg:items-center lg:gap-10 lg:px-10">
+      <section className="hidden self-center lg:block lg:pr-4">
         <p className="text-sm font-black text-blue-600">나를 위한 AI 비서</p>
         <div className="mt-4 flex items-center gap-4">
           <h1 className="text-5xl font-black tracking-tight text-slate-950 md:text-6xl">
@@ -223,7 +236,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="phone-shell mx-auto w-full max-w-[430px] overflow-hidden p-4">
+      <section className="mx-auto min-h-screen w-full bg-white px-4 pb-0 pt-[max(1rem,env(safe-area-inset-top))] sm:phone-shell sm:min-h-0 sm:max-w-[430px] sm:overflow-hidden sm:p-4">
         <div className="flex items-center justify-between px-1 pb-5 pt-1 text-xs font-black text-slate-900">
           <span>9:41</span>
           <span className="tracking-[0.18em]">•••</span>
@@ -231,7 +244,9 @@ export default function Home() {
 
         <header className="flex items-start justify-between">
           <div>
-            <p className="text-xs font-bold text-slate-400">안녕하세요, 지민님</p>
+            <p className="text-xs font-bold text-slate-400">
+              안녕하세요, {userProfile?.displayName ?? "사용자"}님
+            </p>
             <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-950">
               오늘도 잘 부탁해요!
             </h2>
@@ -249,6 +264,11 @@ export default function Home() {
             onChange={setInputText}
             onClassify={handleClassify}
             voiceIntent={voiceIntent}
+          />
+
+          <DeviceProfileCard
+            profile={userProfile}
+            onChange={setUserProfile}
           />
 
           {isClassifying && (
@@ -340,7 +360,7 @@ export default function Home() {
         <BottomNavigation />
       </section>
 
-      <section className="self-center lg:pl-4">
+      <section className="hidden self-center lg:block lg:pl-4">
         <section className="app-card p-5">
           <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <div>

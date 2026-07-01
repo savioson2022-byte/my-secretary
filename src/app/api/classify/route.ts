@@ -173,6 +173,7 @@ function normalizeResult(
 export async function POST(request: Request) {
   const body = await request.json();
   const text = String(body.text ?? "").trim();
+  const userContext = String(body.userContext ?? "").trim().slice(0, 800);
 
   if (!text) {
     return NextResponse.json(
@@ -210,6 +211,7 @@ export async function POST(request: Request) {
 
 현재 날짜는 한국 시간 기준 ${todayText} 이다.
 사용자의 짧은 입력을 보고 반드시 정해진 JSON Schema에 맞춰 분류해라.
+${userContext ? `\n사용자별 분류 기준:\n${userContext}\n` : ""}
 
 분류 기준:
 
