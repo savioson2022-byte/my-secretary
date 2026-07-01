@@ -29,9 +29,24 @@
 
 선택한 음성 입력 방식은 `localStorage`에 저장된다.
 
-## 현재 기기 등록 방식
+## 현재 계정/기기 관리 상태
 
-현재는 서버 로그인이 아니라 브라우저 기기 등록 MVP다.
+Supabase Auth 기반 계정/기기 관리로 전환을 시작했다.
+
+추가된 파일:
+
+- `src/app/account/page.tsx`
+- `src/components/AccountManager.tsx`
+- `src/lib/supabase/client.ts`
+- `src/lib/supabase/config.ts`
+- `supabase/migrations/20260701000000_create_profiles_devices.sql`
+- `.env.example`
+
+환경변수 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`가 없으면 앱은 기존처럼 동작하고, 계정 화면에서는 Supabase 연결이 필요하다는 안내와 로컬 임시 프로필을 보여준다.
+
+환경변수가 있으면 `/account`에서 이메일 로그인 링크를 요청하고, 로그인 후 사용자 프로필과 현재 기기를 연결할 수 있다.
+
+## 로컬 임시 프로필
 
 저장 위치:
 
@@ -44,7 +59,7 @@
 - 사용자별 AI 분류 기준
 - 기기 기억 여부
 
-AI 분류 요청 시 사용자별 분류 기준을 `/api/classify`에 함께 보내고, OpenAI API가 활성화된 경우 시스템 프롬프트에 반영한다.
+이 방식은 현재 브라우저 안에서만 유지된다. 여러 기기를 같은 사용자로 묶으려면 Supabase Auth를 사용해야 한다.
 
 ## AI 분류 실패처럼 보이는 경우
 
@@ -58,18 +73,19 @@ Vercel 또는 로컬 실행 환경에 `OPENAI_API_KEY`가 없으면 실제 OpenA
 
 환경변수 추가 후에는 Vercel에서 다시 배포해야 한다.
 
-## 다음 로그인 구현 방향
+## Supabase 로그인 구현 방향
 
-여러 사용자가 생기면 현재 기기 등록 방식만으로는 충분하지 않다. 다음 단계에서는 Supabase Auth 같은 서버 기반 인증으로 전환한다.
+여러 사용자가 생기면 현재 로컬 프로필만으로는 충분하지 않다. Supabase Auth 같은 서버 기반 인증으로 전환한다.
 
 권장 흐름:
 
-1. Supabase Auth 추가
-2. `profiles` 테이블 생성
-3. 현재 `my-assistant-user-profile` 데이터를 `profiles` 테이블로 이전
-4. 로그인 성공 후 장기 세션 유지
-5. 사용자가 같은 기기에서 다시 열면 자동 로그인
-6. 새 기기에서는 한 번만 로그인 또는 인증
+1. Supabase 프로젝트 생성
+2. `supabase/migrations/20260701000000_create_profiles_devices.sql` 실행
+3. Vercel 환경변수 추가
+4. `/account`에서 이메일 로그인 테스트
+5. 현재 기기 연결
+6. 다른 기기에서도 같은 이메일로 로그인해 같은 사용자로 연결
+7. 기존 localStorage 데이터를 `user_id` 기준 DB 테이블로 이전
 
 핵심 원칙:
 

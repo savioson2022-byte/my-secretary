@@ -90,6 +90,8 @@
 
 목표: 앱에서 Supabase를 사용할 수 있는 최소 연결 코드를 추가한다.
 
+진행 상태: `@supabase/supabase-js`, `@supabase/ssr` 패키지를 추가했고, `src/lib/supabase/client.ts`와 `src/lib/supabase/config.ts`를 만들었다. 아직 실제 Supabase 프로젝트 환경변수는 연결하지 않았다.
+
 권장 작업:
 
 - Supabase 패키지를 설치한다.
@@ -109,6 +111,12 @@
 - 앱에서 Supabase client를 import할 수 있다.
 - 환경변수가 없을 때 명확한 오류가 난다.
 - 아직 기존 기능의 저장 방식은 바꾸지 않는다.
+
+추가 진행 상태:
+
+- `/account` 계정/기기 관리 화면을 추가했다.
+- `profiles`, `devices` 테이블용 SQL migration 초안을 추가했다.
+- 환경변수가 없으면 기존 localStorage MVP가 계속 동작한다.
 
 주의:
 

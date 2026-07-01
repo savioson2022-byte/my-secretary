@@ -24,6 +24,11 @@ const LINKS = [
     label: "알림",
     icon: "M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9ZM10 21h4",
   },
+  {
+    href: "/account",
+    label: "계정",
+    icon: "M20 21a8 8 0 0 0-16 0M12 13a5 5 0 1 0 0-10 5 5 0 0 0 0 10Z",
+  },
 ];
 
 export default function BottomNavigation() {
@@ -31,11 +36,12 @@ export default function BottomNavigation() {
 
   return (
     <nav className="sticky bottom-0 z-30 -mx-4 mt-6 border-t border-slate-100 bg-white/92 px-4 pb-3 pt-2 backdrop-blur md:rounded-b-[38px]">
-      <div className="grid grid-cols-4 gap-1">
+      <div className="grid grid-cols-5 gap-1">
         {LINKS.map((link) => {
           const isActive =
             pathname === link.href ||
-            (link.href === "/calendar/monthly" && pathname.startsWith("/calendar"));
+            (link.href === "/calendar/monthly" &&
+              pathname.startsWith("/calendar"));
 
           return (
             <Link

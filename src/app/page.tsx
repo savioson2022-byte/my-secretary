@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import BottomNavigation from "@/components/BottomNavigation";
 import ClassificationResult from "@/components/ClassificationResult";
-import DeviceProfileCard from "@/components/DeviceProfileCard";
 import FilterBar from "@/components/FilterBar";
 import InputBox from "@/components/InputBox";
 import ItemCard from "@/components/ItemCard";
@@ -266,10 +265,22 @@ export default function Home() {
             voiceIntent={voiceIntent}
           />
 
-          <DeviceProfileCard
-            profile={userProfile}
-            onChange={setUserProfile}
-          />
+          <section className="app-card p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="font-black text-slate-900">계정과 기기</h3>
+                <p className="mt-1 text-xs font-semibold leading-5 text-slate-400">
+                  아이폰, 맥북, 아이패드를 같은 사용자로 연결할 준비를 합니다.
+                </p>
+              </div>
+              <Link
+                href="/account"
+                className="shrink-0 rounded-xl bg-blue-50 px-3 py-2 text-xs font-black text-blue-600"
+              >
+                관리
+              </Link>
+            </div>
+          </section>
 
           {isClassifying && (
             <p className="app-card p-4 text-sm font-black text-slate-500">
