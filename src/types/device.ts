@@ -14,6 +14,7 @@ export type UserProfileRecord = {
   id: string;
   display_name: string;
   classification_preference: string;
+  preferred_travel_mode: "walk" | "transit" | "car";
   created_at: string;
   updated_at: string;
 };

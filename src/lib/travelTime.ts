@@ -34,6 +34,7 @@ export type TravelTransition = {
 };
 
 const NO_PLACE_TEXT = "위치 미입력";
+const TRAVEL_CHECK_GAP_LIMIT_MINUTES = 30;
 
 function normalizePlaceName(placeName: string) {
   return placeName.trim();
@@ -148,7 +149,16 @@ export function calculateTravelTransitionsForDate({
     const gapMinutes =
       timeToMinutes(next.startTime) - timeToMinutes(current.endTime);
 
-    if (!fromPlaceName || !toPlaceName || fromPlaceName === NO_PLACE_TEXT || toPlaceName === NO_PLACE_TEXT) {
+    if (gapMinutes < 0 || gapMinutes > TRAVEL_CHECK_GAP_LIMIT_MINUTES) {
+      continue;
+    }
+
+    if (
+      !fromPlaceName ||
+      !toPlaceName ||
+      fromPlaceName === NO_PLACE_TEXT ||
+      toPlaceName === NO_PLACE_TEXT
+    ) {
       transitions.push({
         date,
         fromTitle: current.title,
@@ -166,19 +176,6 @@ export function calculateTravelTransitionsForDate({
     }
 
     if (fromPlaceName === toPlaceName) {
-      transitions.push({
-        date,
-        fromTitle: current.title,
-        toTitle: next.title,
-        fromPlaceName,
-        toPlaceName,
-        previousEndTime: current.endTime,
-        nextStartTime: next.startTime,
-        gapMinutes,
-        requiredMinutes: 0,
-        mode,
-        status: "same-place",
-      });
       continue;
     }
 

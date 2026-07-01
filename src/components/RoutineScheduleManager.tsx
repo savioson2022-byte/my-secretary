@@ -18,14 +18,14 @@ import { AssistantItem } from "@/types/assistant";
 import { SavedPlace, SingleSchedule, TravelTimeRule } from "@/types/calendar";
 import { DayOfWeek, RoutineSchedule } from "@/types/routine";
 import { useEffect, useMemo, useState } from "react";
-import type { FormEvent, MouseEvent } from "react";
+import type { FormEvent, PointerEvent } from "react";
 
 const DAYS: DayOfWeek[] = ["월", "화", "수", "목", "금", "토", "일"];
 
 const START_HOUR = 0;
 const END_HOUR = 24;
 const HOUR_HEIGHT = 56;
-const SNAP_MINUTES = 30;
+const SNAP_MINUTES = 10;
 
 type DragSelection = {
   day: DayOfWeek;
@@ -84,7 +84,7 @@ function getRoutineHeight(startTime: string, endTime: string) {
 }
 
 function getMinutesFromMouse(
-  event: MouseEvent<HTMLDivElement>,
+  event: PointerEvent<HTMLDivElement>,
   element: HTMLDivElement
 ) {
   const rect = element.getBoundingClientRect();
@@ -351,12 +351,13 @@ function RoutineScheduleManager({ items }: RoutineScheduleManagerProps) {
     return singleSchedules.filter((schedule) => schedule.date === dateText);
   }
 
-  function handleMouseDown(
-    event: MouseEvent<HTMLDivElement>,
+  function handlePointerDown(
+    event: PointerEvent<HTMLDivElement>,
     day: DayOfWeek
   ) {
     const selectedMinutes = getMinutesFromMouse(event, event.currentTarget);
 
+    event.currentTarget.setPointerCapture(event.pointerId);
     setIsDragging(true);
     setDragSelection({
       day,
@@ -365,7 +366,7 @@ function RoutineScheduleManager({ items }: RoutineScheduleManagerProps) {
     });
   }
 
-  function handleMouseMove(event: MouseEvent<HTMLDivElement>) {
+  function handlePointerMove(event: PointerEvent<HTMLDivElement>) {
     if (!isDragging || !dragSelection) return;
 
     const selectedMinutes = getMinutesFromMouse(event, event.currentTarget);
@@ -376,9 +377,10 @@ function RoutineScheduleManager({ items }: RoutineScheduleManagerProps) {
     });
   }
 
-  function handleMouseUp() {
+  function handlePointerUp(event: PointerEvent<HTMLDivElement>) {
     if (!dragSelection) return;
 
+    event.currentTarget.releasePointerCapture(event.pointerId);
     const normalized = normalizeSelection(dragSelection);
 
     setIsDragging(false);
@@ -400,12 +402,13 @@ function RoutineScheduleManager({ items }: RoutineScheduleManagerProps) {
           <h2 className="text-lg font-black text-slate-900">주간 캘린더</h2>
           <p className="mt-1 text-sm text-slate-500">
             이번 주 날짜를 기준으로 정기 일정과 단기 일정을 함께 보여줍니다.
-            시간대를 드래그하면 정기 일정 입력 폼에 자동으로 반영됩니다.
+            시간대를 10분 단위로 드래그하면 정기 일정 입력 폼에 자동으로
+            반영됩니다.
           </p>
         </div>
 
         <div className="mt-4 max-h-[720px] overflow-auto rounded-3xl border border-slate-100 bg-slate-50">
-          <div className="min-w-[860px]">
+          <div className="min-w-[760px] md:min-w-[860px]">
             <div className="sticky top-0 z-20 grid grid-cols-[64px_repeat(7,1fr)] border-b border-slate-200 bg-white">
               <div className="p-3 text-center text-xs font-bold text-slate-400">
                 시간
@@ -466,15 +469,15 @@ function RoutineScheduleManager({ items }: RoutineScheduleManagerProps) {
                 return (
                   <div
                     key={day}
-                    onMouseDown={(event) => handleMouseDown(event, day)}
-                    onMouseMove={handleMouseMove}
-                    onMouseUp={handleMouseUp}
-                    onMouseLeave={() => {
+                    onPointerDown={(event) => handlePointerDown(event, day)}
+                    onPointerMove={handlePointerMove}
+                    onPointerUp={handlePointerUp}
+                    onPointerCancel={() => {
                       if (isDragging) {
                         setIsDragging(false);
                       }
                     }}
-                    className="relative cursor-crosshair border-l border-slate-100 bg-white"
+                    className="relative cursor-crosshair touch-none border-l border-slate-100 bg-white"
                   >
                     {hours.map((hour) => (
                       <div
@@ -635,7 +638,7 @@ function RoutineScheduleManager({ items }: RoutineScheduleManagerProps) {
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid gap-3 sm:grid-cols-3">
             <div>
               <label className="text-sm font-bold text-slate-700">요일</label>
               <select
@@ -657,6 +660,7 @@ function RoutineScheduleManager({ items }: RoutineScheduleManagerProps) {
               <label className="text-sm font-bold text-slate-700">시작</label>
               <input
                 type="time"
+                step={600}
                 value={startTime}
                 onChange={(event) => setStartTime(event.target.value)}
                 className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-400"
@@ -667,6 +671,7 @@ function RoutineScheduleManager({ items }: RoutineScheduleManagerProps) {
               <label className="text-sm font-bold text-slate-700">종료</label>
               <input
                 type="time"
+                step={600}
                 value={endTime}
                 onChange={(event) => setEndTime(event.target.value)}
                 className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-400"

@@ -67,13 +67,18 @@ export type CalendarBusyBlock = {
   placeName: string;
 };
 
-export type TravelMode = "car" | "transit" | "walk" | "bike";
+export type TravelMode = "walk" | "transit" | "car";
 
 export type SavedPlace = {
   id: string;
   name: string;
   address: string;
+  postalCode?: string;
   memo: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  provider?: string | null;
+  providerPlaceId?: string | null;
   createdAt: string;
   updatedAt: string;
 };

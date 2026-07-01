@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { STORAGE_KEYS } from "@/lib/storageKeys";
 
 type InputBoxProps = {
   value: string;
@@ -75,7 +76,7 @@ function appendTranscript(currentText: string, transcript: string) {
 
 type VoiceControlMode = "hold" | "toggle";
 
-const VOICE_MODE_STORAGE_KEY = "my-assistant-voice-control-mode";
+const VOICE_MODE_STORAGE_KEY = STORAGE_KEYS.voiceControlMode;
 
 export default function InputBox({
   value,

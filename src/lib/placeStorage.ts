@@ -1,9 +1,9 @@
 import { createLocalStorageRepository } from "@/lib/localStorageRepository";
+import { STORAGE_KEYS } from "@/lib/storageKeys";
 import { SavedPlace } from "@/types/calendar";
 
-const SAVED_PLACE_STORAGE_KEY = "my-assistant-saved-places";
 const savedPlaceRepository =
-  createLocalStorageRepository<SavedPlace>(SAVED_PLACE_STORAGE_KEY);
+  createLocalStorageRepository<SavedPlace>(STORAGE_KEYS.savedPlaces);
 
 export function getSavedPlaces(): SavedPlace[] {
   return savedPlaceRepository.list();

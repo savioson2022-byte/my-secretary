@@ -1,9 +1,9 @@
 import { AssistantItem } from "@/types/assistant";
 import { createLocalStorageRepository } from "@/lib/localStorageRepository";
+import { STORAGE_KEYS } from "@/lib/storageKeys";
 
-const STORAGE_KEY = "my-assistant-items";
 const assistantItemRepository =
-  createLocalStorageRepository<AssistantItem>(STORAGE_KEY);
+  createLocalStorageRepository<AssistantItem>(STORAGE_KEYS.assistantItems);
 
 export function getItems(): AssistantItem[] {
   return assistantItemRepository.list();

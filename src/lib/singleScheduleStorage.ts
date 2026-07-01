@@ -3,11 +3,11 @@ import {
   createLocalStorageRepository,
   isBrowser,
 } from "@/lib/localStorageRepository";
+import { STORAGE_KEYS } from "@/lib/storageKeys";
 
-const SINGLE_SCHEDULE_STORAGE_KEY = "my-assistant-single-schedules";
 const SINGLE_SCHEDULE_UPDATED_EVENT = "single-schedules-updated";
 const singleScheduleRepository =
-  createLocalStorageRepository<SingleSchedule>(SINGLE_SCHEDULE_STORAGE_KEY);
+  createLocalStorageRepository<SingleSchedule>(STORAGE_KEYS.singleSchedules);
 
 function notifySingleSchedulesUpdated() {
   if (!isBrowser()) {

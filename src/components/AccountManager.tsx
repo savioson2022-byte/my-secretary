@@ -8,6 +8,13 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { getUserProfile } from "@/lib/userProfileStorage";
 import { RegisteredDevice, UserProfileRecord } from "@/types/device";
 import { UserProfile } from "@/types/userProfile";
+import { TravelMode } from "@/types/calendar";
+
+const TRAVEL_MODE_OPTIONS: Array<{ value: TravelMode; label: string }> = [
+  { value: "walk", label: "도보" },
+  { value: "transit", label: "대중교통" },
+  { value: "car", label: "자차" },
+];
 
 function detectDeviceType() {
   if (typeof navigator === "undefined") return "unknown";
@@ -44,6 +51,8 @@ export default function AccountManager() {
 
   const [displayName, setDisplayName] = useState("");
   const [classificationPreference, setClassificationPreference] = useState("");
+  const [preferredTravelMode, setPreferredTravelMode] =
+    useState<TravelMode>("transit");
   const [deviceName, setDeviceName] = useState("");
   const [devices, setDevices] = useState<RegisteredDevice[]>([]);
   const [localProfile, setLocalProfile] = useState<UserProfile | null>(null);
@@ -102,6 +111,7 @@ export default function AccountManager() {
     if (profile) {
       setDisplayName(profile.display_name ?? "");
       setClassificationPreference(profile.classification_preference ?? "");
+      setPreferredTravelMode(profile.preferred_travel_mode ?? "transit");
     }
 
     const { data: nextDevices } = await supabase
@@ -157,6 +167,7 @@ export default function AccountManager() {
       id: user.id,
       display_name: displayName.trim(),
       classification_preference: classificationPreference.trim(),
+      preferred_travel_mode: preferredTravelMode,
       updated_at: new Date().toISOString(),
     });
 
@@ -313,6 +324,19 @@ export default function AccountManager() {
             placeholder="사용자별 AI 분류 기준"
             className="min-h-24 w-full resize-none rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold leading-6 outline-none focus:border-blue-400"
           />
+          <select
+            value={preferredTravelMode}
+            onChange={(event) =>
+              setPreferredTravelMode(event.target.value as TravelMode)
+            }
+            className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold outline-none focus:border-blue-400"
+          >
+            {TRAVEL_MODE_OPTIONS.map((mode) => (
+              <option key={mode.value} value={mode.value}>
+                주 이동수단: {mode.label}
+              </option>
+            ))}
+          </select>
           <button
             type="button"
             onClick={handleSaveProfile}

@@ -1,15 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import {
-  deleteSavedPlace,
-  saveSavedPlace,
-} from "@/lib/placeStorage";
-import {
-  deleteTravelTimeRule,
-  saveTravelTimeRule,
-} from "@/lib/travelTimeStorage";
+import { deleteSavedPlace, saveSavedPlace } from "@/lib/placeStorage";
 import { calculateWeeklyTravelTransitions } from "@/lib/travelTime";
+import { getUserProfile } from "@/lib/userProfileStorage";
 import {
   SavedPlace,
   SingleSchedule,
@@ -29,22 +23,22 @@ type TravelTimePlannerProps = {
 const TRAVEL_MODES: Array<{
   value: TravelMode;
   label: string;
+  hint: string;
 }> = [
   {
-    value: "car",
-    label: "자차",
+    value: "walk",
+    label: "도보",
+    hint: "짧은 거리",
   },
   {
     value: "transit",
     label: "대중교통",
+    hint: "버스/지하철",
   },
   {
-    value: "walk",
-    label: "도보",
-  },
-  {
-    value: "bike",
-    label: "자전거",
+    value: "car",
+    label: "자차",
+    hint: "운전/주차",
   },
 ];
 
@@ -85,19 +79,41 @@ function getStatusStyle(status: string) {
     return "bg-red-50 text-red-700 ring-red-100";
   }
 
-  return "bg-slate-50 text-slate-500 ring-slate-100";
+  return "bg-blue-50 text-blue-700 ring-blue-100";
 }
 
 function getStatusLabel(status: string) {
-  if (status === "same-place") return "같은 장소";
   if (status === "enough") return "이동 가능";
   if (status === "tight") return "빠듯함";
   if (status === "not-enough") return "이동 어려움";
-  return "규칙 필요";
+  return "자동 계산 대기";
 }
 
 function getModeLabel(mode: TravelMode) {
   return TRAVEL_MODES.find((item) => item.value === mode)?.label ?? mode;
+}
+
+function getDefaultTravelMode(): TravelMode {
+  if (typeof window === "undefined") return "transit";
+
+  return getUserProfile()?.preferredTravelMode ?? "transit";
+}
+
+function openAddressSearch(query: string) {
+  if (typeof window === "undefined") return;
+
+  const encodedQuery = encodeURIComponent(query.trim());
+  const url = encodedQuery
+    ? `https://map.kakao.com/link/search/${encodedQuery}`
+    : "https://map.kakao.com";
+
+  window.open(url, "_blank", "noopener,noreferrer");
+}
+
+function openPostalAddressSearch() {
+  if (typeof window === "undefined") return;
+
+  window.open("https://www.juso.go.kr/openIndexPage.do", "_blank", "noopener,noreferrer");
 }
 
 export default function TravelTimePlanner({
@@ -109,38 +125,10 @@ export default function TravelTimePlanner({
 }: TravelTimePlannerProps) {
   const [placeName, setPlaceName] = useState("");
   const [placeAddress, setPlaceAddress] = useState("");
+  const [postalCode, setPostalCode] = useState("");
   const [placeMemo, setPlaceMemo] = useState("");
-
-  const [fromPlaceName, setFromPlaceName] = useState("");
-  const [toPlaceName, setToPlaceName] = useState("");
-  const [mode, setMode] = useState<TravelMode>("transit");
-  const [minutes, setMinutes] = useState("30");
-  const [ruleMemo, setRuleMemo] = useState("");
-  const [selectedMode, setSelectedMode] = useState<TravelMode>("transit");
-
-  const placeNameOptions = useMemo(() => {
-    const names = new Set<string>();
-
-    savedPlaces.forEach((place) => {
-      if (place.name.trim()) {
-        names.add(place.name.trim());
-      }
-    });
-
-    routines.forEach((routine) => {
-      if (routine.placeName.trim()) {
-        names.add(routine.placeName.trim());
-      }
-    });
-
-    singleSchedules.forEach((schedule) => {
-      if (schedule.placeName.trim()) {
-        names.add(schedule.placeName.trim());
-      }
-    });
-
-    return Array.from(names).sort((a, b) => a.localeCompare(b, "ko"));
-  }, [routines, savedPlaces, singleSchedules]);
+  const [selectedMode, setSelectedMode] =
+    useState<TravelMode>(getDefaultTravelMode);
 
   const transitions = useMemo(() => {
     return calculateWeeklyTravelTransitions({
@@ -157,72 +145,47 @@ export default function TravelTimePlanner({
       return;
     }
 
+    if (!placeAddress.trim()) {
+      alert("실제 주소를 검색해서 주소를 입력해줘.");
+      return;
+    }
+
     const now = new Date().toISOString();
 
     saveSavedPlace({
       id: createId(),
       name: placeName.trim(),
       address: placeAddress.trim(),
+      postalCode: postalCode.trim() || undefined,
       memo: placeMemo.trim(),
+      latitude: null,
+      longitude: null,
+      provider: null,
+      providerPlaceId: null,
       createdAt: now,
       updatedAt: now,
     });
 
     setPlaceName("");
     setPlaceAddress("");
+    setPostalCode("");
     setPlaceMemo("");
     onChange();
   }
 
-  function handleSaveTravelRule() {
-    const parsedMinutes = Number(minutes);
-
-    if (!fromPlaceName.trim() || !toPlaceName.trim()) {
-      alert("출발 장소와 도착 장소를 입력해줘.");
-      return;
-    }
-
-    if (fromPlaceName.trim() === toPlaceName.trim()) {
-      alert("서로 다른 장소를 선택해줘.");
-      return;
-    }
-
-    if (!Number.isFinite(parsedMinutes) || parsedMinutes <= 0) {
-      alert("이동 시간을 1분 이상으로 입력해줘.");
-      return;
-    }
-
-    const now = new Date().toISOString();
-
-    saveTravelTimeRule({
-      id: createId(),
-      fromPlaceName: fromPlaceName.trim(),
-      toPlaceName: toPlaceName.trim(),
-      mode,
-      minutes: Math.round(parsedMinutes),
-      memo: ruleMemo.trim(),
-      createdAt: now,
-      updatedAt: now,
-    });
-
-    setMinutes("30");
-    setRuleMemo("");
-    onChange();
-  }
-
   return (
-    <section className="rounded-3xl bg-white p-5 shadow-soft ring-1 ring-slate-100">
+    <section className="rounded-3xl bg-white p-4 shadow-soft ring-1 ring-slate-100 sm:p-5">
       <div>
         <h2 className="text-lg font-black text-slate-900">
-          장소와 이동시간
+          장소와 이동 준비
         </h2>
         <p className="mt-1 text-sm leading-6 text-slate-500">
-          장소를 저장하고 장소 사이 이동시간을 수단별로 입력하면, 이번 주
-          일정 사이에 이동이 가능한지 계산합니다.
+          장소는 실제 주소와 함께 저장합니다. 일정 사이 장소가 바뀌고 여유가
+          30분 이하일 때만 이동시간 계산 후보로 보여줍니다.
         </p>
       </div>
 
-      <div className="mt-5 grid gap-4 xl:grid-cols-2">
+      <div className="mt-5 grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
         <section className="rounded-3xl bg-slate-50 p-4 ring-1 ring-slate-100">
           <h3 className="text-sm font-black text-slate-800">장소 저장</h3>
 
@@ -233,16 +196,41 @@ export default function TravelTimePlanner({
               placeholder="장소 이름: 집, 학교, 영어학원"
               className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-blue-400"
             />
+
+            <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
+              <input
+                value={placeAddress}
+                onChange={(event) => setPlaceAddress(event.target.value)}
+                placeholder="도로명 주소를 붙여넣기"
+                className="min-w-0 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-blue-400"
+              />
+              <button
+                type="button"
+                onClick={() => openAddressSearch(placeName || placeAddress)}
+                className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white hover:bg-blue-500"
+              >
+                지도 검색
+              </button>
+              <button
+                type="button"
+                onClick={openPostalAddressSearch}
+                className="rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
+              >
+                우편주소
+              </button>
+            </div>
+
             <input
-              value={placeAddress}
-              onChange={(event) => setPlaceAddress(event.target.value)}
-              placeholder="주소 또는 설명"
+              value={postalCode}
+              onChange={(event) => setPostalCode(event.target.value)}
+              placeholder="우편번호, 선택"
+              inputMode="numeric"
               className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-blue-400"
             />
             <input
               value={placeMemo}
               onChange={(event) => setPlaceMemo(event.target.value)}
-              placeholder="메모"
+              placeholder="메모: 건물명, 층수, 출입구"
               className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-blue-400"
             />
             <button
@@ -265,13 +253,18 @@ export default function TravelTimePlanner({
                   key={place.id}
                   className="flex items-start justify-between gap-3 rounded-2xl bg-white p-3 ring-1 ring-slate-100"
                 >
-                  <div>
-                    <p className="text-sm font-black text-slate-900">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-black text-slate-900">
                       {place.name}
                     </p>
                     {place.address && (
-                      <p className="mt-1 text-xs text-slate-500">
+                      <p className="mt-1 text-xs leading-5 text-slate-500">
                         {place.address}
+                      </p>
+                    )}
+                    {place.postalCode && (
+                      <p className="mt-1 text-xs font-bold text-slate-400">
+                        우편번호 {place.postalCode}
                       </p>
                     )}
                     {place.memo && (
@@ -298,189 +291,100 @@ export default function TravelTimePlanner({
         </section>
 
         <section className="rounded-3xl bg-slate-50 p-4 ring-1 ring-slate-100">
-          <h3 className="text-sm font-black text-slate-800">
-            이동시간 규칙
-          </h3>
-
-          <div className="mt-3 grid gap-3 md:grid-cols-2">
-            <input
-              list="travel-place-options"
-              value={fromPlaceName}
-              onChange={(event) => setFromPlaceName(event.target.value)}
-              placeholder="출발 장소"
-              className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-blue-400"
-            />
-            <input
-              list="travel-place-options"
-              value={toPlaceName}
-              onChange={(event) => setToPlaceName(event.target.value)}
-              placeholder="도착 장소"
-              className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-blue-400"
-            />
-            <select
-              value={mode}
-              onChange={(event) => setMode(event.target.value as TravelMode)}
-              className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-blue-400"
-            >
-              {TRAVEL_MODES.map((travelMode) => (
-                <option key={travelMode.value} value={travelMode.value}>
-                  {travelMode.label}
-                </option>
-              ))}
-            </select>
-            <input
-              type="number"
-              min={1}
-              value={minutes}
-              onChange={(event) => setMinutes(event.target.value)}
-              placeholder="분"
-              className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-blue-400"
-            />
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h3 className="text-sm font-black text-slate-800">
+                이동시간 자동 계산 준비
+              </h3>
+              <p className="mt-1 text-sm leading-6 text-slate-500">
+                장소가 바뀌는 일정 중 여유가 30분 이하인 경우만 확인합니다.
+              </p>
+            </div>
           </div>
 
-          <input
-            value={ruleMemo}
-            onChange={(event) => setRuleMemo(event.target.value)}
-            placeholder="예: 평일 오후 기준, 버스 환승 포함"
-            className="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-blue-400"
-          />
-
-          <button
-            type="button"
-            onClick={handleSaveTravelRule}
-            className="mt-3 w-full rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white hover:bg-blue-500"
-          >
-            이동시간 저장
-          </button>
-
-          <datalist id="travel-place-options">
-            {placeNameOptions.map((name) => (
-              <option key={name} value={name} />
+          <div className="mt-4 grid grid-cols-3 gap-2">
+            {TRAVEL_MODES.map((travelMode) => (
+              <button
+                key={travelMode.value}
+                type="button"
+                onClick={() => setSelectedMode(travelMode.value)}
+                className={`rounded-2xl px-3 py-3 text-center transition ${
+                  selectedMode === travelMode.value
+                    ? "bg-blue-600 text-white shadow-[0_10px_20px_rgba(37,99,235,0.2)]"
+                    : "bg-white text-slate-600 ring-1 ring-slate-100"
+                }`}
+              >
+                <span className="block text-sm font-black">
+                  {travelMode.label}
+                </span>
+                <span className="mt-0.5 block text-[11px] font-bold opacity-75">
+                  {travelMode.hint}
+                </span>
+              </button>
             ))}
-          </datalist>
+          </div>
 
           <div className="mt-4 space-y-2">
-            {travelTimeRules.length === 0 ? (
-              <p className="rounded-2xl bg-white p-3 text-sm text-slate-500">
-                아직 이동시간 규칙이 없습니다.
+            {transitions.length === 0 ? (
+              <p className="rounded-2xl bg-white p-3 text-sm leading-6 text-slate-500">
+                이번 주에는 장소가 바뀌면서 여유가 30분 이하인 이어지는 일정이
+                없습니다.
               </p>
             ) : (
-              travelTimeRules.map((rule) => (
-                <div
-                  key={rule.id}
-                  className="flex items-start justify-between gap-3 rounded-2xl bg-white p-3 ring-1 ring-slate-100"
+              transitions.map((transition) => (
+                <article
+                  key={`${transition.date}-${transition.fromTitle}-${transition.toTitle}-${transition.previousEndTime}`}
+                  className="rounded-2xl bg-white p-4 ring-1 ring-slate-100"
                 >
-                  <div>
-                    <p className="text-sm font-black text-slate-900">
-                      {rule.fromPlaceName} → {rule.toPlaceName}
-                    </p>
-                    <p className="mt-1 text-xs font-bold text-slate-500">
-                      {getModeLabel(rule.mode)} · {formatMinutes(rule.minutes)}
-                    </p>
-                    {rule.memo && (
-                      <p className="mt-1 text-xs text-slate-400">
-                        {rule.memo}
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="text-sm font-black text-slate-900">
+                        {transition.date} · {transition.fromTitle} →{" "}
+                        {transition.toTitle}
                       </p>
-                    )}
+                      <p className="mt-1 text-xs font-semibold text-slate-500">
+                        {transition.fromPlaceName} → {transition.toPlaceName}
+                      </p>
+                    </div>
+
+                    <span
+                      className={`w-fit rounded-full px-3 py-1 text-xs font-black ring-1 ${getStatusStyle(
+                        transition.status
+                      )}`}
+                    >
+                      {getStatusLabel(transition.status)}
+                    </span>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      deleteTravelTimeRule(rule.id);
-                      onChange();
-                    }}
-                    className="shrink-0 rounded-xl bg-red-50 px-3 py-2 text-xs font-bold text-red-500 hover:bg-red-100"
-                  >
-                    삭제
-                  </button>
-                </div>
+                  <p className="mt-3 text-sm leading-6 text-slate-600">
+                    이전 일정 종료 {transition.previousEndTime}, 다음 일정
+                    시작 {transition.nextStartTime}. 사이 시간은{" "}
+                    <span className="font-black">
+                      {formatMinutes(transition.gapMinutes)}
+                    </span>
+                    입니다.
+                    {transition.requiredMinutes === null
+                      ? ` ${getModeLabel(
+                          transition.mode
+                        )} 기준 이동시간은 API 연결 후 자동 계산됩니다.`
+                      : ` ${getModeLabel(
+                          transition.mode
+                        )} 예상 이동시간은 ${formatMinutes(
+                          transition.requiredMinutes
+                        )}입니다.`}
+                  </p>
+                </article>
               ))
             )}
           </div>
         </section>
       </div>
 
-      <section className="mt-5 rounded-3xl bg-slate-50 p-4 ring-1 ring-slate-100">
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h3 className="text-sm font-black text-slate-800">
-              이번 주 이동 가능성
-            </h3>
-            <p className="mt-1 text-sm text-slate-500">
-              일정 종료 시간과 다음 일정 시작 시간 사이의 여유를 계산합니다.
-            </p>
-          </div>
-
-          <select
-            value={selectedMode}
-            onChange={(event) =>
-              setSelectedMode(event.target.value as TravelMode)
-            }
-            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold outline-none focus:border-blue-400"
-          >
-            {TRAVEL_MODES.map((travelMode) => (
-              <option key={travelMode.value} value={travelMode.value}>
-                {travelMode.label} 기준
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="mt-4 space-y-2">
-          {transitions.length === 0 ? (
-            <p className="rounded-2xl bg-white p-3 text-sm text-slate-500">
-              이번 주에 이어지는 일정이 아직 없습니다.
-            </p>
-          ) : (
-            transitions.map((transition) => (
-              <article
-                key={`${transition.date}-${transition.fromTitle}-${transition.toTitle}-${transition.previousEndTime}`}
-                className="rounded-2xl bg-white p-4 ring-1 ring-slate-100"
-              >
-                <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-                  <div>
-                    <p className="text-sm font-black text-slate-900">
-                      {transition.date} · {transition.fromTitle} →{" "}
-                      {transition.toTitle}
-                    </p>
-                    <p className="mt-1 text-xs font-semibold text-slate-500">
-                      {transition.fromPlaceName} → {transition.toPlaceName}
-                    </p>
-                  </div>
-
-                  <span
-                    className={`rounded-full px-3 py-1 text-xs font-black ring-1 ${getStatusStyle(
-                      transition.status
-                    )}`}
-                  >
-                    {getStatusLabel(transition.status)}
-                  </span>
-                </div>
-
-                <p className="mt-3 text-sm leading-6 text-slate-600">
-                  이전 일정 종료 {transition.previousEndTime}, 다음 일정 시작{" "}
-                  {transition.nextStartTime}. 여유 시간은{" "}
-                  <span className="font-black">
-                    {formatMinutes(transition.gapMinutes)}
-                  </span>
-                  입니다.
-                  {transition.requiredMinutes === null
-                    ? " 이 경로의 이동시간 규칙을 추가하면 판단할 수 있습니다."
-                    : ` ${getModeLabel(transition.mode)} 이동시간은 ${formatMinutes(
-                        transition.requiredMinutes
-                      )}입니다.`}
-                </p>
-              </article>
-            ))
-          )}
-        </div>
-      </section>
-
       <p className="mt-4 rounded-2xl bg-blue-50 p-4 text-sm leading-6 text-blue-700 ring-1 ring-blue-100">
-        현재 이동시간은 사용자가 저장한 규칙으로 계산합니다. 카카오맵 같은
-        실시간 길찾기 API는 나중에 키와 정책을 확인한 뒤 이 규칙 계산 부분에
-        연결할 수 있습니다.
+        카카오 API 외에는 Google Maps Distance Matrix, Naver Maps Directions,
+        TMAP, 공공데이터포털 교통 API, 직접 저장한 과거 이동시간 평균을 사용할
+        수 있습니다. 국내 대중교통 정확도는 카카오/네이버/TMAP 쪽이 현실적인
+        편입니다.
       </p>
     </section>
   );

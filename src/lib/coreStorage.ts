@@ -9,56 +9,57 @@ import {
   readLocalStorageArray,
   writeLocalStorageArray,
 } from "@/lib/localStorageRepository";
-
-const KEYS = {
-  places: "my-assistant-places",
-  routines: "my-assistant-routines",
-  shortTermSchedules: "my-assistant-short-term-schedules",
-  travelRules: "my-assistant-travel-rules",
-  tasks: "my-assistant-tasks",
-};
+import { LEGACY_STORAGE_KEYS } from "@/lib/storageKeys";
 
 export function getPlaces() {
-  return readLocalStorageArray<Place>(KEYS.places);
+  return readLocalStorageArray<Place>(LEGACY_STORAGE_KEYS.places);
 }
 
 export function savePlace(place: Place) {
-  writeLocalStorageArray(KEYS.places, [place, ...getPlaces()]);
+  writeLocalStorageArray(LEGACY_STORAGE_KEYS.places, [place, ...getPlaces()]);
 }
 
 export function getRoutineSchedules() {
-  return readLocalStorageArray<RoutineSchedule>(KEYS.routines);
+  return readLocalStorageArray<RoutineSchedule>(LEGACY_STORAGE_KEYS.routines);
 }
 
 export function saveRoutineSchedule(routine: RoutineSchedule) {
-  writeLocalStorageArray(KEYS.routines, [routine, ...getRoutineSchedules()]);
+  writeLocalStorageArray(LEGACY_STORAGE_KEYS.routines, [
+    routine,
+    ...getRoutineSchedules(),
+  ]);
 }
 
 export function getShortTermSchedules() {
-  return readLocalStorageArray<ShortTermSchedule>(KEYS.shortTermSchedules);
+  return readLocalStorageArray<ShortTermSchedule>(
+    LEGACY_STORAGE_KEYS.shortTermSchedules
+  );
 }
 
 export function saveShortTermSchedule(schedule: ShortTermSchedule) {
-  writeLocalStorageArray(KEYS.shortTermSchedules, [
+  writeLocalStorageArray(LEGACY_STORAGE_KEYS.shortTermSchedules, [
     schedule,
     ...getShortTermSchedules(),
   ]);
 }
 
 export function getTravelTimeRules() {
-  return readLocalStorageArray<TravelTimeRule>(KEYS.travelRules);
+  return readLocalStorageArray<TravelTimeRule>(LEGACY_STORAGE_KEYS.travelRules);
 }
 
 export function saveTravelTimeRule(rule: TravelTimeRule) {
-  writeLocalStorageArray(KEYS.travelRules, [rule, ...getTravelTimeRules()]);
+  writeLocalStorageArray(LEGACY_STORAGE_KEYS.travelRules, [
+    rule,
+    ...getTravelTimeRules(),
+  ]);
 }
 
 export function getTasks() {
-  return readLocalStorageArray<AssistantTask>(KEYS.tasks);
+  return readLocalStorageArray<AssistantTask>(LEGACY_STORAGE_KEYS.tasks);
 }
 
 export function saveTask(task: AssistantTask) {
-  writeLocalStorageArray(KEYS.tasks, [task, ...getTasks()]);
+  writeLocalStorageArray(LEGACY_STORAGE_KEYS.tasks, [task, ...getTasks()]);
 }
 
 export function updateTask(updatedTask: AssistantTask) {
@@ -66,10 +67,10 @@ export function updateTask(updatedTask: AssistantTask) {
     task.id === updatedTask.id ? updatedTask : task
   );
 
-  writeLocalStorageArray(KEYS.tasks, nextTasks);
+  writeLocalStorageArray(LEGACY_STORAGE_KEYS.tasks, nextTasks);
 }
 
 export function deleteTask(id: string) {
   const nextTasks = getTasks().filter((task) => task.id !== id);
-  writeLocalStorageArray(KEYS.tasks, nextTasks);
+  writeLocalStorageArray(LEGACY_STORAGE_KEYS.tasks, nextTasks);
 }

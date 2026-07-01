@@ -1,9 +1,9 @@
 import { createLocalStorageRepository } from "@/lib/localStorageRepository";
+import { STORAGE_KEYS } from "@/lib/storageKeys";
 import { TravelTimeRule } from "@/types/calendar";
 
-const TRAVEL_TIME_RULE_STORAGE_KEY = "my-assistant-travel-time-rules";
 const travelTimeRuleRepository =
-  createLocalStorageRepository<TravelTimeRule>(TRAVEL_TIME_RULE_STORAGE_KEY);
+  createLocalStorageRepository<TravelTimeRule>(STORAGE_KEYS.travelTimeRules);
 
 export function getTravelTimeRules(): TravelTimeRule[] {
   return travelTimeRuleRepository.list();

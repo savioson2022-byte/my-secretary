@@ -1,6 +1,7 @@
 import { UserProfile } from "@/types/userProfile";
+import { STORAGE_KEYS } from "@/lib/storageKeys";
 
-const USER_PROFILE_STORAGE_KEY = "my-assistant-user-profile";
+const DEFAULT_TRAVEL_MODE = "transit";
 
 function createId() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -15,7 +16,7 @@ export function getUserProfile(): UserProfile | null {
     return null;
   }
 
-  const rawValue = window.localStorage.getItem(USER_PROFILE_STORAGE_KEY);
+  const rawValue = window.localStorage.getItem(STORAGE_KEYS.userProfile);
 
   if (!rawValue) {
     return null;
@@ -29,7 +30,11 @@ export function getUserProfile(): UserProfile | null {
 }
 
 export function saveUserProfile(
-  profile: Omit<UserProfile, "id" | "createdAt" | "updatedAt"> &
+  profile: Omit<
+    UserProfile,
+    "id" | "createdAt" | "updatedAt" | "preferredTravelMode"
+  > &
+    Partial<Pick<UserProfile, "preferredTravelMode">> &
     Partial<Pick<UserProfile, "id" | "createdAt" | "updatedAt">>
 ) {
   const now = new Date().toISOString();
@@ -38,13 +43,14 @@ export function saveUserProfile(
     displayName: profile.displayName,
     deviceLabel: profile.deviceLabel,
     classificationPreference: profile.classificationPreference,
+    preferredTravelMode: profile.preferredTravelMode ?? DEFAULT_TRAVEL_MODE,
     rememberDevice: profile.rememberDevice,
     createdAt: profile.createdAt ?? now,
     updatedAt: now,
   };
 
   window.localStorage.setItem(
-    USER_PROFILE_STORAGE_KEY,
+    STORAGE_KEYS.userProfile,
     JSON.stringify(nextProfile)
   );
 
@@ -56,5 +62,5 @@ export function deleteUserProfile() {
     return;
   }
 
-  window.localStorage.removeItem(USER_PROFILE_STORAGE_KEY);
+  window.localStorage.removeItem(STORAGE_KEYS.userProfile);
 }

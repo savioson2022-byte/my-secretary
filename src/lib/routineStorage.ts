@@ -1,9 +1,9 @@
 import { RoutineSchedule } from "@/types/routine";
 import { createLocalStorageRepository } from "@/lib/localStorageRepository";
+import { STORAGE_KEYS } from "@/lib/storageKeys";
 
-const ROUTINE_STORAGE_KEY = "my-assistant-routine-schedules";
 const routineScheduleRepository =
-  createLocalStorageRepository<RoutineSchedule>(ROUTINE_STORAGE_KEY);
+  createLocalStorageRepository<RoutineSchedule>(STORAGE_KEYS.routineSchedules);
 
 export function getRoutineSchedules(): RoutineSchedule[] {
   return routineScheduleRepository.list();
