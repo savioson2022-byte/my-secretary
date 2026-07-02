@@ -4,6 +4,7 @@ export const STORAGE_KEYS = {
   singleSchedules: "my-assistant-single-schedules",
   savedPlaces: "my-assistant-saved-places",
   travelTimeRules: "my-assistant-travel-time-rules",
+  travelTimeEstimates: "my-assistant-travel-time-estimates",
   userProfile: "my-assistant-user-profile",
   voiceControlMode: "my-assistant-voice-control-mode",
 } as const;
@@ -22,6 +23,6 @@ export const STORAGE_TO_SUPABASE_TABLE = {
   [STORAGE_KEYS.singleSchedules]: "single_schedules",
   [STORAGE_KEYS.savedPlaces]: "places",
   [STORAGE_KEYS.travelTimeRules]: "travel_time_rules",
+  [STORAGE_KEYS.travelTimeEstimates]: "travel_time_estimates",
   [STORAGE_KEYS.userProfile]: "profiles",
 } as const;
-

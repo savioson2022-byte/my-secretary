@@ -6,7 +6,12 @@ import {
   timeToMinutes,
   toDateOnlyString,
 } from "@/lib/availability";
-import { SingleSchedule, TravelMode, TravelTimeRule } from "@/types/calendar";
+import {
+  SingleSchedule,
+  TravelMode,
+  TravelTimeEstimate,
+  TravelTimeRule,
+} from "@/types/calendar";
 import { RoutineSchedule } from "@/types/routine";
 
 export type ScheduleTravelBlock = {
@@ -30,6 +35,7 @@ export type TravelTransition = {
   gapMinutes: number;
   requiredMinutes: number | null;
   mode: TravelMode;
+  cacheKey: string | null;
   status: "same-place" | "enough" | "tight" | "not-enough" | "unknown";
 };
 
@@ -38,6 +44,25 @@ const TRAVEL_CHECK_GAP_LIMIT_MINUTES = 30;
 
 function normalizePlaceName(placeName: string) {
   return placeName.trim();
+}
+
+export function createTravelTimeCacheKey({
+  fromPlaceName,
+  toPlaceName,
+  departureTime,
+  mode,
+}: {
+  fromPlaceName: string;
+  toPlaceName: string;
+  departureTime: string;
+  mode: TravelMode;
+}) {
+  return [
+    normalizePlaceName(fromPlaceName).toLowerCase(),
+    departureTime,
+    normalizePlaceName(toPlaceName).toLowerCase(),
+    mode,
+  ].join("|");
 }
 
 function isRoutineActiveOnDate(routine: RoutineSchedule, dateText: string) {
@@ -77,6 +102,36 @@ function getTravelTimeRule({
       normalizePlaceName(rule.toPlaceName) === to
     );
   });
+}
+
+function getTravelTimeEstimate({
+  cacheKey,
+  travelTimeEstimates,
+}: {
+  cacheKey: string;
+  travelTimeEstimates: TravelTimeEstimate[];
+}) {
+  return travelTimeEstimates.find((estimate) => {
+    return estimate.cacheKey === cacheKey;
+  });
+}
+
+function getTravelStatus({
+  gapMinutes,
+  requiredMinutes,
+}: {
+  gapMinutes: number;
+  requiredMinutes: number;
+}): TravelTransition["status"] {
+  if (gapMinutes < requiredMinutes) {
+    return "not-enough";
+  }
+
+  if (gapMinutes - requiredMinutes <= 10) {
+    return "tight";
+  }
+
+  return "enough";
 }
 
 export function getScheduleBlocksForDate({
@@ -125,12 +180,14 @@ export function calculateTravelTransitionsForDate({
   routines,
   singleSchedules,
   travelTimeRules,
+  travelTimeEstimates,
   mode,
 }: {
   date: string;
   routines: RoutineSchedule[];
   singleSchedules: SingleSchedule[];
   travelTimeRules: TravelTimeRule[];
+  travelTimeEstimates?: TravelTimeEstimate[];
   mode: TravelMode;
 }): TravelTransition[] {
   const blocks = getScheduleBlocksForDate({
@@ -170,12 +227,45 @@ export function calculateTravelTransitionsForDate({
         gapMinutes,
         requiredMinutes: null,
         mode,
+        cacheKey: null,
         status: "unknown",
       });
       continue;
     }
 
     if (fromPlaceName === toPlaceName) {
+      continue;
+    }
+
+    const cacheKey = createTravelTimeCacheKey({
+      fromPlaceName,
+      toPlaceName,
+      departureTime: current.endTime,
+      mode,
+    });
+    const estimate = getTravelTimeEstimate({
+      cacheKey,
+      travelTimeEstimates: travelTimeEstimates ?? [],
+    });
+
+    if (estimate) {
+      transitions.push({
+        date,
+        fromTitle: current.title,
+        toTitle: next.title,
+        fromPlaceName,
+        toPlaceName,
+        previousEndTime: current.endTime,
+        nextStartTime: next.startTime,
+        gapMinutes,
+        requiredMinutes: estimate.minutes,
+        mode,
+        cacheKey,
+        status: getTravelStatus({
+          gapMinutes,
+          requiredMinutes: estimate.minutes,
+        }),
+      });
       continue;
     }
 
@@ -198,17 +288,10 @@ export function calculateTravelTransitionsForDate({
         gapMinutes,
         requiredMinutes: null,
         mode,
+        cacheKey,
         status: "unknown",
       });
       continue;
-    }
-
-    let status: TravelTransition["status"] = "enough";
-
-    if (gapMinutes < rule.minutes) {
-      status = "not-enough";
-    } else if (gapMinutes - rule.minutes <= 10) {
-      status = "tight";
     }
 
     transitions.push({
@@ -222,7 +305,11 @@ export function calculateTravelTransitionsForDate({
       gapMinutes,
       requiredMinutes: rule.minutes,
       mode,
-      status,
+      cacheKey,
+      status: getTravelStatus({
+        gapMinutes,
+        requiredMinutes: rule.minutes,
+      }),
     });
   }
 
@@ -233,12 +320,14 @@ export function calculateWeeklyTravelTransitions({
   routines,
   singleSchedules,
   travelTimeRules,
+  travelTimeEstimates,
   mode,
   referenceDate = getTodayDateOnly(),
 }: {
   routines: RoutineSchedule[];
   singleSchedules: SingleSchedule[];
   travelTimeRules: TravelTimeRule[];
+  travelTimeEstimates?: TravelTimeEstimate[];
   mode: TravelMode;
   referenceDate?: Date;
 }) {
@@ -253,6 +342,7 @@ export function calculateWeeklyTravelTransitions({
       routines,
       singleSchedules,
       travelTimeRules,
+      travelTimeEstimates,
       mode,
     });
   });

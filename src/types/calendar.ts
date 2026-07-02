@@ -93,3 +93,18 @@ export type TravelTimeRule = {
   createdAt: string;
   updatedAt: string;
 };
+
+export type TravelTimeEstimate = {
+  id: string;
+  fromPlaceName: string;
+  toPlaceName: string;
+  fromAddress: string;
+  toAddress: string;
+  departureTime: string;
+  mode: TravelMode;
+  minutes: number;
+  provider: string;
+  cacheKey: string;
+  createdAt: string;
+  updatedAt: string;
+};

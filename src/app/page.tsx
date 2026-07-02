@@ -7,6 +7,7 @@ import ClassificationResult from "@/components/ClassificationResult";
 import FilterBar from "@/components/FilterBar";
 import InputBox from "@/components/InputBox";
 import ItemCard from "@/components/ItemCard";
+import UserStatusBadge from "@/components/UserStatusBadge";
 import { aiClassifyInput } from "@/lib/aiClassifyInput";
 import { classifyInput } from "@/lib/classifyInput";
 import { createSingleScheduleFromItem } from "@/lib/singleScheduleFromItem";
@@ -250,10 +251,13 @@ export default function Home() {
               오늘도 잘 부탁해요!
             </h2>
           </div>
-          <div className="grid h-9 w-9 place-items-center rounded-2xl bg-slate-50 text-slate-700 ring-1 ring-slate-100">
-            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor" aria-hidden="true">
-              <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9ZM10 21h4" />
-            </svg>
+          <div className="flex shrink-0 flex-col items-end gap-2">
+            <UserStatusBadge />
+            <div className="grid h-9 w-9 place-items-center rounded-2xl bg-slate-50 text-slate-700 ring-1 ring-slate-100">
+              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor" aria-hidden="true">
+                <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9ZM10 21h4" />
+              </svg>
+            </div>
           </div>
         </header>
 

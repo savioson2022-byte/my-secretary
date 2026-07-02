@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import BottomNavigation from "@/components/BottomNavigation";
 import CalendarNavigation from "@/components/CalendarNavigation";
 import MonthlyCalendarView from "@/components/MonthlyCalendarView";
+import UserStatusBadge from "@/components/UserStatusBadge";
 import {
   getSingleScheduleUpdatedEventName,
   getSingleSchedules,
@@ -40,15 +41,18 @@ export default function MonthlyCalendarPage() {
           <span>9:41</span>
           <span className="tracking-[0.18em]">•••</span>
         </div>
-      <header className="mb-6">
-        <p className="text-sm font-bold text-slate-500">캘린더</p>
-        <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-950">
-          월간 캘린더
-        </h1>
-        <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
-          한 달 단위로 병원, 시험, 약속 같은 단기 일정을 확인합니다.
-        </p>
-      </header>
+        <header className="mb-6 flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-bold text-slate-500">캘린더</p>
+            <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-950">
+              월간 캘린더
+            </h1>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
+              한 달 단위로 병원, 시험, 약속 같은 단기 일정을 확인합니다.
+            </p>
+          </div>
+          <UserStatusBadge />
+        </header>
 
       <CalendarNavigation />
 

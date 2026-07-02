@@ -1,12 +1,20 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { deleteSavedPlace, saveSavedPlace } from "@/lib/placeStorage";
-import { calculateWeeklyTravelTransitions } from "@/lib/travelTime";
+import {
+  calculateWeeklyTravelTransitions,
+  createTravelTimeCacheKey,
+} from "@/lib/travelTime";
+import {
+  getTravelTimeEstimates,
+  saveTravelTimeEstimate,
+} from "@/lib/travelTimeStorage";
 import { getUserProfile } from "@/lib/userProfileStorage";
 import {
   SavedPlace,
   SingleSchedule,
+  TravelTimeEstimate,
   TravelMode,
   TravelTimeRule,
 } from "@/types/calendar";
@@ -99,6 +107,14 @@ function getDefaultTravelMode(): TravelMode {
   return getUserProfile()?.preferredTravelMode ?? "transit";
 }
 
+function getPlaceByName(places: SavedPlace[], placeName: string) {
+  const normalizedPlaceName = placeName.trim().toLowerCase();
+
+  return places.find((place) => {
+    return place.name.trim().toLowerCase() === normalizedPlaceName;
+  });
+}
+
 function openAddressSearch(query: string) {
   if (typeof window === "undefined") return;
 
@@ -129,15 +145,135 @@ export default function TravelTimePlanner({
   const [placeMemo, setPlaceMemo] = useState("");
   const [selectedMode, setSelectedMode] =
     useState<TravelMode>(getDefaultTravelMode);
+  const [travelTimeEstimates, setTravelTimeEstimates] = useState<
+    TravelTimeEstimate[]
+  >([]);
+  const [travelApiMessage, setTravelApiMessage] = useState<string | null>(null);
+  const attemptedTransitCacheKeysRef = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    setTravelTimeEstimates(getTravelTimeEstimates());
+  }, []);
 
   const transitions = useMemo(() => {
     return calculateWeeklyTravelTransitions({
       routines,
       singleSchedules,
       travelTimeRules,
+      travelTimeEstimates,
       mode: selectedMode,
     });
-  }, [routines, selectedMode, singleSchedules, travelTimeRules]);
+  }, [
+    routines,
+    selectedMode,
+    singleSchedules,
+    travelTimeEstimates,
+    travelTimeRules,
+  ]);
+
+  useEffect(() => {
+    let isCancelled = false;
+
+    async function calculateMissingTransitTimes() {
+      if (selectedMode !== "transit") {
+        return;
+      }
+
+      const missingTransitions = transitions.filter((transition) => {
+        return transition.status === "unknown" && transition.cacheKey;
+      });
+
+      if (missingTransitions.length === 0) {
+        return;
+      }
+
+      for (const transition of missingTransitions) {
+        if (attemptedTransitCacheKeysRef.current.has(transition.cacheKey!)) {
+          continue;
+        }
+
+        const fromPlace = getPlaceByName(savedPlaces, transition.fromPlaceName);
+        const toPlace = getPlaceByName(savedPlaces, transition.toPlaceName);
+
+        if (!fromPlace?.address || !toPlace?.address || !transition.cacheKey) {
+          continue;
+        }
+
+        attemptedTransitCacheKeysRef.current.add(transition.cacheKey);
+
+        try {
+          const response = await fetch("/api/travel-time", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              fromPlaceName: transition.fromPlaceName,
+              toPlaceName: transition.toPlaceName,
+              fromAddress: fromPlace.address,
+              toAddress: toPlace.address,
+              departureTime: transition.previousEndTime,
+              mode: selectedMode,
+            }),
+          });
+          const result = (await response.json()) as
+            | {
+                ok: true;
+                provider: string;
+                minutes: number;
+              }
+            | {
+                ok: false;
+                reason: string;
+              };
+
+          if (isCancelled) {
+            return;
+          }
+
+          if (!result.ok) {
+            setTravelApiMessage(result.reason);
+            continue;
+          }
+
+          const now = new Date().toISOString();
+          const estimate: TravelTimeEstimate = {
+            id: createId(),
+            fromPlaceName: transition.fromPlaceName,
+            toPlaceName: transition.toPlaceName,
+            fromAddress: fromPlace.address,
+            toAddress: toPlace.address,
+            departureTime: transition.previousEndTime,
+            mode: selectedMode,
+            minutes: result.minutes,
+            provider: result.provider,
+            cacheKey: createTravelTimeCacheKey({
+              fromPlaceName: transition.fromPlaceName,
+              toPlaceName: transition.toPlaceName,
+              departureTime: transition.previousEndTime,
+              mode: selectedMode,
+            }),
+            createdAt: now,
+            updatedAt: now,
+          };
+
+          saveTravelTimeEstimate(estimate);
+          setTravelTimeEstimates(getTravelTimeEstimates());
+          setTravelApiMessage("대중교통 이동시간을 계산하고 캐시에 저장했습니다.");
+        } catch {
+          if (!isCancelled) {
+            setTravelApiMessage("대중교통 이동시간 계산 요청에 실패했습니다.");
+          }
+        }
+      }
+    }
+
+    calculateMissingTransitTimes();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [savedPlaces, selectedMode, transitions]);
 
   function handleSavePlace() {
     if (!placeName.trim()) {
@@ -298,6 +434,8 @@ export default function TravelTimePlanner({
               </h3>
               <p className="mt-1 text-sm leading-6 text-slate-500">
                 장소가 바뀌는 일정 중 여유가 30분 이하인 경우만 확인합니다.
+                같은 출발지, 출발시각, 도착지, 이동수단이면 저장된 계산값을
+                다시 사용합니다.
               </p>
             </div>
           </div>
@@ -325,6 +463,12 @@ export default function TravelTimePlanner({
           </div>
 
           <div className="mt-4 space-y-2">
+            {travelApiMessage && (
+              <p className="rounded-2xl bg-blue-50 p-3 text-sm font-bold leading-6 text-blue-700 ring-1 ring-blue-100">
+                {travelApiMessage}
+              </p>
+            )}
+
             {transitions.length === 0 ? (
               <p className="rounded-2xl bg-white p-3 text-sm leading-6 text-slate-500">
                 이번 주에는 장소가 바뀌면서 여유가 30분 이하인 이어지는 일정이

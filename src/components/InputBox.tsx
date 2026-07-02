@@ -350,7 +350,7 @@ export default function InputBox({
           onPointerCancel={handleVoicePointerEnd}
           onPointerLeave={handleVoicePointerEnd}
           aria-label={isListening ? "음성 입력 중지" : "음성 입력 시작"}
-          className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl text-white shadow-[0_12px_24px_rgba(49,130,246,0.22)] transition ${
+          className={`grid h-11 w-11 shrink-0 touch-none select-none place-items-center rounded-2xl text-white shadow-[0_12px_24px_rgba(49,130,246,0.22)] transition ${
             isListening
               ? "bg-red-500 hover:bg-red-400"
               : "bg-slate-900 hover:bg-slate-700"

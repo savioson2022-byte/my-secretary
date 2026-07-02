@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import BottomNavigation from "@/components/BottomNavigation";
 import CalendarNavigation from "@/components/CalendarNavigation";
 import SingleScheduleList from "@/components/SingleScheduleList";
+import UserStatusBadge from "@/components/UserStatusBadge";
 import {
   deleteSingleSchedule,
   getSingleScheduleUpdatedEventName,
@@ -46,15 +47,18 @@ export default function SingleSchedulePage() {
           <span>9:41</span>
           <span className="tracking-[0.18em]">•••</span>
         </div>
-      <header className="mb-6">
-        <p className="text-sm font-bold text-slate-500">캘린더</p>
-        <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-950">
-          단기 일정
-        </h1>
-        <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
-          한 번만 발생하는 일정의 날짜, 시간, 위치, 메모를 수정하고 관리합니다.
-        </p>
-      </header>
+        <header className="mb-6 flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-bold text-slate-500">캘린더</p>
+            <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-950">
+              단기 일정
+            </h1>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
+              한 번만 발생하는 일정의 날짜, 시간, 위치, 메모를 수정하고 관리합니다.
+            </p>
+          </div>
+          <UserStatusBadge />
+        </header>
 
       <CalendarNavigation />
 
