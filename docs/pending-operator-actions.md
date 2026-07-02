@@ -4,9 +4,8 @@
 
 ## GitHub
 
-- 현재 변경사항은 로컬에 준비되어 있다.
-- Codex에서 자동 커밋/푸시가 사용량 제한으로 막히면 GitHub Desktop에서 직접 커밋/푸시한다.
-- 추천 커밋 메시지: `Add social auth UI and transit travel cache`
+- 최신 작업은 `main` 브랜치에 커밋하고 GitHub 원격 저장소로 푸시했다.
+- 마지막 기능 커밋: `Improve mobile account and travel time flow`
 
 ## 모바일 로컬 테스트
 
