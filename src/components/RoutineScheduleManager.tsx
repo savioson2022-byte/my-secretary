@@ -3,7 +3,12 @@
 import TimeTaskSuggestionView from "@/components/TimeTaskSuggestionView";
 import TravelTimePlanner from "@/components/TravelTimePlanner";
 import WeeklyAvailabilityView from "@/components/WeeklyAvailabilityView";
-import { getSavedPlaces } from "@/lib/placeStorage";
+import PostcodeAddressSearch from "@/components/PostcodeAddressSearch";
+import {
+  getSavedPlaces,
+  saveSavedPlace,
+  updateSavedPlace,
+} from "@/lib/placeStorage";
 import {
   deleteRoutineSchedule,
   getRoutineSchedules,
@@ -192,6 +197,8 @@ function RoutineScheduleManager({ items }: RoutineScheduleManagerProps) {
   const [startTime, setStartTime] = useState("09:00");
   const [endTime, setEndTime] = useState("10:00");
   const [placeName, setPlaceName] = useState("");
+  const [placeAddress, setPlaceAddress] = useState("");
+  const [placePostalCode, setPlacePostalCode] = useState("");
   const [memo, setMemo] = useState("");
 
   const [startDate, setStartDate] = useState("");
@@ -280,6 +287,62 @@ function RoutineScheduleManager({ items }: RoutineScheduleManagerProps) {
     setTravelTimeRules(getTravelTimeRules());
   }
 
+  function getSavedPlaceByName(nextPlaceName: string) {
+    const normalizedPlaceName = nextPlaceName.trim().toLowerCase();
+
+    return savedPlaces.find((place) => {
+      return place.name.trim().toLowerCase() === normalizedPlaceName;
+    });
+  }
+
+  function handlePlaceNameChange(nextPlaceName: string) {
+    setPlaceName(nextPlaceName);
+
+    const savedPlace = getSavedPlaceByName(nextPlaceName);
+
+    if (savedPlace) {
+      setPlaceAddress(savedPlace.address);
+      setPlacePostalCode(savedPlace.postalCode ?? "");
+    }
+  }
+
+  function saveRoutinePlaceIfNeeded() {
+    const trimmedPlaceName = placeName.trim();
+    const trimmedAddress = placeAddress.trim();
+
+    if (!trimmedPlaceName || !trimmedAddress) {
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const existingPlace = getSavedPlaceByName(trimmedPlaceName);
+
+    if (existingPlace) {
+      updateSavedPlace({
+        ...existingPlace,
+        name: trimmedPlaceName,
+        address: trimmedAddress,
+        postalCode: placePostalCode.trim() || undefined,
+        updatedAt: now,
+      });
+      return;
+    }
+
+    saveSavedPlace({
+      id: createId(),
+      name: trimmedPlaceName,
+      address: trimmedAddress,
+      postalCode: placePostalCode.trim() || undefined,
+      memo: "",
+      latitude: null,
+      longitude: null,
+      provider: "daum-postcode",
+      providerPlaceId: null,
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -290,6 +353,11 @@ function RoutineScheduleManager({ items }: RoutineScheduleManagerProps) {
 
     if (!placeName.trim()) {
       alert("위치를 입력해줘.");
+      return;
+    }
+
+    if (!placeAddress.trim()) {
+      alert("우편번호 검색으로 실제 주소를 선택해줘.");
       return;
     }
 
@@ -321,13 +389,17 @@ function RoutineScheduleManager({ items }: RoutineScheduleManagerProps) {
     };
 
     saveRoutineSchedule(newRoutine);
+    saveRoutinePlaceIfNeeded();
     setRoutines(getRoutineSchedules());
+    setSavedPlaces(getSavedPlaces());
 
     setTitle("");
     setDayOfWeek("월");
     setStartTime("09:00");
     setEndTime("10:00");
     setPlaceName("");
+    setPlaceAddress("");
+    setPlacePostalCode("");
     setMemo("");
     setStartDate("");
     setEndDate("");
@@ -705,20 +777,70 @@ function RoutineScheduleManager({ items }: RoutineScheduleManagerProps) {
             </div>
           </div>
 
-          <div>
-            <label className="text-sm font-bold text-slate-700">위치</label>
-            <input
-              list="routine-place-options"
-              value={placeName}
-              onChange={(event) => setPlaceName(event.target.value)}
-              placeholder="예: 학교, 영어학원, 집, 수영장"
-              className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-400"
-            />
-            <datalist id="routine-place-options">
-              {placeNameOptions.map((name) => (
-                <option key={name} value={name} />
-              ))}
-            </datalist>
+          <div className="rounded-3xl bg-slate-50 p-4 ring-1 ring-slate-100">
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div>
+                <label className="text-sm font-bold text-slate-700">
+                  위치와 실제 주소
+                </label>
+                <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
+                  우편번호 검색으로 도로명 주소를 선택하면 이동시간 계산에
+                  사용할 장소로 함께 저장됩니다.
+                </p>
+              </div>
+              <div className="w-full md:w-44">
+                <PostcodeAddressSearch
+                  onSelect={({ address, postalCode, detailHint }) => {
+                    setPlaceAddress(address);
+                    setPlacePostalCode(postalCode);
+
+                    if (!placeName.trim() && detailHint) {
+                      setPlaceName(detailHint.split(",")[0]);
+                    }
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="mt-3 grid gap-3 md:grid-cols-[0.8fr_1.2fr]">
+              <div>
+                <input
+                  list="routine-place-options"
+                  value={placeName}
+                  onChange={(event) =>
+                    handlePlaceNameChange(event.target.value)
+                  }
+                  placeholder="장소 이름: 집, 학교, 영어학원"
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-emerald-400"
+                />
+                <datalist id="routine-place-options">
+                  {placeNameOptions.map((name) => (
+                    <option key={name} value={name} />
+                  ))}
+                </datalist>
+              </div>
+
+              <input
+                value={placeAddress}
+                onChange={(event) => setPlaceAddress(event.target.value)}
+                placeholder="우편번호 검색 후 도로명 주소가 들어옵니다"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-emerald-400"
+              />
+            </div>
+
+            <div className="mt-3 grid gap-3 md:grid-cols-[180px_1fr]">
+              <input
+                value={placePostalCode}
+                onChange={(event) => setPlacePostalCode(event.target.value)}
+                placeholder="우편번호"
+                inputMode="numeric"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-emerald-400"
+              />
+              <p className="rounded-2xl bg-white p-3 text-xs font-bold leading-5 text-slate-500 ring-1 ring-slate-100">
+                기존 저장 장소를 선택하면 주소가 자동으로 채워집니다. 새 장소는
+                정기 일정 저장 시 저장 장소 목록에도 추가됩니다.
+              </p>
+            </div>
           </div>
 
           <div>
