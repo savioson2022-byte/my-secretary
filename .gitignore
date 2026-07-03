@@ -16,3 +16,4 @@ build/
 
 # typescript
 *.tsbuildinfo
+.vercel
