@@ -1,0 +1,185 @@
+import { NextRequest, NextResponse } from "next/server";
+import { sendPushNotification } from "@/lib/push";
+import { createSupabaseAdminClient } from "@/lib/supabase/server";
+
+type ScheduleEntryRecord = {
+  id: string;
+  user_id: string;
+  source_type: string;
+  source_id: string;
+  occurrence_date: string;
+  start_time: string;
+  title: string;
+  place_name: string;
+  reminder_offsets: number[];
+};
+
+type PushSubscriptionRecord = {
+  id: string;
+  user_id: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+};
+
+function getKoreanTodayText() {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+
+  return formatter.format(new Date());
+}
+
+function getKoreanMinutesOfDay() {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Seoul",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date());
+  const hour = Number(parts.find((part) => part.type === "hour")?.value ?? 0);
+  const minute = Number(
+    parts.find((part) => part.type === "minute")?.value ?? 0
+  );
+
+  return hour * 60 + minute;
+}
+
+function timeToMinutes(timeText: string) {
+  const [hourText, minuteText] = timeText.split(":");
+
+  return Number(hourText) * 60 + Number(minuteText);
+}
+
+function isAuthorized(request: NextRequest) {
+  const cronSecret = process.env.CRON_SECRET;
+
+  if (!cronSecret) {
+    return true;
+  }
+
+  return request.headers.get("authorization") === `Bearer ${cronSecret}`;
+}
+
+export async function GET(request: NextRequest) {
+  if (!isAuthorized(request)) {
+    return NextResponse.json(
+      { ok: false, reason: "권한이 없습니다." },
+      { status: 401 }
+    );
+  }
+
+  const supabase = createSupabaseAdminClient();
+
+  if (!supabase) {
+    return NextResponse.json(
+      {
+        ok: false,
+        reason: "SUPABASE_SERVICE_ROLE_KEY가 설정되어야 서버 푸시를 보낼 수 있습니다.",
+      },
+      { status: 500 }
+    );
+  }
+
+  const todayText = getKoreanTodayText();
+  const nowMinutes = getKoreanMinutesOfDay();
+  const { data: entries, error: entriesError } = await supabase
+    .from("notification_schedule_entries")
+    .select("*")
+    .eq("occurrence_date", todayText)
+    .eq("active", true)
+    .returns<ScheduleEntryRecord[]>();
+
+  if (entriesError) {
+    return NextResponse.json(
+      { ok: false, reason: entriesError.message },
+      { status: 500 }
+    );
+  }
+
+  let sentCount = 0;
+  let skippedCount = 0;
+
+  for (const entry of entries ?? []) {
+    const startMinutes = timeToMinutes(entry.start_time);
+    const dueOffsets = entry.reminder_offsets.filter((offset) => {
+      const dueMinutes = startMinutes - offset;
+      return nowMinutes >= dueMinutes && nowMinutes < dueMinutes + 5;
+    });
+
+    if (dueOffsets.length === 0) {
+      skippedCount += 1;
+      continue;
+    }
+
+    const { data: subscriptions } = await supabase
+      .from("push_subscriptions")
+      .select("*")
+      .eq("user_id", entry.user_id)
+      .eq("enabled", true)
+      .returns<PushSubscriptionRecord[]>();
+
+    for (const subscription of subscriptions ?? []) {
+      for (const offsetMinutes of dueOffsets) {
+        const { data: existingDelivery } = await supabase
+          .from("notification_deliveries")
+          .select("id")
+          .eq("schedule_entry_id", entry.id)
+          .eq("subscription_id", subscription.id)
+          .eq("offset_minutes", offsetMinutes)
+          .maybeSingle<{ id: string }>();
+
+        if (existingDelivery) {
+          continue;
+        }
+
+        try {
+          await sendPushNotification({
+            subscription: {
+              endpoint: subscription.endpoint,
+              keys: {
+                p256dh: subscription.p256dh,
+                auth: subscription.auth,
+              },
+            },
+            title:
+              offsetMinutes === 0
+                ? `${entry.title} 시작 시간이에요`
+                : `${entry.title} ${offsetMinutes}분 전이에요`,
+            body: `${entry.start_time.slice(0, 5)}${
+              entry.place_name ? ` · ${entry.place_name}` : ""
+            }`,
+            url: "/calendar/weekly",
+            tag: `${entry.id}-${offsetMinutes}`,
+          });
+
+          await supabase.from("notification_deliveries").insert({
+            user_id: entry.user_id,
+            schedule_entry_id: entry.id,
+            subscription_id: subscription.id,
+            offset_minutes: offsetMinutes,
+          });
+          sentCount += 1;
+        } catch {
+          await supabase
+            .from("push_subscriptions")
+            .update({
+              enabled: false,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", subscription.id);
+        }
+      }
+    }
+  }
+
+  return NextResponse.json({
+    ok: true,
+    sentCount,
+    skippedCount,
+    checkedCount: entries?.length ?? 0,
+  });
+}

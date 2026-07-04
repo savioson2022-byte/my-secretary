@@ -52,3 +52,30 @@ Vercel 또는 배포 환경에도 아래 값을 추가해야 한다.
 - `OPENAI_API_KEY`
 - `KAKAO_REST_API_KEY`
 - `ODSAY_API_KEY`
+
+## Web Push 알림
+
+코드에는 Web Push 구독 저장, service worker, 5분 단위 발송 엔드포인트가 추가되어 있다.
+실제로 앱이 꺼진 상태에서도 서버 푸시가 오게 하려면 아래 두 가지가 필요하다.
+
+1. Supabase SQL Editor에서 아래 마이그레이션을 실행한다.
+
+```text
+supabase/migrations/20260704000000_create_push_notifications.sql
+```
+
+2. Supabase Project Settings > API에서 service role key를 확인한 뒤 Vercel Production 환경변수에 추가한다.
+
+```text
+SUPABASE_SERVICE_ROLE_KEY=
+```
+
+이미 Vercel Production에 추가한 값:
+
+- `NEXT_PUBLIC_VAPID_PUBLIC_KEY`
+- `VAPID_PRIVATE_KEY`
+- `WEB_PUSH_SUBJECT`
+- `CRON_SECRET`
+
+`SUPABASE_SERVICE_ROLE_KEY`가 없으면 사용자가 푸시 구독을 저장할 수는 있어도,
+Vercel Cron이 모든 사용자의 알림 일정을 읽어 실제 푸시를 발송할 수 없다.
