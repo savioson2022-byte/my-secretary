@@ -222,7 +222,7 @@ function RoutineScheduleManager({
   const [savedPlaces, setSavedPlaces] = useState<SavedPlace[]>([]);
 
   const [title, setTitle] = useState("");
-  const [dayOfWeek, setDayOfWeek] = useState<DayOfWeek>("월");
+  const [selectedDays, setSelectedDays] = useState<DayOfWeek[]>(["월"]);
   const [startTime, setStartTime] = useState("09:00");
   const [endTime, setEndTime] = useState("10:00");
   const [placeName, setPlaceName] = useState("");
@@ -401,10 +401,15 @@ function RoutineScheduleManager({
 
     const now = new Date().toISOString();
 
-    const newRoutine: RoutineSchedule = {
+    if (selectedDays.length === 0) {
+      alert("반복할 요일을 하나 이상 선택해줘.");
+      return;
+    }
+
+    const newRoutines: RoutineSchedule[] = selectedDays.map((selectedDay) => ({
       id: createId(),
       title: title.trim(),
-      dayOfWeek,
+      dayOfWeek: selectedDay,
       startTime,
       endTime,
       placeName: placeName.trim(),
@@ -415,15 +420,15 @@ function RoutineScheduleManager({
       isActive: true,
       createdAt: now,
       updatedAt: now,
-    };
+    }));
 
-    saveRoutineSchedule(newRoutine);
+    newRoutines.forEach(saveRoutineSchedule);
     saveRoutinePlaceIfNeeded();
     setRoutines(getRoutineSchedules());
     setSavedPlaces(getSavedPlaces());
 
     setTitle("");
-    setDayOfWeek("월");
+    setSelectedDays(["월"]);
     setStartTime("09:00");
     setEndTime("10:00");
     setPlaceName("");
@@ -509,7 +514,7 @@ function RoutineScheduleManager({
     event: PointerEvent<HTMLDivElement>,
     day: DayOfWeek
   ) {
-    if (!isEditMode) return;
+    if (!canEditCalendar || !isEditMode) return;
 
     const selectedMinutes = getMinutesFromMouse(event, event.currentTarget);
 
@@ -542,13 +547,13 @@ function RoutineScheduleManager({
     setIsDragging(false);
     setDragSelection(normalized);
 
-    setDayOfWeek(normalized.day);
+    setSelectedDays([normalized.day]);
     setStartTime(minutesToTime(normalized.startMinutes));
     setEndTime(minutesToTime(normalized.endMinutes));
   }
 
   function handleMobilePointerDown(event: PointerEvent<HTMLDivElement>) {
-    if (!isEditMode) return;
+    if (!canEditCalendar || !isEditMode) return;
 
     const selectedMinutes = getMinutesFromMouse(
       event,
@@ -589,7 +594,7 @@ function RoutineScheduleManager({
     setIsDragging(false);
     setDragSelection(normalized);
 
-    setDayOfWeek(normalized.day);
+    setSelectedDays([normalized.day]);
     setStartTime(minutesToTime(normalized.startMinutes));
     setEndTime(minutesToTime(normalized.endMinutes));
   }
@@ -607,7 +612,9 @@ function RoutineScheduleManager({
     selectedMobileDay,
     toDateText(selectedMobileDate)
   );
-  const showWeeklyCalendar = variant !== "management";
+  const showWeeklyCalendar = true;
+  const canEditCalendar = variant !== "weekly";
+  const showAvailabilityAndSuggestions = variant !== "management";
   const showScheduleManagement = variant !== "weekly";
 
   return (
@@ -619,10 +626,12 @@ function RoutineScheduleManager({
           <div>
             <h2 className="text-lg font-black text-slate-900">주간 캘린더</h2>
             <p className="mt-1 text-sm text-slate-500">
-              이번 주 날짜를 기준으로 정기 일정과 단기 일정을 함께 보여줍니다.
-              편집을 켜면 시간대를 10분 단위로 드래그할 수 있습니다.
+              {canEditCalendar
+                ? "편집을 켜면 시간대를 10분 단위로 드래그해 정기 일정 입력에 반영할 수 있습니다."
+                : "오늘과 이번 주 일정을 빠르게 확인하는 보기 전용 시간표입니다."}
             </p>
           </div>
+          {canEditCalendar && (
           <button
             type="button"
             onClick={() => setIsEditMode((current) => !current)}
@@ -634,6 +643,7 @@ function RoutineScheduleManager({
           >
             {isEditMode ? "편집 종료" : "주간 캘린더 편집"}
           </button>
+          )}
         </div>
 
         <div className="mt-4 md:hidden">
@@ -711,7 +721,7 @@ function RoutineScheduleManager({
                 }
               }}
               className={`relative mt-4 overflow-hidden rounded-3xl bg-white ring-1 ring-slate-100 ${
-                isEditMode ? "touch-none" : ""
+                canEditCalendar && isEditMode ? "touch-none" : ""
               }`}
               style={{
                 height: `${(END_HOUR - START_HOUR) * MOBILE_HOUR_HEIGHT}px`,
@@ -805,7 +815,7 @@ function RoutineScheduleManager({
               </div>
             </div>
 
-            {isEditMode && (
+            {canEditCalendar && isEditMode && (
               <p className="mt-3 rounded-2xl bg-blue-50 p-3 text-xs font-bold leading-5 text-blue-700 ring-1 ring-blue-100">
                 하루 시간표를 누르고 드래그하면 10분 단위로 시간이 선택되고,
                 아래 정기 일정 입력칸에 자동 반영됩니다.
@@ -885,7 +895,7 @@ function RoutineScheduleManager({
                       }
                     }}
                     className={`relative border-l border-slate-100 bg-white ${
-                      isEditMode ? "cursor-crosshair touch-none" : "cursor-default"
+                      canEditCalendar && isEditMode ? "cursor-crosshair touch-none" : "cursor-default"
                     }`}
                   >
                     {hours.map((hour) => (
@@ -1017,16 +1027,20 @@ function RoutineScheduleManager({
         </div>
       </section>
 
-      <WeeklyAvailabilityView
-        routines={routines}
-        singleSchedules={singleSchedules}
-      />
+      {showAvailabilityAndSuggestions && (
+      <>
+        <WeeklyAvailabilityView
+          routines={routines}
+          singleSchedules={singleSchedules}
+        />
 
-      <TimeTaskSuggestionView
-        items={items}
-        routines={routines}
-        singleSchedules={singleSchedules}
-      />
+        <TimeTaskSuggestionView
+          items={items}
+          routines={routines}
+          singleSchedules={singleSchedules}
+        />
+      </>
+      )}
       </>
       )}
 
@@ -1056,22 +1070,44 @@ function RoutineScheduleManager({
             />
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-[1.35fr_1fr_1fr]">
             <div>
               <label className="text-sm font-bold text-slate-700">요일</label>
-              <select
-                value={dayOfWeek}
-                onChange={(event) =>
-                  setDayOfWeek(event.target.value as DayOfWeek)
-                }
-                className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-400"
-              >
-                {DAYS.map((day) => (
-                  <option key={day} value={day}>
-                    {day}
-                  </option>
-                ))}
-              </select>
+              <div className="mt-2 grid grid-cols-7 gap-1">
+                {DAYS.map((day) => {
+                  const isSelected = selectedDays.includes(day);
+
+                  return (
+                    <button
+                      key={day}
+                      type="button"
+                      onClick={() => {
+                        setSelectedDays((currentDays) => {
+                          if (currentDays.includes(day)) {
+                            return currentDays.filter(
+                              (currentDay) => currentDay !== day
+                            );
+                          }
+
+                          return [...currentDays, day].sort((a, b) => {
+                            return DAYS.indexOf(a) - DAYS.indexOf(b);
+                          });
+                        });
+                      }}
+                      className={`rounded-2xl px-2 py-3 text-sm font-black transition ${
+                        isSelected
+                          ? "bg-slate-950 text-white"
+                          : "bg-white text-slate-500 ring-1 ring-slate-200"
+                      }`}
+                    >
+                      {day}
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mt-2 text-xs font-bold leading-5 text-slate-500">
+                같은 수업이 여러 요일에 반복되면 요일을 여러 개 선택하세요.
+              </p>
             </div>
 
             <div>
