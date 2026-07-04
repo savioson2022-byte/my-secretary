@@ -6,6 +6,7 @@ export type UserProfile = {
   deviceLabel: string;
   classificationPreference: string;
   preferredTravelMode: TravelMode;
+  travelTimeAutoCalculationEnabled: boolean;
   rememberDevice: boolean;
   createdAt: string;
   updatedAt: string;

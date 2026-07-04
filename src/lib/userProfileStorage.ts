@@ -2,6 +2,7 @@ import { UserProfile } from "@/types/userProfile";
 import { STORAGE_KEYS } from "@/lib/storageKeys";
 
 const DEFAULT_TRAVEL_MODE = "transit";
+const DEFAULT_TRAVEL_TIME_AUTO_CALCULATION = true;
 
 function createId() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -32,9 +33,14 @@ export function getUserProfile(): UserProfile | null {
 export function saveUserProfile(
   profile: Omit<
     UserProfile,
-    "id" | "createdAt" | "updatedAt" | "preferredTravelMode"
+    | "id"
+    | "createdAt"
+    | "updatedAt"
+    | "preferredTravelMode"
+    | "travelTimeAutoCalculationEnabled"
   > &
     Partial<Pick<UserProfile, "preferredTravelMode">> &
+    Partial<Pick<UserProfile, "travelTimeAutoCalculationEnabled">> &
     Partial<Pick<UserProfile, "id" | "createdAt" | "updatedAt">>
 ) {
   const now = new Date().toISOString();
@@ -44,6 +50,9 @@ export function saveUserProfile(
     deviceLabel: profile.deviceLabel,
     classificationPreference: profile.classificationPreference,
     preferredTravelMode: profile.preferredTravelMode ?? DEFAULT_TRAVEL_MODE,
+    travelTimeAutoCalculationEnabled:
+      profile.travelTimeAutoCalculationEnabled ??
+      DEFAULT_TRAVEL_TIME_AUTO_CALCULATION,
     rememberDevice: profile.rememberDevice,
     createdAt: profile.createdAt ?? now,
     updatedAt: now,

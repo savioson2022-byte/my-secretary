@@ -1,13 +1,20 @@
 "use client";
 
+import PostcodeAddressSearch from "@/components/PostcodeAddressSearch";
 import ScheduleColorPicker from "@/components/ScheduleColorPicker";
+import {
+  getSavedPlaces,
+  saveSavedPlace,
+  updateSavedPlace,
+} from "@/lib/placeStorage";
 import {
   DEFAULT_SINGLE_SCHEDULE_COLOR,
   getScheduleColor,
 } from "@/lib/scheduleColors";
 import { updateSingleSchedule } from "@/lib/singleScheduleStorage";
-import { SingleSchedule } from "@/types/calendar";
-import { useState } from "react";
+import { getUserProfile } from "@/lib/userProfileStorage";
+import { SavedPlace, SingleSchedule, TravelMode } from "@/types/calendar";
+import { useMemo, useState } from "react";
 
 type SingleScheduleListProps = {
   schedules: SingleSchedule[];
@@ -23,6 +30,34 @@ function sortSchedulesByDateTime(schedules: SingleSchedule[]) {
   });
 }
 
+function createId() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function getDefaultTravelMode(): TravelMode {
+  if (typeof window === "undefined") return "transit";
+
+  return getUserProfile()?.preferredTravelMode ?? "transit";
+}
+
+function getSavedPlaceByName(places: SavedPlace[], placeName: string) {
+  const normalizedPlaceName = placeName.trim().toLowerCase();
+
+  return places.find((place) => {
+    return place.name.trim().toLowerCase() === normalizedPlaceName;
+  });
+}
+
+const TRAVEL_MODE_OPTIONS: Array<{ value: TravelMode; label: string }> = [
+  { value: "walk", label: "도보" },
+  { value: "transit", label: "대중교통" },
+  { value: "car", label: "자차" },
+];
+
 export default function SingleScheduleList({
   schedules,
   onDelete,
@@ -35,8 +70,32 @@ export default function SingleScheduleList({
   const [editStartTime, setEditStartTime] = useState("");
   const [editEndTime, setEditEndTime] = useState("");
   const [editPlaceName, setEditPlaceName] = useState("");
+  const [editPlaceAddress, setEditPlaceAddress] = useState("");
+  const [editPlacePostalCode, setEditPlacePostalCode] = useState("");
+  const [editTravelMode, setEditTravelMode] =
+    useState<TravelMode>(getDefaultTravelMode);
   const [editMemo, setEditMemo] = useState("");
   const [editColor, setEditColor] = useState(DEFAULT_SINGLE_SCHEDULE_COLOR);
+  const [savedPlaces, setSavedPlaces] = useState<SavedPlace[]>(() =>
+    typeof window === "undefined" ? [] : getSavedPlaces()
+  );
+  const placeNameOptions = useMemo(() => {
+    const names = new Set<string>();
+
+    savedPlaces.forEach((place) => {
+      if (place.name.trim()) {
+        names.add(place.name.trim());
+      }
+    });
+
+    schedules.forEach((schedule) => {
+      if (schedule.placeName.trim()) {
+        names.add(schedule.placeName.trim());
+      }
+    });
+
+    return Array.from(names).sort((a, b) => a.localeCompare(b, "ko"));
+  }, [savedPlaces, schedules]);
 
   function startEdit(schedule: SingleSchedule) {
     setEditingId(schedule.id);
@@ -45,6 +104,9 @@ export default function SingleScheduleList({
     setEditStartTime(schedule.startTime);
     setEditEndTime(schedule.endTime);
     setEditPlaceName(schedule.placeName);
+    setEditPlaceAddress(schedule.placeAddress ?? "");
+    setEditPlacePostalCode(schedule.placePostalCode ?? "");
+    setEditTravelMode(schedule.travelMode ?? getDefaultTravelMode());
     setEditMemo(schedule.memo);
     setEditColor(getScheduleColor(schedule.color, DEFAULT_SINGLE_SCHEDULE_COLOR));
   }
@@ -56,8 +118,62 @@ export default function SingleScheduleList({
     setEditStartTime("");
     setEditEndTime("");
     setEditPlaceName("");
+    setEditPlaceAddress("");
+    setEditPlacePostalCode("");
+    setEditTravelMode(getDefaultTravelMode());
     setEditMemo("");
     setEditColor(DEFAULT_SINGLE_SCHEDULE_COLOR);
+  }
+
+  function handlePlaceNameChange(nextPlaceName: string) {
+    setEditPlaceName(nextPlaceName);
+
+    const savedPlace = getSavedPlaceByName(savedPlaces, nextPlaceName);
+
+    if (!savedPlace) {
+      return;
+    }
+
+    setEditPlaceAddress(savedPlace.address);
+    setEditPlacePostalCode(savedPlace.postalCode ?? "");
+  }
+
+  function savePlaceIfNeeded() {
+    const trimmedPlaceName = editPlaceName.trim();
+    const trimmedAddress = editPlaceAddress.trim();
+
+    if (!trimmedPlaceName || !trimmedAddress) {
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const existingPlace = getSavedPlaceByName(savedPlaces, trimmedPlaceName);
+
+    if (existingPlace) {
+      updateSavedPlace({
+        ...existingPlace,
+        name: trimmedPlaceName,
+        address: trimmedAddress,
+        postalCode: editPlacePostalCode.trim() || undefined,
+        updatedAt: now,
+      });
+    } else {
+      saveSavedPlace({
+        id: createId(),
+        name: trimmedPlaceName,
+        address: trimmedAddress,
+        postalCode: editPlacePostalCode.trim() || undefined,
+        memo: "",
+        latitude: null,
+        longitude: null,
+        provider: "daum-postcode",
+        providerPlaceId: null,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+
+    setSavedPlaces(getSavedPlaces());
   }
 
   function saveEdit(schedule: SingleSchedule) {
@@ -88,10 +204,14 @@ export default function SingleScheduleList({
       startTime: editStartTime,
       endTime: editEndTime,
       placeName: editPlaceName.trim(),
+      placeAddress: editPlaceAddress.trim() || undefined,
+      placePostalCode: editPlacePostalCode.trim() || undefined,
+      travelMode: editTravelMode,
       memo: editMemo.trim(),
       color: editColor,
       updatedAt: new Date().toISOString(),
     });
+    savePlaceIfNeeded();
 
     cancelEdit();
   }
@@ -178,18 +298,83 @@ export default function SingleScheduleList({
                       </div>
                     </div>
 
-                    <div>
-                      <label className="text-sm font-bold text-slate-700">
-                        위치
-                      </label>
-                      <input
-                        value={editPlaceName}
-                        onChange={(event) =>
-                          setEditPlaceName(event.target.value)
-                        }
-                        placeholder="예: 병원, 학교, 카페, 학원"
-                        className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-400"
-                      />
+                    <div className="rounded-3xl bg-slate-50 p-4 ring-1 ring-slate-100">
+                      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                        <div>
+                          <label className="text-sm font-bold text-slate-700">
+                            위치와 실제 주소
+                          </label>
+                          <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
+                            우편번호 검색으로 도로명 주소를 선택하면 이동시간
+                            계산에 사용할 수 있습니다.
+                          </p>
+                        </div>
+                        <div className="w-full md:w-44">
+                          <PostcodeAddressSearch
+                            onSelect={({ address, postalCode, detailHint }) => {
+                              setEditPlaceAddress(address);
+                              setEditPlacePostalCode(postalCode);
+
+                              if (!editPlaceName.trim() && detailHint) {
+                                setEditPlaceName(detailHint.split(",")[0]);
+                              }
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="mt-3 grid gap-3 md:grid-cols-[0.8fr_1.2fr]">
+                        <div>
+                          <input
+                            list="single-place-options"
+                            value={editPlaceName}
+                            onChange={(event) =>
+                              handlePlaceNameChange(event.target.value)
+                            }
+                            placeholder="장소 이름: 병원, 학교, 카페"
+                            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-emerald-400"
+                          />
+                          <datalist id="single-place-options">
+                            {placeNameOptions.map((name) => (
+                              <option key={name} value={name} />
+                            ))}
+                          </datalist>
+                        </div>
+
+                        <input
+                          value={editPlaceAddress}
+                          onChange={(event) =>
+                            setEditPlaceAddress(event.target.value)
+                          }
+                          placeholder="우편번호 검색 후 도로명 주소가 들어옵니다"
+                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-emerald-400"
+                        />
+                      </div>
+
+                      <div className="mt-3 grid gap-3 md:grid-cols-[160px_1fr]">
+                        <input
+                          value={editPlacePostalCode}
+                          onChange={(event) =>
+                            setEditPlacePostalCode(event.target.value)
+                          }
+                          placeholder="우편번호"
+                          inputMode="numeric"
+                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-emerald-400"
+                        />
+                        <select
+                          value={editTravelMode}
+                          onChange={(event) =>
+                            setEditTravelMode(event.target.value as TravelMode)
+                          }
+                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold outline-none focus:border-emerald-400"
+                        >
+                          {TRAVEL_MODE_OPTIONS.map((mode) => (
+                            <option key={mode.value} value={mode.value}>
+                              이동수단: {mode.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
 
                     <div>
@@ -249,6 +434,15 @@ export default function SingleScheduleList({
                       <p className="mt-1 text-sm text-slate-500">
                         위치: {schedule.placeName || "아직 입력 안 됨"}
                       </p>
+
+                      {schedule.placeAddress && (
+                        <p className="mt-1 text-xs font-semibold leading-5 text-slate-400">
+                          {schedule.placeAddress}
+                          {schedule.placePostalCode
+                            ? ` · ${schedule.placePostalCode}`
+                            : ""}
+                        </p>
+                      )}
 
                       {schedule.memo && (
                         <p className="mt-1 text-sm text-slate-500">

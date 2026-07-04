@@ -1,7 +1,6 @@
 "use client";
 
 import TimeTaskSuggestionView from "@/components/TimeTaskSuggestionView";
-import TravelTimePlanner from "@/components/TravelTimePlanner";
 import WeeklyAvailabilityView from "@/components/WeeklyAvailabilityView";
 import PostcodeAddressSearch from "@/components/PostcodeAddressSearch";
 import ScheduleColorPicker from "@/components/ScheduleColorPicker";
@@ -26,9 +25,8 @@ import {
   getSingleScheduleUpdatedEventName,
   getSingleSchedules,
 } from "@/lib/singleScheduleStorage";
-import { getTravelTimeRules } from "@/lib/travelTimeStorage";
 import { AssistantItem } from "@/types/assistant";
-import { SavedPlace, SingleSchedule, TravelTimeRule } from "@/types/calendar";
+import { SavedPlace, SingleSchedule } from "@/types/calendar";
 import { DayOfWeek, RoutineSchedule } from "@/types/routine";
 import { useEffect, useMemo, useState } from "react";
 import type { FormEvent, PointerEvent } from "react";
@@ -218,7 +216,6 @@ function RoutineScheduleManager({ items }: RoutineScheduleManagerProps) {
   const [routines, setRoutines] = useState<RoutineSchedule[]>([]);
   const [singleSchedules, setSingleSchedules] = useState<SingleSchedule[]>([]);
   const [savedPlaces, setSavedPlaces] = useState<SavedPlace[]>([]);
-  const [travelTimeRules, setTravelTimeRules] = useState<TravelTimeRule[]>([]);
 
   const [title, setTitle] = useState("");
   const [dayOfWeek, setDayOfWeek] = useState<DayOfWeek>("월");
@@ -247,7 +244,6 @@ function RoutineScheduleManager({ items }: RoutineScheduleManagerProps) {
       setRoutines(getRoutineSchedules());
       setSingleSchedules(getSingleSchedules());
       setSavedPlaces(getSavedPlaces());
-      setTravelTimeRules(getTravelTimeRules());
     }
 
     refreshSchedules();
@@ -314,11 +310,6 @@ function RoutineScheduleManager({ items }: RoutineScheduleManagerProps) {
 
     return Array.from(names).sort((a, b) => a.localeCompare(b, "ko"));
   }, [routines, savedPlaces, singleSchedules]);
-
-  function refreshTravelData() {
-    setSavedPlaces(getSavedPlaces());
-    setTravelTimeRules(getTravelTimeRules());
-  }
 
   function getSavedPlaceByName(nextPlaceName: string) {
     const normalizedPlaceName = nextPlaceName.trim().toLowerCase();
@@ -1210,15 +1201,6 @@ function RoutineScheduleManager({ items }: RoutineScheduleManagerProps) {
           </button>
         </form>
 
-        <div className="mt-6 border-t border-slate-100 pt-6">
-          <TravelTimePlanner
-            routines={routines}
-            singleSchedules={singleSchedules}
-            savedPlaces={savedPlaces}
-            travelTimeRules={travelTimeRules}
-            onChange={refreshTravelData}
-          />
-        </div>
       </section>
 
       <section className="rounded-3xl bg-white p-5 shadow-soft ring-1 ring-slate-100">

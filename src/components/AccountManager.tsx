@@ -5,7 +5,7 @@ import type { User } from "@supabase/supabase-js";
 import DeviceProfileCard from "@/components/DeviceProfileCard";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { getUserProfile } from "@/lib/userProfileStorage";
+import { getUserProfile, saveUserProfile } from "@/lib/userProfileStorage";
 import { RegisteredDevice, UserProfileRecord } from "@/types/device";
 import { UserProfile } from "@/types/userProfile";
 import { TravelMode } from "@/types/calendar";
@@ -114,12 +114,21 @@ export default function AccountManager() {
   const [classificationPreference, setClassificationPreference] = useState("");
   const [preferredTravelMode, setPreferredTravelMode] =
     useState<TravelMode>("transit");
+  const [
+    travelTimeAutoCalculationEnabled,
+    setTravelTimeAutoCalculationEnabled,
+  ] = useState(true);
   const [deviceName, setDeviceName] = useState("");
   const [devices, setDevices] = useState<RegisteredDevice[]>([]);
   const [localProfile, setLocalProfile] = useState<UserProfile | null>(null);
 
   useEffect(() => {
-    setLocalProfile(getUserProfile());
+    const savedProfile = getUserProfile();
+    setLocalProfile(savedProfile);
+    setPreferredTravelMode(savedProfile?.preferredTravelMode ?? "transit");
+    setTravelTimeAutoCalculationEnabled(
+      savedProfile?.travelTimeAutoCalculationEnabled ?? true
+    );
     setDeviceName(getDefaultDeviceName());
 
     if (!supabase) {
@@ -328,6 +337,17 @@ export default function AccountManager() {
     }
 
     setMessage("사용자 기준을 저장했습니다.");
+    const nextLocalProfile = saveUserProfile({
+      id: localProfile?.id,
+      createdAt: localProfile?.createdAt,
+      displayName: displayName.trim() || getUserDisplayName(user, ""),
+      deviceLabel: localProfile?.deviceLabel ?? getDefaultDeviceName(),
+      classificationPreference: classificationPreference.trim(),
+      preferredTravelMode,
+      travelTimeAutoCalculationEnabled,
+      rememberDevice: true,
+    });
+    setLocalProfile(nextLocalProfile);
   }
 
   async function handleRegisterCurrentDevice() {
@@ -557,19 +577,49 @@ export default function AccountManager() {
             placeholder="사용자별 AI 분류 기준"
             className="min-h-24 w-full resize-none rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold leading-6 outline-none focus:border-blue-400"
           />
-          <select
-            value={preferredTravelMode}
-            onChange={(event) =>
-              setPreferredTravelMode(event.target.value as TravelMode)
-            }
-            className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold outline-none focus:border-blue-400"
-          >
-            {TRAVEL_MODE_OPTIONS.map((mode) => (
-              <option key={mode.value} value={mode.value}>
-                주 이동수단: {mode.label}
-              </option>
-            ))}
-          </select>
+          <div className="rounded-3xl bg-slate-50 p-4 ring-1 ring-slate-100">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-black text-slate-900">
+                  이동시간 설정
+                </h3>
+                <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
+                  일정 사이 장소가 바뀔 때 자동 계산 여부와 기본 이동수단을
+                  정합니다. 개별 일정에서는 다시 바꿀 수 있습니다.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  setTravelTimeAutoCalculationEnabled((current) => !current)
+                }
+                className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-black transition ${
+                  travelTimeAutoCalculationEnabled
+                    ? "bg-blue-600 text-white"
+                    : "bg-white text-slate-500 ring-1 ring-slate-200"
+                }`}
+              >
+                {travelTimeAutoCalculationEnabled ? "ON" : "OFF"}
+              </button>
+            </div>
+
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              {TRAVEL_MODE_OPTIONS.map((mode) => (
+                <button
+                  key={mode.value}
+                  type="button"
+                  onClick={() => setPreferredTravelMode(mode.value)}
+                  className={`rounded-2xl px-3 py-3 text-sm font-black transition ${
+                    preferredTravelMode === mode.value
+                      ? "bg-slate-950 text-white"
+                      : "bg-white text-slate-500 ring-1 ring-slate-100"
+                  }`}
+                >
+                  {mode.label}
+                </button>
+              ))}
+            </div>
+          </div>
           <button
             type="button"
             onClick={handleSaveProfile}

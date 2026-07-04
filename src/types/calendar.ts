@@ -31,6 +31,19 @@ export type SingleSchedule = {
   placeName: string;
 
   /**
+   * 실제 도로명 주소와 우편번호
+   * 이동시간 API 연동 시 장소 식별에 사용한다.
+   */
+  placeAddress?: string;
+  placePostalCode?: string;
+
+  /**
+   * 이 일정으로 이동할 때 사용할 이동수단.
+   * 없으면 사용자 기본 이동수단을 사용한다.
+   */
+  travelMode?: TravelMode;
+
+  /**
    * 메모
    */
   memo: string;

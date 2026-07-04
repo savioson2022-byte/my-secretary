@@ -32,6 +32,9 @@ export default function DeviceProfileCard({
       displayName: displayName.trim() || "사용자",
       deviceLabel: deviceLabel.trim() || "내 휴대폰",
       classificationPreference: classificationPreference.trim(),
+      preferredTravelMode: profile?.preferredTravelMode,
+      travelTimeAutoCalculationEnabled:
+        profile?.travelTimeAutoCalculationEnabled,
       rememberDevice: true,
     });
 
