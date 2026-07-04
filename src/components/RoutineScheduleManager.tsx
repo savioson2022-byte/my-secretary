@@ -47,6 +47,7 @@ type DragSelection = {
 
 type RoutineScheduleManagerProps = {
   items: AssistantItem[];
+  variant?: "weekly" | "management" | "all";
 };
 
 function createId() {
@@ -212,7 +213,10 @@ function isRoutineActiveOnDate(routine: RoutineSchedule, dateText: string) {
   return true;
 }
 
-function RoutineScheduleManager({ items }: RoutineScheduleManagerProps) {
+function RoutineScheduleManager({
+  items,
+  variant = "all",
+}: RoutineScheduleManagerProps) {
   const [routines, setRoutines] = useState<RoutineSchedule[]>([]);
   const [singleSchedules, setSingleSchedules] = useState<SingleSchedule[]>([]);
   const [savedPlaces, setSavedPlaces] = useState<SavedPlace[]>([]);
@@ -603,9 +607,13 @@ function RoutineScheduleManager({ items }: RoutineScheduleManagerProps) {
     selectedMobileDay,
     toDateText(selectedMobileDate)
   );
+  const showWeeklyCalendar = variant !== "management";
+  const showScheduleManagement = variant !== "weekly";
 
   return (
     <section className="space-y-6">
+      {showWeeklyCalendar && (
+      <>
       <section className="rounded-3xl bg-white p-5 shadow-soft ring-1 ring-slate-100">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -1019,7 +1027,11 @@ function RoutineScheduleManager({ items }: RoutineScheduleManagerProps) {
         routines={routines}
         singleSchedules={singleSchedules}
       />
+      </>
+      )}
 
+      {showScheduleManagement && (
+      <>
       <section
         id="schedule-manager"
         className="rounded-3xl bg-white p-5 shadow-soft ring-1 ring-slate-100"
@@ -1306,6 +1318,8 @@ function RoutineScheduleManager({ items }: RoutineScheduleManagerProps) {
           </div>
         )}
       </section>
+      </>
+      )}
     </section>
   );
 }

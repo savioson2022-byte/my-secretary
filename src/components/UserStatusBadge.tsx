@@ -63,24 +63,34 @@ export default function UserStatusBadge() {
   const initial = displayName.slice(0, 1).toUpperCase() || "나";
 
   return (
-    <Link
-      href="/account"
-      aria-label="계정과 기기 관리로 이동"
-      className="flex max-w-[180px] items-center gap-2 rounded-full bg-white px-2 py-1.5 shadow-soft ring-1 ring-slate-100 transition hover:bg-slate-50"
-    >
-      <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-gradient-to-tr from-fuchsia-500 via-rose-400 to-amber-300 p-[2px]">
-        <div className="grid h-full w-full place-items-center rounded-full bg-white text-xs font-black text-slate-950">
-          {initial}
+    <div className="flex shrink-0 flex-col items-end gap-1">
+      <Link
+        href="/settings"
+        aria-label="설정으로 이동"
+        className="grid h-8 w-8 place-items-center rounded-full bg-white text-sm font-black text-slate-500 shadow-soft ring-1 ring-slate-100 transition hover:bg-slate-50"
+      >
+        ...
+      </Link>
+
+      <Link
+        href="/account"
+        aria-label="계정과 기기 관리로 이동"
+        className="flex max-w-[180px] items-center gap-2 rounded-full bg-white px-2 py-1.5 shadow-soft ring-1 ring-slate-100 transition hover:bg-slate-50"
+      >
+        <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-gradient-to-tr from-fuchsia-500 via-rose-400 to-amber-300 p-[2px]">
+          <div className="grid h-full w-full place-items-center rounded-full bg-white text-xs font-black text-slate-950">
+            {initial}
+          </div>
         </div>
-      </div>
-      <div className="min-w-0">
-        <p className="truncate text-xs font-black text-slate-900">
-          {displayName}
-        </p>
-        <p className="text-[10px] font-bold text-slate-400">
-          {user ? "로그인됨" : "로그인 필요"}
-        </p>
-      </div>
-    </Link>
+        <div className="min-w-0">
+          <p className="truncate text-xs font-black text-slate-900">
+            {displayName}
+          </p>
+          <p className="text-[10px] font-bold text-slate-400">
+            {user ? "로그인됨" : "로그인 필요"}
+          </p>
+        </div>
+      </Link>
+    </div>
   );
 }

@@ -38,7 +38,7 @@ export default function WeeklyCalendarPage() {
       <CalendarNavigation />
 
       <section className="mt-6">
-        <RoutineScheduleManager items={items} />
+        <RoutineScheduleManager items={items} variant="weekly" />
       </section>
         <BottomNavigation />
       </div>
