@@ -79,3 +79,11 @@ SUPABASE_SERVICE_ROLE_KEY=
 
 `SUPABASE_SERVICE_ROLE_KEY`가 없으면 사용자가 푸시 구독을 저장할 수는 있어도,
 Vercel Cron이 모든 사용자의 알림 일정을 읽어 실제 푸시를 발송할 수 없다.
+
+추가 제한:
+
+- 현재 Vercel Hobby 플랜은 5분 단위 Cron을 허용하지 않는다.
+- 그래서 `/api/push/dispatch` 엔드포인트는 코드에 만들어두었지만 Vercel 내장 Cron 설정은 배포에서 제외했다.
+- 실제 운영 발송을 하려면 둘 중 하나가 필요하다.
+  - Vercel Pro로 올리고 5분 단위 Cron을 설정한다.
+  - `cron-job.org` 같은 외부 스케줄러에서 5분마다 `https://my-secretary-remote.vercel.app/api/push/dispatch`를 호출하고 `Authorization: Bearer CRON_SECRET` 헤더를 넣는다.
