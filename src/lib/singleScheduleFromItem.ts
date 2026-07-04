@@ -123,6 +123,7 @@ export function createSingleScheduleFromItem(
     endTime,
     placeName: "",
     memo: item.originalText,
+    color: item.color,
     sourceItemId: item.id,
     createdAt: now,
     updatedAt: now,

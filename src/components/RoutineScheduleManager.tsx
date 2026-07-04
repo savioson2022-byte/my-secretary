@@ -4,6 +4,7 @@ import TimeTaskSuggestionView from "@/components/TimeTaskSuggestionView";
 import TravelTimePlanner from "@/components/TravelTimePlanner";
 import WeeklyAvailabilityView from "@/components/WeeklyAvailabilityView";
 import PostcodeAddressSearch from "@/components/PostcodeAddressSearch";
+import ScheduleColorPicker from "@/components/ScheduleColorPicker";
 import {
   getSavedPlaces,
   saveSavedPlace,
@@ -13,7 +14,14 @@ import {
   deleteRoutineSchedule,
   getRoutineSchedules,
   saveRoutineSchedule,
+  updateRoutineSchedule,
 } from "@/lib/routineStorage";
+import {
+  DEFAULT_ROUTINE_SCHEDULE_COLOR,
+  DEFAULT_SINGLE_SCHEDULE_COLOR,
+  getScheduleColor,
+  getSoftColorStyle,
+} from "@/lib/scheduleColors";
 import {
   getSingleScheduleUpdatedEventName,
   getSingleSchedules,
@@ -200,6 +208,7 @@ function RoutineScheduleManager({ items }: RoutineScheduleManagerProps) {
   const [placeAddress, setPlaceAddress] = useState("");
   const [placePostalCode, setPlacePostalCode] = useState("");
   const [memo, setMemo] = useState("");
+  const [color, setColor] = useState(DEFAULT_ROUTINE_SCHEDULE_COLOR);
 
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -208,6 +217,7 @@ function RoutineScheduleManager({ items }: RoutineScheduleManagerProps) {
     null
   );
   const [isDragging, setIsDragging] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
 
   useEffect(() => {
     function refreshSchedules() {
@@ -381,6 +391,7 @@ function RoutineScheduleManager({ items }: RoutineScheduleManagerProps) {
       endTime,
       placeName: placeName.trim(),
       memo: memo.trim(),
+      color,
       startDate: startDate || null,
       endDate: endDate || null,
       isActive: true,
@@ -401,6 +412,7 @@ function RoutineScheduleManager({ items }: RoutineScheduleManagerProps) {
     setPlaceAddress("");
     setPlacePostalCode("");
     setMemo("");
+    setColor(DEFAULT_ROUTINE_SCHEDULE_COLOR);
     setStartDate("");
     setEndDate("");
     setDragSelection(null);
@@ -408,6 +420,15 @@ function RoutineScheduleManager({ items }: RoutineScheduleManagerProps) {
 
   function handleDelete(id: string) {
     deleteRoutineSchedule(id);
+    setRoutines(getRoutineSchedules());
+  }
+
+  function handleRoutineColorChange(routine: RoutineSchedule, nextColor: string) {
+    updateRoutineSchedule({
+      ...routine,
+      color: nextColor,
+      updatedAt: new Date().toISOString(),
+    });
     setRoutines(getRoutineSchedules());
   }
 
@@ -427,6 +448,8 @@ function RoutineScheduleManager({ items }: RoutineScheduleManagerProps) {
     event: PointerEvent<HTMLDivElement>,
     day: DayOfWeek
   ) {
+    if (!isEditMode) return;
+
     const selectedMinutes = getMinutesFromMouse(event, event.currentTarget);
 
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -470,13 +493,25 @@ function RoutineScheduleManager({ items }: RoutineScheduleManagerProps) {
   return (
     <section className="space-y-6">
       <section className="rounded-3xl bg-white p-5 shadow-soft ring-1 ring-slate-100">
-        <div>
-          <h2 className="text-lg font-black text-slate-900">주간 캘린더</h2>
-          <p className="mt-1 text-sm text-slate-500">
-            이번 주 날짜를 기준으로 정기 일정과 단기 일정을 함께 보여줍니다.
-            시간대를 10분 단위로 드래그하면 정기 일정 입력 폼에 자동으로
-            반영됩니다.
-          </p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="text-lg font-black text-slate-900">주간 캘린더</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              이번 주 날짜를 기준으로 정기 일정과 단기 일정을 함께 보여줍니다.
+              편집을 켜면 시간대를 10분 단위로 드래그할 수 있습니다.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsEditMode((current) => !current)}
+            className={`rounded-2xl px-4 py-3 text-sm font-black transition ${
+              isEditMode
+                ? "bg-slate-950 text-white"
+                : "bg-blue-50 text-blue-700 ring-1 ring-blue-100"
+            }`}
+          >
+            {isEditMode ? "편집 종료" : "주간 캘린더 편집"}
+          </button>
         </div>
 
         <div className="mt-4 max-h-[720px] overflow-auto rounded-3xl border border-slate-100 bg-slate-50">
@@ -549,7 +584,9 @@ function RoutineScheduleManager({ items }: RoutineScheduleManagerProps) {
                         setIsDragging(false);
                       }
                     }}
-                    className="relative cursor-crosshair touch-none border-l border-slate-100 bg-white"
+                    className={`relative border-l border-slate-100 bg-white ${
+                      isEditMode ? "cursor-crosshair touch-none" : "cursor-default"
+                    }`}
                   >
                     {hours.map((hour) => (
                       <div
@@ -562,7 +599,7 @@ function RoutineScheduleManager({ items }: RoutineScheduleManagerProps) {
                     {normalizedDragSelection &&
                       normalizedDragSelection.day === day && (
                         <div
-                          className="pointer-events-none absolute left-1 right-1 z-10 rounded-2xl border border-emerald-400 bg-emerald-200/60 p-2 text-xs"
+                          className="pointer-events-none absolute left-1 right-1 z-10 rounded-2xl border border-blue-400 bg-blue-200/60 p-2 text-xs"
                           style={{
                             top: `${
                               ((normalizedDragSelection.startMinutes -
@@ -579,10 +616,10 @@ function RoutineScheduleManager({ items }: RoutineScheduleManagerProps) {
                             )}px`,
                           }}
                         >
-                          <p className="font-black text-emerald-950">
+                          <p className="font-black text-blue-950">
                             선택한 시간
                           </p>
-                          <p className="mt-0.5 font-semibold text-emerald-800">
+                          <p className="mt-0.5 font-semibold text-blue-800">
                             {minutesToTime(
                               normalizedDragSelection.startMinutes
                             )}{" "}
@@ -597,30 +634,35 @@ function RoutineScheduleManager({ items }: RoutineScheduleManagerProps) {
                         routine.startTime,
                         routine.endTime
                       );
+                      const scheduleColor = getScheduleColor(
+                        routine.color,
+                        DEFAULT_ROUTINE_SCHEDULE_COLOR
+                      );
 
                       return (
                         <div
                           key={`routine-${routine.id}-${dateText}`}
                           onMouseDown={(event) => event.stopPropagation()}
-                          className="absolute left-1 right-1 overflow-hidden rounded-2xl bg-emerald-100 p-2 text-xs ring-1 ring-emerald-200"
+                          className="absolute left-1 right-1 overflow-hidden rounded-2xl border p-2 text-xs"
                           style={{
                             top: `${top}px`,
                             height: `${Math.max(height, 36)}px`,
+                            ...getSoftColorStyle(scheduleColor),
                           }}
                         >
                           <div className="flex items-center gap-1">
-                            <span className="rounded-full bg-emerald-200 px-1.5 py-0.5 text-[10px] font-black text-emerald-800">
+                            <span className="rounded-full bg-white/70 px-1.5 py-0.5 text-[10px] font-black">
                               정기
                             </span>
-                            <p className="truncate font-black text-emerald-950">
+                            <p className="truncate font-black">
                               {routine.title}
                             </p>
                           </div>
 
-                          <p className="mt-0.5 truncate font-semibold text-emerald-800">
+                          <p className="mt-0.5 truncate font-semibold">
                             {routine.startTime} ~ {routine.endTime}
                           </p>
-                          <p className="mt-0.5 truncate text-emerald-700">
+                          <p className="mt-0.5 truncate">
                             {routine.placeName}
                           </p>
                         </div>
@@ -633,30 +675,35 @@ function RoutineScheduleManager({ items }: RoutineScheduleManagerProps) {
                         schedule.startTime,
                         schedule.endTime
                       );
+                      const scheduleColor = getScheduleColor(
+                        schedule.color,
+                        DEFAULT_SINGLE_SCHEDULE_COLOR
+                      );
 
                       return (
                         <div
                           key={`single-${schedule.id}`}
                           onMouseDown={(event) => event.stopPropagation()}
-                          className="absolute left-1 right-1 overflow-hidden rounded-2xl bg-sky-100 p-2 text-xs ring-1 ring-sky-200"
+                          className="absolute left-1 right-1 overflow-hidden rounded-2xl border p-2 text-xs"
                           style={{
                             top: `${top}px`,
                             height: `${Math.max(height, 36)}px`,
+                            ...getSoftColorStyle(scheduleColor),
                           }}
                         >
                           <div className="flex items-center gap-1">
-                            <span className="rounded-full bg-sky-200 px-1.5 py-0.5 text-[10px] font-black text-sky-800">
+                            <span className="rounded-full bg-white/70 px-1.5 py-0.5 text-[10px] font-black">
                               단기
                             </span>
-                            <p className="truncate font-black text-sky-950">
+                            <p className="truncate font-black">
                               {schedule.title}
                             </p>
                           </div>
 
-                          <p className="mt-0.5 truncate font-semibold text-sky-800">
+                          <p className="mt-0.5 truncate font-semibold">
                             {schedule.startTime} ~ {schedule.endTime}
                           </p>
-                          <p className="mt-0.5 truncate text-sky-700">
+                          <p className="mt-0.5 truncate">
                             {schedule.placeName || "위치 미입력"}
                           </p>
                         </div>
@@ -681,19 +728,14 @@ function RoutineScheduleManager({ items }: RoutineScheduleManagerProps) {
         singleSchedules={singleSchedules}
       />
 
-      <TravelTimePlanner
-        routines={routines}
-        singleSchedules={singleSchedules}
-        savedPlaces={savedPlaces}
-        travelTimeRules={travelTimeRules}
-        onChange={refreshTravelData}
-      />
-
-      <section className="rounded-3xl bg-white p-5 shadow-soft ring-1 ring-slate-100">
+      <section
+        id="schedule-manager"
+        className="rounded-3xl bg-white p-5 shadow-soft ring-1 ring-slate-100"
+      >
         <div>
-          <h2 className="text-lg font-black text-slate-900">정기 일정 입력</h2>
+          <h2 className="text-lg font-black text-slate-900">나의 일정 관리</h2>
           <p className="mt-1 text-sm text-slate-500">
-            학교, 학원, 운동처럼 반복되는 고정 일정을 입력합니다.
+            반복 일정과 이동 준비를 한 곳에서 관리합니다.
           </p>
         </div>
 
@@ -750,6 +792,12 @@ function RoutineScheduleManager({ items }: RoutineScheduleManagerProps) {
               />
             </div>
           </div>
+
+          <ScheduleColorPicker
+            label="캘린더 색인"
+            value={color}
+            onChange={setColor}
+          />
 
           <div className="grid gap-3 md:grid-cols-2">
             <div>
@@ -860,6 +908,16 @@ function RoutineScheduleManager({ items }: RoutineScheduleManagerProps) {
             정기 일정 저장
           </button>
         </form>
+
+        <div className="mt-6 border-t border-slate-100 pt-6">
+          <TravelTimePlanner
+            routines={routines}
+            singleSchedules={singleSchedules}
+            savedPlaces={savedPlaces}
+            travelTimeRules={travelTimeRules}
+            onChange={refreshTravelData}
+          />
+        </div>
       </section>
 
       <section className="rounded-3xl bg-white p-5 shadow-soft ring-1 ring-slate-100">
@@ -897,6 +955,17 @@ function RoutineScheduleManager({ items }: RoutineScheduleManagerProps) {
                         메모: {routine.memo}
                       </p>
                     )}
+                    <div className="mt-3">
+                      <ScheduleColorPicker
+                        value={getScheduleColor(
+                          routine.color,
+                          DEFAULT_ROUTINE_SCHEDULE_COLOR
+                        )}
+                        onChange={(nextColor) =>
+                          handleRoutineColorChange(routine, nextColor)
+                        }
+                      />
+                    </div>
                   </div>
 
                   <button

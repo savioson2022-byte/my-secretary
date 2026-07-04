@@ -8,6 +8,8 @@ import {
   ProcessType,
   RepeatType,
 } from "@/types/assistant";
+import ScheduleColorPicker from "@/components/ScheduleColorPicker";
+import { DEFAULT_SINGLE_SCHEDULE_COLOR } from "@/lib/scheduleColors";
 
 type ClassificationResultProps = {
   result: AssistantItemWithoutId;
@@ -253,6 +255,14 @@ export default function ClassificationResult({
             ))}
           </select>
         </div>
+
+        {result.processType === "단기일정" && (
+          <ScheduleColorPicker
+            label="캘린더 색인"
+            value={result.color ?? DEFAULT_SINGLE_SCHEDULE_COLOR}
+            onChange={(color) => updateResult({ color })}
+          />
+        )}
 
         <div className="grid gap-3 md:grid-cols-3">
           <div>

@@ -10,6 +10,7 @@ import {
 } from "@/lib/availability";
 import { SingleSchedule } from "@/types/calendar";
 import { RoutineSchedule } from "@/types/routine";
+import { useState } from "react";
 
 type WeeklyAvailabilityViewProps = {
   routines: RoutineSchedule[];
@@ -47,6 +48,15 @@ export default function WeeklyAvailabilityView({
   const weekDates = Array.from({ length: 7 }, (_, index) => {
     return toDateOnlyString(addDays(startOfWeek, index));
   });
+  const [selectedDateText, setSelectedDateText] = useState(() => {
+    return toDateOnlyString(today);
+  });
+  const selectedFreeTimeBlocks = calculateFreeTimeBlocksForDate({
+    date: selectedDateText,
+    routines,
+    singleSchedules,
+  });
+  const selectedDayOfWeek = getDayOfWeekFromDateText(selectedDateText);
 
   return (
     <section className="rounded-3xl border border-slate-100 bg-slate-50 p-5">
@@ -59,7 +69,7 @@ export default function WeeklyAvailabilityView({
         </p>
       </div>
 
-      <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+      <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
         {weekDates.map((dateText) => {
           const freeTimeBlocks = calculateFreeTimeBlocksForDate({
             date: dateText,
@@ -69,53 +79,62 @@ export default function WeeklyAvailabilityView({
 
           const dayOfWeek = getDayOfWeekFromDateText(dateText);
           const isToday = dateText === toDateOnlyString(today);
+          const isSelected = dateText === selectedDateText;
 
           return (
-            <div
+            <button
+              type="button"
               key={dateText}
-              className="rounded-2xl border border-slate-100 bg-white p-4"
+              onClick={() => setSelectedDateText(dateText)}
+              className={`shrink-0 rounded-2xl border px-4 py-3 text-left transition ${
+                isSelected
+                  ? "border-blue-200 bg-white text-blue-700 shadow-soft"
+                  : "border-slate-100 bg-white text-slate-500"
+              }`}
             >
-              <div className="mb-3 flex items-center justify-between gap-2">
-                <div>
-                  <h4 className="font-black text-slate-800">
-                    {formatMonthDay(dateText)} {dayOfWeek}
-                  </h4>
-                  {isToday && (
-                    <p className="mt-1 text-xs font-bold text-emerald-600">
-                      오늘
-                    </p>
-                  )}
-                </div>
-
-                <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-bold text-slate-500">
-                  {freeTimeBlocks.length}개
-                </span>
-              </div>
-
-              {freeTimeBlocks.length === 0 ? (
-                <p className="rounded-xl bg-slate-50 p-3 text-sm text-slate-500">
-                  빈 시간이 없습니다.
-                </p>
-              ) : (
-                <ul className="space-y-2">
-                  {freeTimeBlocks.map((block) => (
-                    <li
-                      key={`${dateText}-${block.startTime}-${block.endTime}`}
-                      className="rounded-xl bg-slate-50 px-3 py-2 text-sm"
-                    >
-                      <p className="font-bold text-slate-800">
-                        {block.startTime} ~ {block.endTime}
-                      </p>
-                      <p className="mt-1 text-xs font-semibold text-slate-500">
-                        {formatMinutes(block.minutes)}
-                      </p>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+              <p className="text-sm font-black">
+                {formatMonthDay(dateText)} {dayOfWeek}
+              </p>
+              <p className="mt-1 text-xs font-bold">
+                {isToday ? "오늘 · " : ""}
+                빈 시간 {freeTimeBlocks.length}개
+              </p>
+            </button>
           );
         })}
+      </div>
+
+      <div className="mt-4 rounded-2xl border border-slate-100 bg-white p-4">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <h4 className="font-black text-slate-800">
+            {formatMonthDay(selectedDateText)} {selectedDayOfWeek}
+          </h4>
+          <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-bold text-slate-500">
+            {selectedFreeTimeBlocks.length}개
+          </span>
+        </div>
+
+        {selectedFreeTimeBlocks.length === 0 ? (
+          <p className="rounded-xl bg-slate-50 p-3 text-sm text-slate-500">
+            빈 시간이 없습니다.
+          </p>
+        ) : (
+          <ul className="space-y-2">
+            {selectedFreeTimeBlocks.map((block) => (
+              <li
+                key={`${selectedDateText}-${block.startTime}-${block.endTime}`}
+                className="rounded-xl bg-slate-50 px-3 py-2 text-sm"
+              >
+                <p className="font-bold text-slate-800">
+                  {block.startTime} ~ {block.endTime}
+                </p>
+                <p className="mt-1 text-xs font-semibold text-slate-500">
+                  {formatMinutes(block.minutes)}
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </section>
   );

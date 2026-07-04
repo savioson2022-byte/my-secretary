@@ -36,6 +36,12 @@ export type SingleSchedule = {
   memo: string;
 
   /**
+   * 캘린더에서 표시할 사용자 지정 색상
+   * 예: "#8B5CF6"
+   */
+  color?: string;
+
+  /**
    * 사용자가 입력한 원래 기록 AssistantItem과 연결하기 위한 id
    * 아직 연결된 기록이 없으면 null
    */

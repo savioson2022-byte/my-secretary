@@ -21,13 +21,13 @@ const LINKS = [
   },
   {
     href: "/calendar/weekly",
-    label: "알림",
+    label: "주간",
     icon: "M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9ZM10 21h4",
   },
   {
-    href: "/account",
-    label: "계정",
-    icon: "M20 21a8 8 0 0 0-16 0M12 13a5 5 0 1 0 0-10 5 5 0 0 0 0 10Z",
+    href: "/calendar/weekly#schedule-manager",
+    label: "일정관리",
+    icon: "M4 6h16M4 12h10M4 18h16M17 10l3 3-3 3",
   },
 ];
 

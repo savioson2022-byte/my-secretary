@@ -1,5 +1,10 @@
 "use client";
 
+import ScheduleColorPicker from "@/components/ScheduleColorPicker";
+import {
+  DEFAULT_SINGLE_SCHEDULE_COLOR,
+  getScheduleColor,
+} from "@/lib/scheduleColors";
 import { updateSingleSchedule } from "@/lib/singleScheduleStorage";
 import { SingleSchedule } from "@/types/calendar";
 import { useState } from "react";
@@ -31,6 +36,7 @@ export default function SingleScheduleList({
   const [editEndTime, setEditEndTime] = useState("");
   const [editPlaceName, setEditPlaceName] = useState("");
   const [editMemo, setEditMemo] = useState("");
+  const [editColor, setEditColor] = useState(DEFAULT_SINGLE_SCHEDULE_COLOR);
 
   function startEdit(schedule: SingleSchedule) {
     setEditingId(schedule.id);
@@ -40,6 +46,7 @@ export default function SingleScheduleList({
     setEditEndTime(schedule.endTime);
     setEditPlaceName(schedule.placeName);
     setEditMemo(schedule.memo);
+    setEditColor(getScheduleColor(schedule.color, DEFAULT_SINGLE_SCHEDULE_COLOR));
   }
 
   function cancelEdit() {
@@ -50,6 +57,7 @@ export default function SingleScheduleList({
     setEditEndTime("");
     setEditPlaceName("");
     setEditMemo("");
+    setEditColor(DEFAULT_SINGLE_SCHEDULE_COLOR);
   }
 
   function saveEdit(schedule: SingleSchedule) {
@@ -81,6 +89,7 @@ export default function SingleScheduleList({
       endTime: editEndTime,
       placeName: editPlaceName.trim(),
       memo: editMemo.trim(),
+      color: editColor,
       updatedAt: new Date().toISOString(),
     });
 
@@ -104,6 +113,10 @@ export default function SingleScheduleList({
         ) : (
           sortedSchedules.map((schedule) => {
             const isEditing = editingId === schedule.id;
+            const scheduleColor = getScheduleColor(
+              schedule.color,
+              DEFAULT_SINGLE_SCHEDULE_COLOR
+            );
 
             return (
               <article
@@ -191,6 +204,12 @@ export default function SingleScheduleList({
                       />
                     </div>
 
+                    <ScheduleColorPicker
+                      label="캘린더 색인"
+                      value={editColor}
+                      onChange={setEditColor}
+                    />
+
                     <div className="flex gap-2">
                       <button
                         type="button"
@@ -211,10 +230,16 @@ export default function SingleScheduleList({
                   </div>
                 ) : (
                   <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="font-black text-slate-900">
-                        {schedule.title}
-                      </p>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="h-3 w-3 shrink-0 rounded-full"
+                          style={{ backgroundColor: scheduleColor }}
+                        />
+                        <p className="truncate font-black text-slate-900">
+                          {schedule.title}
+                        </p>
+                      </div>
 
                       <p className="mt-1 text-sm font-semibold text-slate-600">
                         {schedule.date} {schedule.startTime} ~{" "}

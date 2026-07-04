@@ -72,6 +72,11 @@ export type AssistantItemWithoutId = {
    * 예: "16:00"
    */
   scheduleEndTime?: string | null;
+
+  /**
+   * 기록 저장 시 단기 일정으로 등록될 경우 캘린더에 표시할 색상
+   */
+  color?: string;
 };
 
 export type AssistantItem = AssistantItemWithoutId & {

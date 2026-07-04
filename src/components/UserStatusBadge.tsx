@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { User } from "@supabase/supabase-js";
+import Link from "next/link";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 function getDisplayName(user: User | null, profileName: string) {
@@ -62,7 +63,11 @@ export default function UserStatusBadge() {
   const initial = displayName.slice(0, 1).toUpperCase() || "나";
 
   return (
-    <div className="flex max-w-[180px] items-center gap-2 rounded-full bg-white px-2 py-1.5 shadow-soft ring-1 ring-slate-100">
+    <Link
+      href="/account"
+      aria-label="계정과 기기 관리로 이동"
+      className="flex max-w-[180px] items-center gap-2 rounded-full bg-white px-2 py-1.5 shadow-soft ring-1 ring-slate-100 transition hover:bg-slate-50"
+    >
       <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-gradient-to-tr from-fuchsia-500 via-rose-400 to-amber-300 p-[2px]">
         <div className="grid h-full w-full place-items-center rounded-full bg-white text-xs font-black text-slate-950">
           {initial}
@@ -76,6 +81,6 @@ export default function UserStatusBadge() {
           {user ? "로그인됨" : "로그인 필요"}
         </p>
       </div>
-    </div>
+    </Link>
   );
 }

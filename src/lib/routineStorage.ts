@@ -13,6 +13,10 @@ export function saveRoutineSchedule(routine: RoutineSchedule) {
   routineScheduleRepository.create(routine);
 }
 
+export function updateRoutineSchedule(routine: RoutineSchedule) {
+  routineScheduleRepository.update(routine);
+}
+
 export function deleteRoutineSchedule(id: string) {
   routineScheduleRepository.delete(id);
 }
