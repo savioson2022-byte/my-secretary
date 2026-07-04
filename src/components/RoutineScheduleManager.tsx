@@ -38,6 +38,7 @@ const DAYS: DayOfWeek[] = ["월", "화", "수", "목", "금", "토", "일"];
 const START_HOUR = 0;
 const END_HOUR = 24;
 const HOUR_HEIGHT = 56;
+const MOBILE_HOUR_HEIGHT = 26;
 const SNAP_MINUTES = 10;
 
 type DragSelection = {
@@ -59,7 +60,7 @@ function createId() {
 }
 
 function getTodayText() {
-  return new Date().toISOString().slice(0, 10);
+  return toDateText(new Date());
 }
 
 function timeToMinutes(time: string) {
@@ -96,14 +97,33 @@ function getRoutineHeight(startTime: string, endTime: string) {
   return ((endMinutes - startMinutes) / 60) * HOUR_HEIGHT;
 }
 
+function getScheduleTop(startTime: string, hourHeight: number) {
+  const startMinutes = timeToMinutes(startTime);
+  const baseMinutes = START_HOUR * 60;
+
+  return ((startMinutes - baseMinutes) / 60) * hourHeight;
+}
+
+function getScheduleHeight(
+  startTime: string,
+  endTime: string,
+  hourHeight: number
+) {
+  const startMinutes = timeToMinutes(startTime);
+  const endMinutes = timeToMinutes(endTime);
+
+  return ((endMinutes - startMinutes) / 60) * hourHeight;
+}
+
 function getMinutesFromMouse(
   event: PointerEvent<HTMLDivElement>,
-  element: HTMLDivElement
+  element: HTMLDivElement,
+  hourHeight = HOUR_HEIGHT
 ) {
   const rect = element.getBoundingClientRect();
   const y = event.clientY - rect.top;
 
-  const minutesFromStart = (y / HOUR_HEIGHT) * 60;
+  const minutesFromStart = (y / hourHeight) * 60;
   const rawMinutes = START_HOUR * 60 + minutesFromStart;
 
   return clamp(snapMinutes(rawMinutes), START_HOUR * 60, END_HOUR * 60);
@@ -218,6 +238,9 @@ function RoutineScheduleManager({ items }: RoutineScheduleManagerProps) {
   );
   const [isDragging, setIsDragging] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
+  const [selectedMobileDateText, setSelectedMobileDateText] = useState(() =>
+    getTodayText()
+  );
 
   useEffect(() => {
     function refreshSchedules() {
@@ -444,6 +467,49 @@ function RoutineScheduleManager({ items }: RoutineScheduleManagerProps) {
     return singleSchedules.filter((schedule) => schedule.date === dateText);
   }
 
+  function getDailyScheduleItems(day: DayOfWeek, dateText: string) {
+    const routineItems = getRoutinesByDayAndDate(day, dateText).map(
+      (routine) => {
+        const scheduleColor = getScheduleColor(
+          routine.color,
+          DEFAULT_ROUTINE_SCHEDULE_COLOR
+        );
+
+        return {
+          id: `routine-${routine.id}-${dateText}`,
+          type: "정기",
+          title: routine.title,
+          placeName: routine.placeName,
+          startTime: routine.startTime,
+          endTime: routine.endTime,
+          color: scheduleColor,
+        };
+      }
+    );
+    const singleItems = getSingleSchedulesByDateText(dateText).map(
+      (schedule) => {
+        const scheduleColor = getScheduleColor(
+          schedule.color,
+          DEFAULT_SINGLE_SCHEDULE_COLOR
+        );
+
+        return {
+          id: `single-${schedule.id}`,
+          type: "단기",
+          title: schedule.title,
+          placeName: schedule.placeName || "위치 미입력",
+          startTime: schedule.startTime,
+          endTime: schedule.endTime,
+          color: scheduleColor,
+        };
+      }
+    );
+
+    return [...routineItems, ...singleItems].sort((a, b) => {
+      return a.startTime.localeCompare(b.startTime);
+    });
+  }
+
   function handlePointerDown(
     event: PointerEvent<HTMLDivElement>,
     day: DayOfWeek
@@ -486,9 +552,66 @@ function RoutineScheduleManager({ items }: RoutineScheduleManagerProps) {
     setEndTime(minutesToTime(normalized.endMinutes));
   }
 
+  function handleMobilePointerDown(event: PointerEvent<HTMLDivElement>) {
+    if (!isEditMode) return;
+
+    const selectedMinutes = getMinutesFromMouse(
+      event,
+      event.currentTarget,
+      MOBILE_HOUR_HEIGHT
+    );
+
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setIsDragging(true);
+    setDragSelection({
+      day: selectedMobileDay,
+      startMinutes: selectedMinutes,
+      endMinutes: selectedMinutes + SNAP_MINUTES,
+    });
+  }
+
+  function handleMobilePointerMove(event: PointerEvent<HTMLDivElement>) {
+    if (!isDragging || !dragSelection) return;
+
+    const selectedMinutes = getMinutesFromMouse(
+      event,
+      event.currentTarget,
+      MOBILE_HOUR_HEIGHT
+    );
+
+    setDragSelection({
+      ...dragSelection,
+      endMinutes: selectedMinutes,
+    });
+  }
+
+  function handleMobilePointerUp(event: PointerEvent<HTMLDivElement>) {
+    if (!dragSelection) return;
+
+    event.currentTarget.releasePointerCapture(event.pointerId);
+    const normalized = normalizeSelection(dragSelection);
+
+    setIsDragging(false);
+    setDragSelection(normalized);
+
+    setDayOfWeek(normalized.day);
+    setStartTime(minutesToTime(normalized.startMinutes));
+    setEndTime(minutesToTime(normalized.endMinutes));
+  }
+
   const normalizedDragSelection = dragSelection
     ? normalizeSelection(dragSelection)
     : null;
+  const selectedMobileIndex = Math.max(
+    0,
+    weekDates.findIndex((date) => toDateText(date) === selectedMobileDateText)
+  );
+  const selectedMobileDate = weekDates[selectedMobileIndex] ?? weekDates[0];
+  const selectedMobileDay = DAYS[selectedMobileIndex] ?? DAYS[0];
+  const selectedMobileItems = getDailyScheduleItems(
+    selectedMobileDay,
+    toDateText(selectedMobileDate)
+  );
 
   return (
     <section className="space-y-6">
@@ -514,7 +637,185 @@ function RoutineScheduleManager({ items }: RoutineScheduleManagerProps) {
           </button>
         </div>
 
-        <div className="mt-4 max-h-[720px] overflow-auto rounded-3xl border border-slate-100 bg-slate-50">
+        <div className="mt-4 md:hidden">
+          <div className="flex gap-2 overflow-x-auto pb-2">
+            {DAYS.map((day, index) => {
+              const date = weekDates[index];
+              const dateText = toDateText(date);
+              const dayItems = getDailyScheduleItems(day, dateText);
+              const isToday = dateText === toDateText(today);
+              const isSelected = dateText === toDateText(selectedMobileDate);
+              const densityLabel =
+                dayItems.length >= 4
+                  ? "바쁨"
+                  : dayItems.length >= 2
+                  ? "보통"
+                  : dayItems.length === 1
+                  ? "여유"
+                  : "비어있음";
+
+              return (
+                <button
+                  key={dateText}
+                  type="button"
+                  onClick={() => setSelectedMobileDateText(dateText)}
+                  className={`min-w-[78px] rounded-3xl px-3 py-3 text-left transition ${
+                    isSelected
+                      ? "bg-slate-950 text-white shadow-[0_14px_28px_rgba(15,23,42,0.18)]"
+                      : "bg-slate-50 text-slate-600 ring-1 ring-slate-100"
+                  }`}
+                >
+                  <p className="text-xs font-black opacity-80">
+                    {formatMonthDay(date)}
+                  </p>
+                  <p className="mt-1 text-xl font-black">{day}</p>
+                  <p className="mt-2 text-[11px] font-bold opacity-75">
+                    {isToday ? "오늘 · " : ""}
+                    {densityLabel}
+                  </p>
+                  <div className="mt-2 flex gap-1">
+                    {dayItems.slice(0, 4).map((item) => (
+                      <span
+                        key={`${dateText}-${item.id}`}
+                        className="h-1.5 w-3 rounded-full"
+                        style={{ backgroundColor: item.color }}
+                      />
+                    ))}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="mt-4 rounded-[28px] bg-slate-50 p-4 ring-1 ring-slate-100">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-black text-slate-500">
+                  {formatMonthDay(selectedMobileDate)} {selectedMobileDay}요일
+                </p>
+                <h3 className="mt-1 text-2xl font-black tracking-tight text-slate-950">
+                  하루 시간표
+                </h3>
+              </div>
+              <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-slate-500 ring-1 ring-slate-100">
+                {selectedMobileItems.length}개
+              </span>
+            </div>
+
+            <div
+              onPointerDown={handleMobilePointerDown}
+              onPointerMove={handleMobilePointerMove}
+              onPointerUp={handleMobilePointerUp}
+              onPointerCancel={() => {
+                if (isDragging) {
+                  setIsDragging(false);
+                }
+              }}
+              className={`relative mt-4 overflow-hidden rounded-3xl bg-white ring-1 ring-slate-100 ${
+                isEditMode ? "touch-none" : ""
+              }`}
+              style={{
+                height: `${(END_HOUR - START_HOUR) * MOBILE_HOUR_HEIGHT}px`,
+              }}
+            >
+              <div className="absolute inset-y-0 left-0 w-14 border-r border-slate-100 bg-slate-50">
+                {hours.map((hour) => (
+                  <div
+                    key={hour}
+                    className="border-b border-slate-100 pr-2 text-right text-[10px] font-bold text-slate-400"
+                    style={{ height: `${MOBILE_HOUR_HEIGHT}px` }}
+                  >
+                    <span className="relative top-[-2px]">
+                      {String(hour).padStart(2, "0")}:00
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="absolute inset-y-0 left-14 right-0">
+                {hours.map((hour) => (
+                  <div
+                    key={hour}
+                    className="border-b border-slate-100"
+                    style={{ height: `${MOBILE_HOUR_HEIGHT}px` }}
+                  />
+                ))}
+
+                {normalizedDragSelection &&
+                  normalizedDragSelection.day === selectedMobileDay && (
+                    <div
+                      className="pointer-events-none absolute left-2 right-2 z-10 rounded-2xl border border-blue-400 bg-blue-200/70 p-2 text-xs"
+                      style={{
+                        top: `${
+                          ((normalizedDragSelection.startMinutes -
+                            START_HOUR * 60) /
+                            60) *
+                          MOBILE_HOUR_HEIGHT
+                        }px`,
+                        height: `${Math.max(
+                          ((normalizedDragSelection.endMinutes -
+                            normalizedDragSelection.startMinutes) /
+                            60) *
+                            MOBILE_HOUR_HEIGHT,
+                          24
+                        )}px`,
+                      }}
+                    >
+                      <p className="font-black text-blue-950">선택한 시간</p>
+                      <p className="mt-0.5 font-semibold text-blue-800">
+                        {minutesToTime(normalizedDragSelection.startMinutes)} ~{" "}
+                        {minutesToTime(normalizedDragSelection.endMinutes)}
+                      </p>
+                    </div>
+                  )}
+
+                {selectedMobileItems.map((item) => {
+                  const top = getScheduleTop(
+                    item.startTime,
+                    MOBILE_HOUR_HEIGHT
+                  );
+                  const height = getScheduleHeight(
+                    item.startTime,
+                    item.endTime,
+                    MOBILE_HOUR_HEIGHT
+                  );
+
+                  return (
+                    <div
+                      key={item.id}
+                      className="absolute left-2 right-2 overflow-hidden rounded-2xl border p-3 text-xs"
+                      style={{
+                        top: `${top}px`,
+                        height: `${Math.max(height, 28)}px`,
+                        ...getSoftColorStyle(item.color),
+                      }}
+                    >
+                      <div className="flex items-center gap-1">
+                        <span className="rounded-full bg-white/70 px-1.5 py-0.5 text-[10px] font-black">
+                          {item.type}
+                        </span>
+                        <p className="truncate font-black">{item.title}</p>
+                      </div>
+                      <p className="mt-1 truncate font-semibold">
+                        {item.startTime} ~ {item.endTime}
+                      </p>
+                      <p className="mt-0.5 truncate">{item.placeName}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {isEditMode && (
+              <p className="mt-3 rounded-2xl bg-blue-50 p-3 text-xs font-bold leading-5 text-blue-700 ring-1 ring-blue-100">
+                하루 시간표를 누르고 드래그하면 10분 단위로 시간이 선택되고,
+                아래 정기 일정 입력칸에 자동 반영됩니다.
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="mt-4 hidden max-h-[720px] overflow-auto rounded-3xl border border-slate-100 bg-slate-50 md:block">
           <div className="min-w-[760px] md:min-w-[860px]">
             <div className="sticky top-0 z-20 grid grid-cols-[64px_repeat(7,1fr)] border-b border-slate-200 bg-white">
               <div className="p-3 text-center text-xs font-bold text-slate-400">

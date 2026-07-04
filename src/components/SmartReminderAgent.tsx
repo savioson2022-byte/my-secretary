@@ -208,19 +208,24 @@ function checkDueReminders() {
 
 export default function SmartReminderAgent() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
+  const [isMounted, setIsMounted] = useState(false);
   const [permission, setPermission] = useState<NotificationPermission | "none">(
     "none"
   );
   const [message, setMessage] = useState<string | null>(null);
   const canUseNotification = useMemo(() => {
-    return typeof window !== "undefined" && "Notification" in window;
-  }, []);
+    return isMounted && "Notification" in window;
+  }, [isMounted]);
   const canUsePush = useMemo(() => {
     return (
-      typeof window !== "undefined" &&
+      isMounted &&
       "serviceWorker" in navigator &&
       "PushManager" in window
     );
+  }, [isMounted]);
+
+  useEffect(() => {
+    setIsMounted(true);
   }, []);
 
   useEffect(() => {

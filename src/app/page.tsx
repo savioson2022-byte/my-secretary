@@ -7,11 +7,16 @@ import ClassificationResult from "@/components/ClassificationResult";
 import FilterBar from "@/components/FilterBar";
 import InputBox from "@/components/InputBox";
 import ItemCard from "@/components/ItemCard";
+import TimeTaskSuggestionView from "@/components/TimeTaskSuggestionView";
 import UserStatusBadge from "@/components/UserStatusBadge";
 import { aiClassifyInput } from "@/lib/aiClassifyInput";
 import { classifyInput } from "@/lib/classifyInput";
+import { getRoutineSchedules } from "@/lib/routineStorage";
 import { createSingleScheduleFromItem } from "@/lib/singleScheduleFromItem";
-import { saveSingleSchedule } from "@/lib/singleScheduleStorage";
+import {
+  getSingleSchedules,
+  saveSingleSchedule,
+} from "@/lib/singleScheduleStorage";
 import { deleteItem, getItems, saveItem, updateItem } from "@/lib/storage";
 import { getUserProfile } from "@/lib/userProfileStorage";
 import {
@@ -19,6 +24,8 @@ import {
   AssistantItemWithoutId,
   FilterType,
 } from "@/types/assistant";
+import { SingleSchedule } from "@/types/calendar";
+import { RoutineSchedule } from "@/types/routine";
 import { UserProfile } from "@/types/userProfile";
 
 function createId() {
@@ -85,6 +92,8 @@ export default function Home() {
   const [classificationResult, setClassificationResult] =
     useState<AssistantItemWithoutId | null>(null);
   const [items, setItems] = useState<AssistantItem[]>([]);
+  const [routines, setRoutines] = useState<RoutineSchedule[]>([]);
+  const [singleSchedules, setSingleSchedules] = useState<SingleSchedule[]>([]);
   const [selectedFilter, setSelectedFilter] = useState<FilterType>("전체");
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
@@ -96,6 +105,8 @@ export default function Home() {
 
   useEffect(() => {
     setItems(getItems());
+    setRoutines(getRoutineSchedules());
+    setSingleSchedules(getSingleSchedules());
     setUserProfile(getUserProfile());
 
     const searchParams = new URLSearchParams(window.location.search);
@@ -164,6 +175,7 @@ export default function Home() {
 
     if (singleSchedule) {
       saveSingleSchedule(singleSchedule);
+      setSingleSchedules(getSingleSchedules());
     }
 
     setItems(getItems());
@@ -331,28 +343,13 @@ export default function Home() {
             </section>
           )}
 
-          <section className="app-card p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="font-black text-slate-900">AI 추천 시간작업</h3>
-              <Link href="/calendar/weekly" className="text-xs font-black text-slate-400">
-                전체 보기
-              </Link>
-            </div>
-            <div className="flex items-center gap-3 rounded-2xl bg-slate-50 p-3">
-              <div className="grid h-10 w-10 place-items-center rounded-2xl bg-blue-100 text-blue-600">
-                <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor" aria-hidden="true">
-                  <path d="M5 5h14v14H5zM8 8h3v8H8zM13 8h3v8h-3z" />
-                </svg>
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-black text-slate-900">영어 단어 암기</p>
-                <p className="mt-0.5 truncate text-xs font-semibold text-slate-400">
-                  오늘 빈 시간에 딱 맞는 추천이에요
-                </p>
-              </div>
-              <span className="text-xs font-black text-slate-300">30분</span>
-            </div>
-          </section>
+          <TimeTaskSuggestionView
+            items={items}
+            routines={routines}
+            singleSchedules={singleSchedules}
+            compact
+            maxItems={2}
+          />
         </div>
 
         <BottomNavigation />
