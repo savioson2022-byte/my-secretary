@@ -310,6 +310,7 @@ export default function AccountManager() {
       provider,
       options: {
         redirectTo: getAuthRedirectUrl(),
+        scopes: provider === "kakao" ? "profile_nickname" : undefined,
       },
     });
 
