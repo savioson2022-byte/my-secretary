@@ -99,6 +99,13 @@ function getInitial(name: string) {
   return name.trim().slice(0, 1).toUpperCase() || "나";
 }
 
+function getAuthRedirectUrl() {
+  const callbackUrl = new URL("/auth/callback", window.location.origin);
+  callbackUrl.searchParams.set("next", window.location.pathname || "/settings");
+
+  return callbackUrl.toString();
+}
+
 export default function AccountManager() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const configured = isSupabaseConfigured();
@@ -123,6 +130,13 @@ export default function AccountManager() {
   const [localProfile, setLocalProfile] = useState<UserProfile | null>(null);
 
   useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const authError = searchParams.get("auth_error");
+
+    if (authError) {
+      setMessage(authError);
+    }
+
     const savedProfile = getUserProfile();
     setLocalProfile(savedProfile);
     setPreferredTravelMode(savedProfile?.preferredTravelMode ?? "transit");
@@ -268,7 +282,7 @@ export default function AccountManager() {
       email: email.trim(),
       options: {
         shouldCreateUser: authMode === "signup",
-        emailRedirectTo: `${window.location.origin}/account`,
+        emailRedirectTo: getAuthRedirectUrl(),
       },
     });
 
@@ -295,7 +309,7 @@ export default function AccountManager() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: `${window.location.origin}/account`,
+        redirectTo: getAuthRedirectUrl(),
       },
     });
 
