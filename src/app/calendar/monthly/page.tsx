@@ -45,7 +45,6 @@ export default function MonthlyCalendarPage() {
       <div className="min-h-screen bg-white pb-2 sm:phone-shell sm:min-h-0 sm:overflow-hidden sm:p-4">
         <div className="flex items-center justify-between px-1 pb-5 pt-1 text-xs font-black text-slate-900">
           <span>9:41</span>
-          <span className="tracking-[0.18em]">•••</span>
         </div>
         <header className="mb-4 flex items-start justify-between gap-4">
           <div>

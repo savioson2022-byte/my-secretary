@@ -45,7 +45,6 @@ export default function SingleSchedulePage() {
       <div className="phone-shell overflow-hidden p-4">
         <div className="flex items-center justify-between px-1 pb-5 pt-1 text-xs font-black text-slate-900">
           <span>9:41</span>
-          <span className="tracking-[0.18em]">•••</span>
         </div>
         <header className="mb-6 flex items-start justify-between gap-4">
           <div>

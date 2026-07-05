@@ -251,7 +251,6 @@ export default function Home() {
       <section className="mx-auto min-h-screen w-full bg-white px-4 pb-0 pt-[max(1rem,env(safe-area-inset-top))] sm:phone-shell sm:min-h-0 sm:max-w-[430px] sm:overflow-hidden sm:p-4">
         <div className="flex items-center justify-between px-1 pb-5 pt-1 text-xs font-black text-slate-900">
           <span>9:41</span>
-          <span className="tracking-[0.18em]">•••</span>
         </div>
 
         <header className="flex items-start justify-between">
