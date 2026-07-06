@@ -103,6 +103,35 @@ npm run check:supabase
 
 Supabase JavaScript 클라이언트는 `signInWithOAuth`로 소셜 로그인을 시작하고, `redirectTo`로 로그인 후 돌아올 주소를 지정한다. 공식 문서: https://supabase.com/docs/reference/javascript/auth-signinwithoauth
 
+### Google 로그인
+
+Google 로그인은 Supabase 기본 OAuth provider를 사용한다.
+
+1. Google Cloud Console에서 프로젝트를 만들거나 기존 프로젝트를 선택한다.
+2. APIs & Services > OAuth consent screen에서 외부 사용자용 앱 정보를 설정한다.
+3. APIs & Services > Credentials에서 OAuth client ID를 만든다.
+4. Application type은 `Web application`으로 선택한다.
+5. Authorized JavaScript origins에는 아래 값을 추가한다.
+
+```text
+https://my-secretary-remote.vercel.app
+http://localhost:3000
+http://localhost:3001
+```
+
+6. Authorized redirect URIs에는 Supabase Auth 콜백 주소를 추가한다.
+
+```text
+https://fesrtvxmqalkispmmhro.supabase.co/auth/v1/callback
+```
+
+7. Google에서 발급된 Client ID와 Client secret을 복사한다.
+8. Supabase Dashboard > Authentication > Providers > Google로 이동한다.
+9. Google provider를 ON으로 켜고 Client ID와 Client secret을 붙여넣은 뒤 저장한다.
+10. 앱의 `/account` 또는 `/settings` 페이지에서 `Google로 계속하기` 버튼이 활성화되는지 확인한다.
+
+Google provider가 꺼져 있으면 앱은 버튼을 `Google 설정 필요`로 표시한다. 설정을 저장한 뒤 새로고침하면 버튼이 다시 활성화된다.
+
 Kakao는 Supabase 기본 OAuth가 `account_email`, `profile_image`, `profile_nickname` 동의항목을 요청한다. 앱이 아직 카카오 Biz App이 아니거나 이메일 권한이 없으면 `KOE205`가 발생할 수 있으므로, 현재 앱의 Kakao 버튼은 `/api/auth/kakao/start`에서 카카오 OIDC를 직접 시작하고 `openid profile_nickname`만 요청한다. 카카오 개발자 콘솔에는 아래 Redirect URI를 추가해야 한다.
 
 ```text

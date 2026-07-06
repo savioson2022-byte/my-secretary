@@ -4,7 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import DeviceProfileCard from "@/components/DeviceProfileCard";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
-import { isSupabaseConfigured } from "@/lib/supabase/config";
+import {
+  getSupabaseBrowserConfig,
+  isSupabaseConfigured,
+} from "@/lib/supabase/config";
 import { getUserProfile, saveUserProfile } from "@/lib/userProfileStorage";
 import { RegisteredDevice, UserProfileRecord } from "@/types/device";
 import { UserProfile } from "@/types/userProfile";
@@ -21,6 +24,7 @@ const TRAVEL_MODE_OPTIONS: Array<{ value: TravelMode; label: string }> = [
 const OAUTH_PROVIDERS: Array<{
   provider: OAuthProvider | "naver";
   label: string;
+  setupLabel?: string;
   bgClassName: string;
   textClassName: string;
   enabled: boolean;
@@ -35,6 +39,7 @@ const OAUTH_PROVIDERS: Array<{
   {
     provider: "google",
     label: "Google로 계속하기",
+    setupLabel: "Google 설정 필요",
     bgClassName: "bg-white ring-1 ring-slate-200",
     textClassName: "text-slate-800",
     enabled: true,
@@ -42,6 +47,7 @@ const OAUTH_PROVIDERS: Array<{
   {
     provider: "apple",
     label: "Apple로 계속하기",
+    setupLabel: "Apple 설정 필요",
     bgClassName: "bg-slate-950",
     textClassName: "text-white",
     enabled: true,
@@ -123,6 +129,9 @@ export default function AccountManager() {
   const [message, setMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [oauthProviderStatus, setOauthProviderStatus] = useState<
+    Partial<Record<OAuthProvider, boolean>>
+  >({});
 
   const [displayName, setDisplayName] = useState("");
   const [classificationPreference, setClassificationPreference] = useState("");
@@ -158,6 +167,30 @@ export default function AccountManager() {
     }
 
     const client = supabase;
+    const config = getSupabaseBrowserConfig();
+
+    async function loadOAuthProviderStatus() {
+      if (!config) return;
+
+      try {
+        const response = await fetch(`${config.url}/auth/v1/settings`, {
+          headers: {
+            apikey: config.publishableKey,
+          },
+        });
+        const data = (await response.json()) as {
+          external?: Partial<Record<OAuthProvider, boolean>>;
+        };
+
+        setOauthProviderStatus({
+          apple: data.external?.apple,
+          google: data.external?.google,
+          kakao: data.external?.kakao,
+        });
+      } catch {
+        setOauthProviderStatus({});
+      }
+    }
 
     async function loadAuthState() {
       const { data: sessionData } = await client.auth.getSession();
@@ -181,6 +214,7 @@ export default function AccountManager() {
     }
 
     loadAuthState();
+    loadOAuthProviderStatus();
 
     const { data: listener } = client.auth.onAuthStateChange(
       async (_event, session) => {
@@ -509,21 +543,32 @@ export default function AccountManager() {
           </div>
 
           <div className="mt-4 space-y-2">
-            {OAUTH_PROVIDERS.map((item) => (
-              <button
-                key={item.provider}
-                type="button"
-                onClick={() => {
-                  if (item.enabled) {
-                    handleOAuthLogin(item.provider as OAuthProvider);
-                  }
-                }}
-                disabled={!item.enabled || isSaving}
-                className={`flex w-full items-center justify-center rounded-2xl px-4 py-3 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-55 ${item.bgClassName} ${item.textClassName}`}
-              >
-                {item.label}
-              </button>
-            ))}
+            {OAUTH_PROVIDERS.map((item) => {
+              const providerStatus =
+                item.provider === "naver"
+                  ? false
+                  : oauthProviderStatus[item.provider];
+              const isProviderEnabled =
+                item.enabled && providerStatus !== false;
+
+              return (
+                <button
+                  key={item.provider}
+                  type="button"
+                  onClick={() => {
+                    if (isProviderEnabled) {
+                      handleOAuthLogin(item.provider as OAuthProvider);
+                    }
+                  }}
+                  disabled={!isProviderEnabled || isSaving}
+                  className={`flex w-full items-center justify-center rounded-2xl px-4 py-3 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-55 ${item.bgClassName} ${item.textClassName}`}
+                >
+                  {isProviderEnabled
+                    ? item.label
+                    : item.setupLabel ?? item.label}
+                </button>
+              );
+            })}
           </div>
 
           <div className="my-5 flex items-center gap-3">
