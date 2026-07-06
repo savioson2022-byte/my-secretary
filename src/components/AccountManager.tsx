@@ -160,11 +160,21 @@ export default function AccountManager() {
     const client = supabase;
 
     async function loadAuthState() {
-      const { data } = await client.auth.getUser();
-      setUser(data.user);
+      const { data: sessionData } = await client.auth.getSession();
+      const sessionUser = sessionData.session?.user ?? null;
 
-      if (data.user) {
-        await ensureProfileAndDevice(data.user);
+      if (sessionUser) {
+        setUser(sessionUser);
+        await ensureProfileAndDevice(sessionUser);
+        setIsLoading(false);
+        return;
+      }
+
+      const { data: userData } = await client.auth.getUser();
+      setUser(userData.user);
+
+      if (userData.user) {
+        await ensureProfileAndDevice(userData.user);
       }
 
       setIsLoading(false);

@@ -75,6 +75,12 @@ export async function GET(request: NextRequest) {
   });
 
   if (!tokenResponse.ok) {
+    console.error("Kakao token exchange failed", {
+      status: tokenResponse.status,
+      statusText: tokenResponse.statusText,
+      hasClientSecret: Boolean(kakaoClientSecret),
+    });
+
     return redirectWithError(
       request,
       "카카오 토큰을 가져오지 못했습니다. 카카오 Redirect URI와 Client Secret 설정을 확인해주세요."
@@ -110,6 +116,12 @@ export async function GET(request: NextRequest) {
   });
 
   if (error) {
+    console.error("Supabase Kakao sign-in failed", {
+      message: error.message,
+      status: error.status,
+      name: error.name,
+    });
+
     response = redirectWithError(request, error.message);
   }
 
