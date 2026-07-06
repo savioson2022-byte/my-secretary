@@ -106,6 +106,13 @@ function getAuthRedirectUrl() {
   return callbackUrl.toString();
 }
 
+function getKakaoAuthStartUrl() {
+  const startUrl = new URL("/api/auth/kakao/start", window.location.origin);
+  startUrl.searchParams.set("next", window.location.pathname || "/account");
+
+  return startUrl.toString();
+}
+
 export default function AccountManager() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const configured = isSupabaseConfigured();
@@ -305,6 +312,11 @@ export default function AccountManager() {
 
     setIsSaving(true);
     setMessage(null);
+
+    if (provider === "kakao") {
+      window.location.href = getKakaoAuthStartUrl();
+      return;
+    }
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider,

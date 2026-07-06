@@ -103,4 +103,14 @@ npm run check:supabase
 
 Supabase JavaScript 클라이언트는 `signInWithOAuth`로 소셜 로그인을 시작하고, `redirectTo`로 로그인 후 돌아올 주소를 지정한다. 공식 문서: https://supabase.com/docs/reference/javascript/auth-signinwithoauth
 
+Kakao는 Supabase 기본 OAuth가 `account_email`, `profile_image`, `profile_nickname` 동의항목을 요청한다. 앱이 아직 카카오 Biz App이 아니거나 이메일 권한이 없으면 `KOE205`가 발생할 수 있으므로, 현재 앱의 Kakao 버튼은 `/api/auth/kakao/start`에서 카카오 OIDC를 직접 시작하고 `openid profile_nickname`만 요청한다. 카카오 개발자 콘솔에는 아래 Redirect URI를 추가해야 한다.
+
+```text
+https://my-secretary-remote.vercel.app/api/auth/kakao/callback
+http://localhost:3000/api/auth/kakao/callback
+http://localhost:3001/api/auth/kakao/callback
+```
+
+Kakao Developer Console에서는 `카카오 로그인 > 일반`의 사용 설정과 OpenID Connect를 ON으로 두고, `카카오 로그인 > 동의항목`에서 `profile_nickname`을 사용 가능하게 둔다. 이메일 기반 사용자 식별이 꼭 필요해지면 Kakao Biz App 전환 후 `account_email`을 켜고 Supabase 기본 Kakao provider 흐름으로 되돌릴 수 있다.
+
 네이버는 Supabase 기본 provider 목록에 없으므로 앱에서는 준비 중 버튼으로 표시한다. 나중에 커스텀 OAuth/OIDC 또는 별도 인증 중계 서버를 붙이는 방식으로 확장한다.

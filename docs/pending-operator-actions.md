@@ -30,6 +30,16 @@ npm run dev -- -H 0.0.0.0 -p 3001
 
 각 provider 콘솔에서 Client ID/Secret을 발급하고 Supabase Authentication > Providers에 등록한다.
 
+Kakao는 `account_email` 권한이 없으면 Supabase 기본 OAuth에서 `KOE205`가 날 수 있다. 현재 앱은 카카오 OIDC 직접 로그인으로 우회하므로 Kakao Developers의 Redirect URI에 아래 값을 추가한다.
+
+```text
+https://my-secretary-remote.vercel.app/api/auth/kakao/callback
+http://localhost:3000/api/auth/kakao/callback
+http://localhost:3001/api/auth/kakao/callback
+```
+
+Kakao Developers에서 `카카오 로그인 > 일반 > OpenID Connect`는 ON이어야 한다.
+
 네이버는 Supabase 기본 provider 목록에 없으므로 별도 커스텀 OAuth/OIDC 또는 인증 중계 서버가 필요하다.
 
 ## 대중교통 API
