@@ -173,7 +173,7 @@ function normalizeResult(
 export async function POST(request: Request) {
   const body = await request.json();
   const text = String(body.text ?? "").trim();
-  const userContext = String(body.userContext ?? "").trim().slice(0, 800);
+  const userContext = String(body.userContext ?? "").trim().slice(0, 3000);
 
   if (!text) {
     return NextResponse.json(
@@ -224,6 +224,8 @@ ${userContext ? `\n사용자별 분류 기준:\n${userContext}\n` : ""}
 - 시간이 필요하지만 아직 시간이 확정된 일정은 아닌 작업
 - 캘린더의 빈 시간에 배치 추천할 대상
 - 예: 기하 문제 풀기, 미적분 수업 준비하기, 보고서 쓰기, 데이트 장소 찾아보기, 방 청소하기
+- "머리 잘라야 하는데 언제 예약하지", "병원 갈 시간 잡아야 해"처럼 확정 시간은 없지만 사용자가 적절한 시간을 고르고 싶은 예약/방문/처리 대상도 시간작업으로 분류해라.
+- 이런 예약형 시간작업은 actionType을 "예약"으로 두고, 실제 방문/처리에 필요한 시간을 estimatedMinutes로 추정해라.
 - estimatedMinutes는 보통 30, 40, 45, 60 중 적절히 추정
 - scheduleStartTime과 scheduleEndTime은 null
 

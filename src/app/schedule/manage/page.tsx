@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import BottomNavigation from "@/components/BottomNavigation";
 import RoutineScheduleManager from "@/components/RoutineScheduleManager";
 import UserStatusBadge from "@/components/UserStatusBadge";
+import { getCloudDataSyncedEventName } from "@/lib/dataSyncEvents";
 import { getItems } from "@/lib/storage";
 import { AssistantItem } from "@/types/assistant";
 
@@ -11,7 +12,16 @@ export default function ScheduleManagePage() {
   const [items, setItems] = useState<AssistantItem[]>([]);
 
   useEffect(() => {
-    setItems(getItems());
+    function refreshItems() {
+      setItems(getItems());
+    }
+
+    refreshItems();
+    window.addEventListener(getCloudDataSyncedEventName(), refreshItems);
+
+    return () => {
+      window.removeEventListener(getCloudDataSyncedEventName(), refreshItems);
+    };
   }, []);
 
   return (

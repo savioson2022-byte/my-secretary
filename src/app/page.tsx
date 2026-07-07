@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import BottomNavigation from "@/components/BottomNavigation";
+import AgentActionSuggestionView from "@/components/AgentActionSuggestionView";
 import ClassificationResult from "@/components/ClassificationResult";
 import FilterBar from "@/components/FilterBar";
 import InputBox from "@/components/InputBox";
@@ -11,6 +12,8 @@ import TimeTaskSuggestionView from "@/components/TimeTaskSuggestionView";
 import UserStatusBadge from "@/components/UserStatusBadge";
 import { aiClassifyInput } from "@/lib/aiClassifyInput";
 import { classifyInput } from "@/lib/classifyInput";
+import { buildClassificationContext } from "@/lib/classificationContext";
+import { getCloudDataSyncedEventName } from "@/lib/dataSyncEvents";
 import { getRoutineSchedules } from "@/lib/routineStorage";
 import { createSingleScheduleFromItem } from "@/lib/singleScheduleFromItem";
 import {
@@ -104,13 +107,26 @@ export default function Home() {
   const [voiceIntent, setVoiceIntent] = useState(false);
 
   useEffect(() => {
-    setItems(getItems());
-    setRoutines(getRoutineSchedules());
-    setSingleSchedules(getSingleSchedules());
-    setUserProfile(getUserProfile());
+    function refreshLocalData() {
+      setItems(getItems());
+      setRoutines(getRoutineSchedules());
+      setSingleSchedules(getSingleSchedules());
+      setUserProfile(getUserProfile());
+    }
+
+    refreshLocalData();
 
     const searchParams = new URLSearchParams(window.location.search);
     setVoiceIntent(searchParams.get("voice") === "1");
+
+    window.addEventListener(getCloudDataSyncedEventName(), refreshLocalData);
+
+    return () => {
+      window.removeEventListener(
+        getCloudDataSyncedEventName(),
+        refreshLocalData
+      );
+    };
   }, []);
 
   const todayItems = useMemo(() => {
@@ -138,9 +154,14 @@ export default function Home() {
     setClassificationSource(null);
 
     try {
+      const classificationContext = buildClassificationContext({
+        inputText: trimmedText,
+        items,
+        userProfile,
+      });
       const { result, source } = await aiClassifyInput(
         trimmedText,
-        userProfile?.classificationPreference
+        classificationContext
       );
 
       setClassificationResult(result);
@@ -349,6 +370,8 @@ export default function Home() {
             compact
             maxItems={2}
           />
+
+          <AgentActionSuggestionView items={items} compact maxItems={2} />
         </div>
 
         <BottomNavigation />

@@ -5,6 +5,7 @@ import BottomNavigation from "@/components/BottomNavigation";
 import CalendarNavigation from "@/components/CalendarNavigation";
 import SingleScheduleList from "@/components/SingleScheduleList";
 import UserStatusBadge from "@/components/UserStatusBadge";
+import { getCloudDataSyncedEventName } from "@/lib/dataSyncEvents";
 import {
   deleteSingleSchedule,
   getSingleScheduleUpdatedEventName,
@@ -26,10 +27,15 @@ export default function SingleSchedulePage() {
       getSingleScheduleUpdatedEventName(),
       refreshSchedules
     );
+    window.addEventListener(getCloudDataSyncedEventName(), refreshSchedules);
 
     return () => {
       window.removeEventListener(
         getSingleScheduleUpdatedEventName(),
+        refreshSchedules
+      );
+      window.removeEventListener(
+        getCloudDataSyncedEventName(),
         refreshSchedules
       );
     };

@@ -1,3 +1,5 @@
+import type { TravelMode } from "@/types/calendar";
+
 export type DayOfWeek = "월" | "화" | "수" | "목" | "금" | "토" | "일";
 
 export type RoutineSchedule = {
@@ -7,6 +9,9 @@ export type RoutineSchedule = {
   startTime: string;
   endTime: string;
   placeName: string;
+  placeAddress?: string;
+  placePostalCode?: string;
+  travelMode?: TravelMode;
   memo: string;
 
   // 월간/주간 캘린더에서 표시할 사용자 지정 색상

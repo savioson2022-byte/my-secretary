@@ -4,6 +4,7 @@ import TimeTaskSuggestionView from "@/components/TimeTaskSuggestionView";
 import WeeklyAvailabilityView from "@/components/WeeklyAvailabilityView";
 import PostcodeAddressSearch from "@/components/PostcodeAddressSearch";
 import ScheduleColorPicker from "@/components/ScheduleColorPicker";
+import { getCloudDataSyncedEventName } from "@/lib/dataSyncEvents";
 import {
   getSavedPlaces,
   saveSavedPlace,
@@ -256,10 +257,15 @@ function RoutineScheduleManager({
       getSingleScheduleUpdatedEventName(),
       refreshSchedules
     );
+    window.addEventListener(getCloudDataSyncedEventName(), refreshSchedules);
 
     return () => {
       window.removeEventListener(
         getSingleScheduleUpdatedEventName(),
+        refreshSchedules
+      );
+      window.removeEventListener(
+        getCloudDataSyncedEventName(),
         refreshSchedules
       );
     };
@@ -413,6 +419,8 @@ function RoutineScheduleManager({
       startTime,
       endTime,
       placeName: placeName.trim(),
+      placeAddress: placeAddress.trim(),
+      placePostalCode: placePostalCode.trim(),
       memo: memo.trim(),
       color,
       startDate: startDate || null,

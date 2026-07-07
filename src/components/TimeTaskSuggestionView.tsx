@@ -29,14 +29,17 @@ export default function TimeTaskSuggestionView({
     typeof maxItems === "number" ? suggestions.slice(0, maxItems) : suggestions;
 
   const timeTasks = items.filter((item) => {
-    return item.status === "미완료" && item.processType === "시간작업";
+    return (
+      item.status === "미완료" &&
+      (item.processType === "시간작업" || item.actionType === "예약")
+    );
   });
 
   if (compact) {
     return (
       <section className="app-card p-4">
         <div className="mb-3 flex items-center justify-between">
-          <h3 className="font-black text-slate-900">AI 추천 시간작업</h3>
+          <h3 className="font-black text-slate-900">AI 추천 배치</h3>
           <span className="text-xs font-black text-slate-400">
             {suggestions.length}개
           </span>
@@ -44,11 +47,11 @@ export default function TimeTaskSuggestionView({
 
         {timeTasks.length === 0 ? (
           <p className="rounded-2xl bg-slate-50 p-3 text-sm font-semibold leading-6 text-slate-500">
-            시간작업으로 저장한 일이 생기면 빈 시간에 맞춰 추천해드릴게요.
+            시간작업이나 예약할 일이 생기면 빈 시간에 맞춰 추천해드릴게요.
           </p>
         ) : suggestions.length === 0 ? (
           <p className="rounded-2xl bg-slate-50 p-3 text-sm font-semibold leading-6 text-slate-500">
-            시간작업은 있지만 이번 주 빈 시간 안에 넣을 자리를 찾지 못했어요.
+            추천할 일은 있지만 이번 주 빈 시간 안에 넣을 자리를 찾지 못했어요.
           </p>
         ) : (
           <div className="space-y-2">
@@ -77,7 +80,7 @@ export default function TimeTaskSuggestionView({
                   </p>
                 </div>
                 <span className="text-xs font-black text-slate-400">
-                  {suggestion.estimatedMinutes}분
+                  {suggestion.kind === "reservation-candidate" ? "예약" : `${suggestion.estimatedMinutes}분`}
                 </span>
               </article>
             ))}
@@ -94,19 +97,19 @@ export default function TimeTaskSuggestionView({
           시간작업 배치 추천
         </h3>
         <p className="mt-1 text-sm text-slate-500">
-          정기 일정과 단기 일정을 모두 제외한 뒤, 시간작업을 넣을 수 있는 빈
-          시간을 추천합니다.
+          정기 일정과 단기 일정을 모두 제외한 뒤, 시간작업과 예약 후보를 넣을
+          수 있는 빈 시간을 추천합니다.
         </p>
       </div>
 
       {timeTasks.length === 0 ? (
         <p className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">
-          아직 추천할 시간작업이 없습니다. 예를 들어 “기하 문제 풀기”처럼
-          저장하면 추천이 표시됩니다.
+          아직 추천할 일이 없습니다. 예를 들어 “기하 문제 풀기”나 “머리
+          잘라야 하는데 언제 예약하지”처럼 저장하면 추천이 표시됩니다.
         </p>
       ) : suggestions.length === 0 ? (
         <p className="mt-4 rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">
-          시간작업은 있지만, 현재 캘린더 기준으로 들어갈 수 있는 빈 시간을
+          추천할 일은 있지만, 현재 캘린더 기준으로 들어갈 수 있는 빈 시간을
           찾지 못했습니다.
         </p>
       ) : (
@@ -122,7 +125,9 @@ export default function TimeTaskSuggestionView({
                     {suggestion.title}
                   </p>
                   <p className="mt-1 text-xs font-semibold text-slate-500">
-                    예상 시간 {suggestion.estimatedMinutes}분
+                    {suggestion.kind === "reservation-candidate"
+                      ? `예약 후보 · 예상 ${suggestion.estimatedMinutes}분`
+                      : `예상 시간 ${suggestion.estimatedMinutes}분`}
                   </p>
                 </div>
 

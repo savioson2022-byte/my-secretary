@@ -1,0 +1,357 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { STORAGE_KEYS } from "@/lib/storageKeys";
+import type { AssistantItem } from "@/types/assistant";
+import type {
+  SavedPlace,
+  SingleSchedule,
+  TravelMode,
+  TravelTimeRule,
+} from "@/types/calendar";
+import type { DayOfWeek, RoutineSchedule } from "@/types/routine";
+
+type SyncableItem = {
+  id: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type SyncDomain<TLocal extends SyncableItem, TRow extends { id: string }> = {
+  key: string;
+  table: string;
+  toRow: (item: TLocal, userId: string) => TRow;
+  fromRow: (row: Record<string, unknown>) => TLocal;
+};
+
+function readLocalArray<TItem>(key: string): TItem[] {
+  if (typeof window === "undefined") return [];
+
+  const rawValue = window.localStorage.getItem(key);
+  if (!rawValue) return [];
+
+  try {
+    const parsedValue = JSON.parse(rawValue);
+    return Array.isArray(parsedValue) ? parsedValue : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeLocalArraySilently<TItem>(key: string, value: TItem[]) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(key, JSON.stringify(value));
+}
+
+function asText(value: unknown, fallback = "") {
+  return typeof value === "string" ? value : fallback;
+}
+
+function asNullableText(value: unknown) {
+  return typeof value === "string" && value ? value : null;
+}
+
+function asNullableNumber(value: unknown) {
+  return typeof value === "number" ? value : null;
+}
+
+function asBoolean(value: unknown, fallback = true) {
+  return typeof value === "boolean" ? value : fallback;
+}
+
+function asTravelMode(value: unknown): TravelMode | undefined {
+  if (value === "walk" || value === "transit" || value === "car") {
+    return value;
+  }
+
+  return undefined;
+}
+
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value
+  );
+}
+
+function toTimeText(value: unknown) {
+  const text = asText(value);
+  return text.slice(0, 5);
+}
+
+function chooseLatest<TItem extends SyncableItem>(
+  currentItem: TItem | undefined,
+  nextItem: TItem
+) {
+  if (!currentItem) return nextItem;
+
+  return new Date(nextItem.updatedAt).getTime() >
+    new Date(currentItem.updatedAt).getTime()
+    ? nextItem
+    : currentItem;
+}
+
+function mergeByUpdatedAt<TItem extends SyncableItem>(
+  localItems: TItem[],
+  remoteItems: TItem[]
+) {
+  const itemMap = new Map<string, TItem>();
+
+  [...remoteItems, ...localItems].forEach((item) => {
+    itemMap.set(item.id, chooseLatest(itemMap.get(item.id), item));
+  });
+
+  return Array.from(itemMap.values()).sort((a, b) => {
+    return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+  });
+}
+
+const syncDomains: Array<SyncDomain<SyncableItem, { id: string }>> = [
+  {
+    key: STORAGE_KEYS.assistantItems,
+    table: "assistant_items",
+    toRow(item, userId) {
+      const assistantItem = item as AssistantItem;
+
+      return {
+        id: assistantItem.id,
+        user_id: userId,
+        original_text: assistantItem.originalText,
+        title: assistantItem.title,
+        category: assistantItem.category,
+        action_type: assistantItem.actionType,
+        process_type: assistantItem.processType,
+        priority: assistantItem.priority,
+        repeat_type: assistantItem.repeatType,
+        status: assistantItem.status,
+        estimated_minutes: assistantItem.estimatedMinutes,
+        due_date: assistantItem.dueDate,
+        reminder_date: assistantItem.reminderDate,
+        schedule_start_time: assistantItem.scheduleStartTime ?? null,
+        schedule_end_time: assistantItem.scheduleEndTime ?? null,
+        created_at: assistantItem.createdAt,
+        updated_at: assistantItem.updatedAt,
+      };
+    },
+    fromRow(row) {
+      return {
+        id: asText(row.id),
+        originalText: asText(row.original_text),
+        title: asText(row.title),
+        category: asText(row.category, "기타"),
+        actionType: asText(row.action_type, "기타"),
+        processType: asText(row.process_type, "메모"),
+        priority: asText(row.priority, "보통"),
+        repeatType: asText(row.repeat_type, "일회성"),
+        status: asText(row.status, "미완료"),
+        estimatedMinutes: asNullableNumber(row.estimated_minutes),
+        dueDate: asNullableText(row.due_date),
+        reminderDate: asNullableText(row.reminder_date),
+        scheduleStartTime: row.schedule_start_time
+          ? toTimeText(row.schedule_start_time)
+          : null,
+        scheduleEndTime: row.schedule_end_time
+          ? toTimeText(row.schedule_end_time)
+          : null,
+        color: asNullableText(row.color) ?? undefined,
+        createdAt: asText(row.created_at),
+        updatedAt: asText(row.updated_at),
+      } as AssistantItem;
+    },
+  },
+  {
+    key: STORAGE_KEYS.routineSchedules,
+    table: "routine_schedules",
+    toRow(item, userId) {
+      const routine = item as RoutineSchedule;
+
+      return {
+        id: routine.id,
+        user_id: userId,
+        title: routine.title,
+        day_of_week: routine.dayOfWeek,
+        start_time: routine.startTime,
+        end_time: routine.endTime,
+        place_name: routine.placeName,
+        memo: routine.memo,
+        start_date: routine.startDate,
+        end_date: routine.endDate,
+        is_active: routine.isActive,
+        created_at: routine.createdAt,
+        updated_at: routine.updatedAt,
+      };
+    },
+    fromRow(row) {
+      return {
+        id: asText(row.id),
+        title: asText(row.title),
+        dayOfWeek: asText(row.day_of_week, "월") as DayOfWeek,
+        startTime: toTimeText(row.start_time),
+        endTime: toTimeText(row.end_time),
+        placeName: asText(row.place_name),
+        placeAddress: asText(row.place_address),
+        placePostalCode: asText(row.place_postal_code),
+        travelMode: asTravelMode(row.travel_mode),
+        memo: asText(row.memo),
+        color: asNullableText(row.color) ?? undefined,
+        startDate: asNullableText(row.start_date),
+        endDate: asNullableText(row.end_date),
+        isActive: asBoolean(row.is_active, true),
+        createdAt: asText(row.created_at),
+        updatedAt: asText(row.updated_at),
+      } as RoutineSchedule;
+    },
+  },
+  {
+    key: STORAGE_KEYS.singleSchedules,
+    table: "single_schedules",
+    toRow(item, userId) {
+      const schedule = item as SingleSchedule;
+
+      return {
+        id: schedule.id,
+        user_id: userId,
+        source_item_id:
+          schedule.sourceItemId && isUuid(schedule.sourceItemId)
+            ? schedule.sourceItemId
+            : null,
+        title: schedule.title,
+        date: schedule.date,
+        start_time: schedule.startTime,
+        end_time: schedule.endTime,
+        place_name: schedule.placeName,
+        memo: schedule.memo,
+        created_at: schedule.createdAt,
+        updated_at: schedule.updatedAt,
+      };
+    },
+    fromRow(row) {
+      return {
+        id: asText(row.id),
+        sourceItemId: asNullableText(row.source_item_id),
+        title: asText(row.title),
+        date: asText(row.date),
+        startTime: toTimeText(row.start_time),
+        endTime: toTimeText(row.end_time),
+        placeName: asText(row.place_name),
+        placeAddress: asText(row.place_address),
+        placePostalCode: asText(row.place_postal_code),
+        travelMode: asTravelMode(row.travel_mode),
+        memo: asText(row.memo),
+        color: asNullableText(row.color) ?? undefined,
+        createdAt: asText(row.created_at),
+        updatedAt: asText(row.updated_at),
+      } as SingleSchedule;
+    },
+  },
+  {
+    key: STORAGE_KEYS.savedPlaces,
+    table: "places",
+    toRow(item, userId) {
+      const place = item as SavedPlace;
+
+      return {
+        id: place.id,
+        user_id: userId,
+        name: place.name,
+        address: place.address,
+        memo: place.memo,
+        provider: place.provider,
+        provider_place_id: place.providerPlaceId,
+        latitude: place.latitude,
+        longitude: place.longitude,
+        created_at: place.createdAt,
+        updated_at: place.updatedAt,
+      };
+    },
+    fromRow(row) {
+      return {
+        id: asText(row.id),
+        name: asText(row.name),
+        address: asText(row.address),
+        postalCode: asText(row.postal_code),
+        memo: asText(row.memo),
+        provider: asNullableText(row.provider),
+        providerPlaceId: asNullableText(row.provider_place_id),
+        latitude: asNullableNumber(row.latitude),
+        longitude: asNullableNumber(row.longitude),
+        createdAt: asText(row.created_at),
+        updatedAt: asText(row.updated_at),
+      } as SavedPlace;
+    },
+  },
+  {
+    key: STORAGE_KEYS.travelTimeRules,
+    table: "travel_time_rules",
+    toRow(item, userId) {
+      const rule = item as TravelTimeRule;
+
+      return {
+        id: rule.id,
+        user_id: userId,
+        from_place_name: rule.fromPlaceName,
+        to_place_name: rule.toPlaceName,
+        mode: rule.mode,
+        minutes: rule.minutes,
+        memo: rule.memo,
+        created_at: rule.createdAt,
+        updated_at: rule.updatedAt,
+      };
+    },
+    fromRow(row) {
+      return {
+        id: asText(row.id),
+        fromPlaceName: asText(row.from_place_name),
+        toPlaceName: asText(row.to_place_name),
+        mode: asText(row.mode, "transit") as TravelMode,
+        minutes: Number(row.minutes) || 0,
+        memo: asText(row.memo),
+        createdAt: asText(row.created_at),
+        updatedAt: asText(row.updated_at),
+      } as TravelTimeRule;
+    },
+  },
+];
+
+export async function syncLocalDataWithCloud({
+  supabase,
+  userId,
+}: {
+  supabase: SupabaseClient;
+  userId: string;
+}) {
+  for (const domain of syncDomains) {
+    const localItems = readLocalArray<SyncableItem>(domain.key);
+    const { data, error } = await supabase
+      .from(domain.table)
+      .select("*")
+      .eq("user_id", userId);
+
+    if (error) {
+      throw error;
+    }
+
+    const remoteItems = ((data ?? []) as Record<string, unknown>[]).map((row) =>
+      domain.fromRow(row)
+    );
+    const mergedItems = mergeByUpdatedAt(localItems, remoteItems);
+
+    if (mergedItems.length > 0) {
+      const rows = mergedItems
+        .filter((item) => isUuid(item.id))
+        .map((item) => domain.toRow(item, userId));
+
+      if (rows.length === 0) {
+        writeLocalArraySilently(domain.key, mergedItems);
+        continue;
+      }
+
+      const { error: upsertError } = await supabase
+        .from(domain.table)
+        .upsert(rows, { onConflict: "id" });
+
+      if (upsertError) {
+        throw upsertError;
+      }
+    }
+
+    writeLocalArraySilently(domain.key, mergedItems);
+  }
+}

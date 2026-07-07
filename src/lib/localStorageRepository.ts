@@ -5,8 +5,14 @@ export type LocalStorageRepository<TItem extends { id: string }> = {
   delete: (id: string) => void;
 };
 
+const LOCAL_DATA_UPDATED_EVENT = "assistant-local-data-updated";
+
 export function isBrowser() {
   return typeof window !== "undefined";
+}
+
+export function getLocalDataUpdatedEventName() {
+  return LOCAL_DATA_UPDATED_EVENT;
 }
 
 export function readLocalStorageArray<TItem>(key: string): TItem[] {
@@ -39,6 +45,13 @@ export function writeLocalStorageArray<TItem>(key: string, value: TItem[]) {
   }
 
   window.localStorage.setItem(key, JSON.stringify(value));
+  window.dispatchEvent(
+    new CustomEvent(LOCAL_DATA_UPDATED_EVENT, {
+      detail: {
+        key,
+      },
+    })
+  );
 }
 
 export function createLocalStorageRepository<TItem extends { id: string }>(
