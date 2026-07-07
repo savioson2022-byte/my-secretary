@@ -18,7 +18,12 @@ type SyncableItem = {
 type SyncDomain<TLocal extends SyncableItem, TRow extends { id: string }> = {
   key: string;
   table: string;
-  toRow: (item: TLocal, userId: string) => TRow;
+  optionalColumns?: string[];
+  toRow: (
+    item: TLocal,
+    userId: string,
+    availableColumns: Set<string>
+  ) => TRow;
   fromRow: (row: Record<string, unknown>) => TLocal;
 };
 
@@ -65,6 +70,31 @@ function asTravelMode(value: unknown): TravelMode | undefined {
   return undefined;
 }
 
+async function getAvailableOptionalColumns({
+  supabase,
+  table,
+  optionalColumns = [],
+}: {
+  supabase: SupabaseClient;
+  table: string;
+  optionalColumns?: string[];
+}) {
+  const availableColumns = new Set<string>();
+
+  for (const column of optionalColumns) {
+    const { error } = await supabase
+      .from(table)
+      .select(`id, ${column}`)
+      .limit(1);
+
+    if (!error) {
+      availableColumns.add(column);
+    }
+  }
+
+  return availableColumns;
+}
+
 function isUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
     value
@@ -107,10 +137,11 @@ const syncDomains: Array<SyncDomain<SyncableItem, { id: string }>> = [
   {
     key: STORAGE_KEYS.assistantItems,
     table: "assistant_items",
-    toRow(item, userId) {
+    optionalColumns: ["color"],
+    toRow(item, userId, availableColumns) {
       const assistantItem = item as AssistantItem;
 
-      return {
+      const row = {
         id: assistantItem.id,
         user_id: userId,
         original_text: assistantItem.originalText,
@@ -129,6 +160,15 @@ const syncDomains: Array<SyncDomain<SyncableItem, { id: string }>> = [
         created_at: assistantItem.createdAt,
         updated_at: assistantItem.updatedAt,
       };
+
+      if (availableColumns.has("color")) {
+        return {
+          ...row,
+          color: assistantItem.color ?? null,
+        };
+      }
+
+      return row;
     },
     fromRow(row) {
       return {
@@ -159,10 +199,16 @@ const syncDomains: Array<SyncDomain<SyncableItem, { id: string }>> = [
   {
     key: STORAGE_KEYS.routineSchedules,
     table: "routine_schedules",
-    toRow(item, userId) {
+    optionalColumns: [
+      "color",
+      "place_address",
+      "place_postal_code",
+      "travel_mode",
+    ],
+    toRow(item, userId, availableColumns) {
       const routine = item as RoutineSchedule;
 
-      return {
+      const row = {
         id: routine.id,
         user_id: userId,
         title: routine.title,
@@ -176,6 +222,20 @@ const syncDomains: Array<SyncDomain<SyncableItem, { id: string }>> = [
         is_active: routine.isActive,
         created_at: routine.createdAt,
         updated_at: routine.updatedAt,
+      };
+
+      return {
+        ...row,
+        ...(availableColumns.has("color") ? { color: routine.color ?? null } : {}),
+        ...(availableColumns.has("place_address")
+          ? { place_address: routine.placeAddress ?? "" }
+          : {}),
+        ...(availableColumns.has("place_postal_code")
+          ? { place_postal_code: routine.placePostalCode ?? "" }
+          : {}),
+        ...(availableColumns.has("travel_mode")
+          ? { travel_mode: routine.travelMode ?? null }
+          : {}),
       };
     },
     fromRow(row) {
@@ -202,10 +262,16 @@ const syncDomains: Array<SyncDomain<SyncableItem, { id: string }>> = [
   {
     key: STORAGE_KEYS.singleSchedules,
     table: "single_schedules",
-    toRow(item, userId) {
+    optionalColumns: [
+      "color",
+      "place_address",
+      "place_postal_code",
+      "travel_mode",
+    ],
+    toRow(item, userId, availableColumns) {
       const schedule = item as SingleSchedule;
 
-      return {
+      const row = {
         id: schedule.id,
         user_id: userId,
         source_item_id:
@@ -220,6 +286,22 @@ const syncDomains: Array<SyncDomain<SyncableItem, { id: string }>> = [
         memo: schedule.memo,
         created_at: schedule.createdAt,
         updated_at: schedule.updatedAt,
+      };
+
+      return {
+        ...row,
+        ...(availableColumns.has("color")
+          ? { color: schedule.color ?? null }
+          : {}),
+        ...(availableColumns.has("place_address")
+          ? { place_address: schedule.placeAddress ?? "" }
+          : {}),
+        ...(availableColumns.has("place_postal_code")
+          ? { place_postal_code: schedule.placePostalCode ?? "" }
+          : {}),
+        ...(availableColumns.has("travel_mode")
+          ? { travel_mode: schedule.travelMode ?? null }
+          : {}),
       };
     },
     fromRow(row) {
@@ -244,10 +326,11 @@ const syncDomains: Array<SyncDomain<SyncableItem, { id: string }>> = [
   {
     key: STORAGE_KEYS.savedPlaces,
     table: "places",
-    toRow(item, userId) {
+    optionalColumns: ["postal_code"],
+    toRow(item, userId, availableColumns) {
       const place = item as SavedPlace;
 
-      return {
+      const row = {
         id: place.id,
         user_id: userId,
         name: place.name,
@@ -260,6 +343,15 @@ const syncDomains: Array<SyncDomain<SyncableItem, { id: string }>> = [
         created_at: place.createdAt,
         updated_at: place.updatedAt,
       };
+
+      if (availableColumns.has("postal_code")) {
+        return {
+          ...row,
+          postal_code: place.postalCode ?? "",
+        };
+      }
+
+      return row;
     },
     fromRow(row) {
       return {
@@ -319,6 +411,11 @@ export async function syncLocalDataWithCloud({
 }) {
   for (const domain of syncDomains) {
     const localItems = readLocalArray<SyncableItem>(domain.key);
+    const availableColumns = await getAvailableOptionalColumns({
+      supabase,
+      table: domain.table,
+      optionalColumns: domain.optionalColumns,
+    });
     const { data, error } = await supabase
       .from(domain.table)
       .select("*")
@@ -336,7 +433,7 @@ export async function syncLocalDataWithCloud({
     if (mergedItems.length > 0) {
       const rows = mergedItems
         .filter((item) => isUuid(item.id))
-        .map((item) => domain.toRow(item, userId));
+        .map((item) => domain.toRow(item, userId, availableColumns));
 
       if (rows.length === 0) {
         writeLocalArraySilently(domain.key, mergedItems);
