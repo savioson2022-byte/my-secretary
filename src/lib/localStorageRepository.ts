@@ -1,3 +1,5 @@
+import { getScopedStorageKey } from "@/lib/authScopedStorage";
+
 export type LocalStorageRepository<TItem extends { id: string }> = {
   list: () => TItem[];
   create: (item: TItem) => void;
@@ -20,7 +22,8 @@ export function readLocalStorageArray<TItem>(key: string): TItem[] {
     return [];
   }
 
-  const rawValue = window.localStorage.getItem(key);
+  const scopedKey = getScopedStorageKey(key);
+  const rawValue = window.localStorage.getItem(scopedKey);
 
   if (!rawValue) {
     return [];
@@ -44,11 +47,13 @@ export function writeLocalStorageArray<TItem>(key: string, value: TItem[]) {
     return;
   }
 
-  window.localStorage.setItem(key, JSON.stringify(value));
+  const scopedKey = getScopedStorageKey(key);
+  window.localStorage.setItem(scopedKey, JSON.stringify(value));
   window.dispatchEvent(
     new CustomEvent(LOCAL_DATA_UPDATED_EVENT, {
       detail: {
         key,
+        scopedKey,
       },
     })
   );

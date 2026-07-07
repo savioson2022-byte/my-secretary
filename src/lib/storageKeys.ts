@@ -26,3 +26,13 @@ export const STORAGE_TO_SUPABASE_TABLE = {
   [STORAGE_KEYS.travelTimeEstimates]: "travel_time_estimates",
   [STORAGE_KEYS.userProfile]: "profiles",
 } as const;
+
+export const USER_SCOPED_STORAGE_KEYS = [
+  STORAGE_KEYS.assistantItems,
+  STORAGE_KEYS.routineSchedules,
+  STORAGE_KEYS.singleSchedules,
+  STORAGE_KEYS.savedPlaces,
+  STORAGE_KEYS.travelTimeRules,
+  STORAGE_KEYS.travelTimeEstimates,
+  STORAGE_KEYS.userProfile,
+] as const;

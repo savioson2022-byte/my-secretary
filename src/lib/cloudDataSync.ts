@@ -9,6 +9,7 @@ import type {
 } from "@/types/calendar";
 import type { DayOfWeek, RoutineSchedule } from "@/types/routine";
 import type { CloudSyncDomainResult } from "@/lib/dataSyncEvents";
+import { getScopedStorageKey } from "@/lib/authScopedStorage";
 
 type SyncableItem = {
   id: string;
@@ -31,7 +32,7 @@ type SyncDomain<TLocal extends SyncableItem, TRow extends { id: string }> = {
 function readLocalArray<TItem>(key: string): TItem[] {
   if (typeof window === "undefined") return [];
 
-  const rawValue = window.localStorage.getItem(key);
+  const rawValue = window.localStorage.getItem(getScopedStorageKey(key));
   if (!rawValue) return [];
 
   try {
@@ -44,7 +45,7 @@ function readLocalArray<TItem>(key: string): TItem[] {
 
 function writeLocalArraySilently<TItem>(key: string, value: TItem[]) {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(key, JSON.stringify(value));
+  window.localStorage.setItem(getScopedStorageKey(key), JSON.stringify(value));
 }
 
 function asText(value: unknown, fallback = "") {

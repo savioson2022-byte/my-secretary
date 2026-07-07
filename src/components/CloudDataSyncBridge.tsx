@@ -5,9 +5,14 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { getLocalDataUpdatedEventName } from "@/lib/localStorageRepository";
 import { syncLocalDataWithCloud } from "@/lib/cloudDataSync";
 import {
+  migrateUnscopedDataToUserStorage,
+  setActiveUserIdForStorage,
+} from "@/lib/authScopedStorage";
+import {
   CLOUD_DATA_SYNCED_EVENT,
   saveCloudSyncStatus,
 } from "@/lib/dataSyncEvents";
+import { USER_SCOPED_STORAGE_KEYS } from "@/lib/storageKeys";
 
 export default function CloudDataSyncBridge() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
@@ -23,17 +28,44 @@ export default function CloudDataSyncBridge() {
 
     async function loadSession() {
       const { data } = await client.auth.getSession();
+      const nextUserId = data.session?.user.id ?? null;
 
       if (!isMounted) return;
 
-      setUserId(data.session?.user.id ?? null);
+      if (nextUserId) {
+        migrateUnscopedDataToUserStorage({
+          baseKeys: [...USER_SCOPED_STORAGE_KEYS],
+          userId: nextUserId,
+        });
+      }
+
+      setActiveUserIdForStorage(nextUserId);
+      setUserId(nextUserId);
     }
 
     loadSession();
 
     const { data: listener } = client.auth.onAuthStateChange(
       (_event, session) => {
-        setUserId(session?.user.id ?? null);
+        const nextUserId = session?.user.id ?? null;
+
+        if (nextUserId) {
+          migrateUnscopedDataToUserStorage({
+            baseKeys: [...USER_SCOPED_STORAGE_KEYS],
+            userId: nextUserId,
+          });
+        }
+
+        setActiveUserIdForStorage(nextUserId);
+        setUserId(nextUserId);
+
+        window.dispatchEvent(
+          new CustomEvent(CLOUD_DATA_SYNCED_EVENT, {
+            detail: {
+              source: "auth-scope",
+            },
+          })
+        );
       }
     );
 
@@ -44,7 +76,16 @@ export default function CloudDataSyncBridge() {
   }, [supabase]);
 
   useEffect(() => {
-    if (!supabase || !userId) return;
+    if (!supabase || !userId) {
+      window.dispatchEvent(
+        new CustomEvent(CLOUD_DATA_SYNCED_EVENT, {
+          detail: {
+            source: "auth-scope",
+          },
+        })
+      );
+      return;
+    }
 
     const client = supabase;
     const activeUserId = userId;

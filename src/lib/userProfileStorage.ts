@@ -1,5 +1,6 @@
 import { UserProfile } from "@/types/userProfile";
 import { STORAGE_KEYS } from "@/lib/storageKeys";
+import { getScopedStorageKey } from "@/lib/authScopedStorage";
 
 const DEFAULT_TRAVEL_MODE = "transit";
 const DEFAULT_TRAVEL_TIME_AUTO_CALCULATION = true;
@@ -17,7 +18,9 @@ export function getUserProfile(): UserProfile | null {
     return null;
   }
 
-  const rawValue = window.localStorage.getItem(STORAGE_KEYS.userProfile);
+  const rawValue = window.localStorage.getItem(
+    getScopedStorageKey(STORAGE_KEYS.userProfile)
+  );
 
   if (!rawValue) {
     return null;
@@ -59,7 +62,7 @@ export function saveUserProfile(
   };
 
   window.localStorage.setItem(
-    STORAGE_KEYS.userProfile,
+    getScopedStorageKey(STORAGE_KEYS.userProfile),
     JSON.stringify(nextProfile)
   );
 
@@ -71,5 +74,5 @@ export function deleteUserProfile() {
     return;
   }
 
-  window.localStorage.removeItem(STORAGE_KEYS.userProfile);
+  window.localStorage.removeItem(getScopedStorageKey(STORAGE_KEYS.userProfile));
 }
