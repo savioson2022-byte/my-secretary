@@ -46,6 +46,13 @@ type DragSelection = {
   endMinutes: number;
 };
 
+type RoutineTimeSlot = {
+  id: string;
+  days: DayOfWeek[];
+  startTime: string;
+  endTime: string;
+};
+
 type RoutineScheduleManagerProps = {
   items: AssistantItem[];
   variant?: "weekly" | "management" | "all";
@@ -57,6 +64,15 @@ function createId() {
   }
 
   return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function createDefaultTimeSlot(): RoutineTimeSlot {
+  return {
+    id: createId(),
+    days: ["월"],
+    startTime: "09:00",
+    endTime: "10:00",
+  };
 }
 
 function getTodayText() {
@@ -223,9 +239,9 @@ function RoutineScheduleManager({
   const [savedPlaces, setSavedPlaces] = useState<SavedPlace[]>([]);
 
   const [title, setTitle] = useState("");
-  const [selectedDays, setSelectedDays] = useState<DayOfWeek[]>(["월"]);
-  const [startTime, setStartTime] = useState("09:00");
-  const [endTime, setEndTime] = useState("10:00");
+  const [timeSlots, setTimeSlots] = useState<RoutineTimeSlot[]>(() => [
+    createDefaultTimeSlot(),
+  ]);
   const [placeName, setPlaceName] = useState("");
   const [placeAddress, setPlaceAddress] = useState("");
   const [placePostalCode, setPlacePostalCode] = useState("");
@@ -377,6 +393,76 @@ function RoutineScheduleManager({
     });
   }
 
+  function updateTimeSlot(
+    slotId: string,
+    nextPartialSlot: Partial<Omit<RoutineTimeSlot, "id">>
+  ) {
+    setTimeSlots((currentSlots) =>
+      currentSlots.map((slot) => {
+        if (slot.id !== slotId) return slot;
+
+        return {
+          ...slot,
+          ...nextPartialSlot,
+        };
+      })
+    );
+  }
+
+  function toggleTimeSlotDay(slotId: string, day: DayOfWeek) {
+    setTimeSlots((currentSlots) =>
+      currentSlots.map((slot) => {
+        if (slot.id !== slotId) return slot;
+
+        const nextDays = slot.days.includes(day)
+          ? slot.days.filter((currentDay) => currentDay !== day)
+          : [...slot.days, day];
+
+        return {
+          ...slot,
+          days: nextDays.sort((a, b) => DAYS.indexOf(a) - DAYS.indexOf(b)),
+        };
+      })
+    );
+  }
+
+  function addTimeSlot() {
+    setTimeSlots((currentSlots) => [
+      ...currentSlots,
+      {
+        ...createDefaultTimeSlot(),
+        startTime: currentSlots[currentSlots.length - 1]?.startTime ?? "09:00",
+        endTime: currentSlots[currentSlots.length - 1]?.endTime ?? "10:00",
+      },
+    ]);
+  }
+
+  function removeTimeSlot(slotId: string) {
+    setTimeSlots((currentSlots) => {
+      if (currentSlots.length === 1) {
+        return currentSlots;
+      }
+
+      return currentSlots.filter((slot) => slot.id !== slotId);
+    });
+  }
+
+  function applySelectionToFirstTimeSlot(selection: DragSelection) {
+    const normalized = normalizeSelection(selection);
+
+    setTimeSlots((currentSlots) => {
+      const firstSlot = currentSlots[0] ?? createDefaultTimeSlot();
+      const nextFirstSlot: RoutineTimeSlot = {
+        ...firstSlot,
+        days: [normalized.day],
+        startTime: minutesToTime(normalized.startMinutes),
+        endTime: minutesToTime(normalized.endMinutes),
+      };
+
+      return [nextFirstSlot, ...currentSlots.slice(1)];
+    });
+  }
+
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -395,11 +481,6 @@ function RoutineScheduleManager({
       return;
     }
 
-    if (startTime >= endTime) {
-      alert("종료 시간은 시작 시간보다 늦어야 해.");
-      return;
-    }
-
     if (startDate && endDate && startDate > endDate) {
       alert("종료일은 시작일보다 늦거나 같아야 해.");
       return;
@@ -407,28 +488,34 @@ function RoutineScheduleManager({
 
     const now = new Date().toISOString();
 
-    if (selectedDays.length === 0) {
-      alert("반복할 요일을 하나 이상 선택해줘.");
+    const invalidSlot = timeSlots.find((slot) => {
+      return slot.days.length === 0 || slot.startTime >= slot.endTime;
+    });
+
+    if (invalidSlot) {
+      alert("각 시간대마다 요일을 하나 이상 고르고, 종료 시간을 시작 시간보다 늦게 설정해줘.");
       return;
     }
 
-    const newRoutines: RoutineSchedule[] = selectedDays.map((selectedDay) => ({
-      id: createId(),
-      title: title.trim(),
-      dayOfWeek: selectedDay,
-      startTime,
-      endTime,
-      placeName: placeName.trim(),
-      placeAddress: placeAddress.trim(),
-      placePostalCode: placePostalCode.trim(),
-      memo: memo.trim(),
-      color,
-      startDate: startDate || null,
-      endDate: endDate || null,
-      isActive: true,
-      createdAt: now,
-      updatedAt: now,
-    }));
+    const newRoutines: RoutineSchedule[] = timeSlots.flatMap((slot) =>
+      slot.days.map((selectedDay) => ({
+        id: createId(),
+        title: title.trim(),
+        dayOfWeek: selectedDay,
+        startTime: slot.startTime,
+        endTime: slot.endTime,
+        placeName: placeName.trim(),
+        placeAddress: placeAddress.trim(),
+        placePostalCode: placePostalCode.trim(),
+        memo: memo.trim(),
+        color,
+        startDate: startDate || null,
+        endDate: endDate || null,
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      }))
+    );
 
     newRoutines.forEach(saveRoutineSchedule);
     saveRoutinePlaceIfNeeded();
@@ -436,9 +523,7 @@ function RoutineScheduleManager({
     setSavedPlaces(getSavedPlaces());
 
     setTitle("");
-    setSelectedDays(["월"]);
-    setStartTime("09:00");
-    setEndTime("10:00");
+    setTimeSlots([createDefaultTimeSlot()]);
     setPlaceName("");
     setPlaceAddress("");
     setPlacePostalCode("");
@@ -555,9 +640,7 @@ function RoutineScheduleManager({
     setIsDragging(false);
     setDragSelection(normalized);
 
-    setSelectedDays([normalized.day]);
-    setStartTime(minutesToTime(normalized.startMinutes));
-    setEndTime(minutesToTime(normalized.endMinutes));
+    applySelectionToFirstTimeSlot(normalized);
   }
 
   function handleMobilePointerDown(event: PointerEvent<HTMLDivElement>) {
@@ -602,9 +685,7 @@ function RoutineScheduleManager({
     setIsDragging(false);
     setDragSelection(normalized);
 
-    setSelectedDays([normalized.day]);
-    setStartTime(minutesToTime(normalized.startMinutes));
-    setEndTime(minutesToTime(normalized.endMinutes));
+    applySelectionToFirstTimeSlot(normalized);
   }
 
   const normalizedDragSelection = dragSelection
@@ -1078,66 +1159,107 @@ function RoutineScheduleManager({
             />
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-[1.35fr_1fr_1fr]">
-            <div>
-              <label className="text-sm font-bold text-slate-700">요일</label>
-              <div className="mt-2 grid grid-cols-7 gap-1">
-                {DAYS.map((day) => {
-                  const isSelected = selectedDays.includes(day);
-
-                  return (
-                    <button
-                      key={day}
-                      type="button"
-                      onClick={() => {
-                        setSelectedDays((currentDays) => {
-                          if (currentDays.includes(day)) {
-                            return currentDays.filter(
-                              (currentDay) => currentDay !== day
-                            );
-                          }
-
-                          return [...currentDays, day].sort((a, b) => {
-                            return DAYS.indexOf(a) - DAYS.indexOf(b);
-                          });
-                        });
-                      }}
-                      className={`rounded-2xl px-2 py-3 text-sm font-black transition ${
-                        isSelected
-                          ? "bg-slate-950 text-white"
-                          : "bg-white text-slate-500 ring-1 ring-slate-200"
-                      }`}
-                    >
-                      {day}
-                    </button>
-                  );
-                })}
+          <div className="rounded-3xl bg-slate-50 p-4 ring-1 ring-slate-100">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <label className="text-sm font-bold text-slate-700">
+                  요일 및 시간
+                </label>
+                <p className="mt-1 text-xs font-bold leading-5 text-slate-500">
+                  제목, 장소, 기간은 한 번만 쓰고 시간대만 여러 줄로 추가할 수
+                  있습니다.
+                </p>
               </div>
-              <p className="mt-2 text-xs font-bold leading-5 text-slate-500">
-                같은 수업이 여러 요일에 반복되면 요일을 여러 개 선택하세요.
-              </p>
+              <button
+                type="button"
+                onClick={addTimeSlot}
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-slate-950 text-lg font-black text-white transition hover:bg-slate-700"
+                aria-label="요일 및 시간 추가"
+                title="요일 및 시간 추가"
+              >
+                +
+              </button>
             </div>
 
-            <div>
-              <label className="text-sm font-bold text-slate-700">시작</label>
-              <input
-                type="time"
-                step={600}
-                value={startTime}
-                onChange={(event) => setStartTime(event.target.value)}
-                className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-400"
-              />
-            </div>
+            <div className="mt-4 space-y-3">
+              {timeSlots.map((slot, index) => (
+                <div
+                  key={slot.id}
+                  className="rounded-3xl bg-white p-3 ring-1 ring-slate-100"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-xs font-black text-slate-500">
+                      시간대 {index + 1}
+                    </p>
+                    {timeSlots.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeTimeSlot(slot.id)}
+                        className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-500 transition hover:bg-rose-50 hover:text-rose-600"
+                      >
+                        삭제
+                      </button>
+                    )}
+                  </div>
 
-            <div>
-              <label className="text-sm font-bold text-slate-700">종료</label>
-              <input
-                type="time"
-                step={600}
-                value={endTime}
-                onChange={(event) => setEndTime(event.target.value)}
-                className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-400"
-              />
+                  <div className="mt-3 grid grid-cols-7 gap-1">
+                    {DAYS.map((day) => {
+                      const isSelected = slot.days.includes(day);
+
+                      return (
+                        <button
+                          key={`${slot.id}-${day}`}
+                          type="button"
+                          onClick={() => toggleTimeSlotDay(slot.id, day)}
+                          className={`rounded-2xl px-2 py-3 text-sm font-black transition ${
+                            isSelected
+                              ? "bg-slate-950 text-white"
+                              : "bg-white text-slate-500 ring-1 ring-slate-200"
+                          }`}
+                        >
+                          {day}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs font-black text-slate-500">
+                        시작
+                      </label>
+                      <input
+                        type="time"
+                        step={600}
+                        value={slot.startTime}
+                        onChange={(event) =>
+                          updateTimeSlot(slot.id, {
+                            startTime: event.target.value,
+                          })
+                        }
+                        className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-400"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-black text-slate-500">
+                        종료
+                      </label>
+                      <input
+                        type="time"
+                        step={600}
+                        value={slot.endTime}
+                        onChange={(event) =>
+                          updateTimeSlot(slot.id, {
+                            endTime: event.target.value,
+                          })
+                        }
+                        className="mt-1 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-400"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 
