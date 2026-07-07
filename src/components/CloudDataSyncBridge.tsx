@@ -4,7 +4,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { getLocalDataUpdatedEventName } from "@/lib/localStorageRepository";
 import { syncLocalDataWithCloud } from "@/lib/cloudDataSync";
-import { CLOUD_DATA_SYNCED_EVENT } from "@/lib/dataSyncEvents";
+import {
+  CLOUD_DATA_SYNCED_EVENT,
+  saveCloudSyncStatus,
+} from "@/lib/dataSyncEvents";
 
 export default function CloudDataSyncBridge() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
@@ -52,20 +55,44 @@ export default function CloudDataSyncBridge() {
       isSyncingRef.current = true;
 
       try {
-        await syncLocalDataWithCloud({
+        const results = await syncLocalDataWithCloud({
           supabase: client,
           userId: activeUserId,
+        });
+        const failedResults = results.filter((result) => !result.ok);
+        const status = failedResults.length === 0 ? "success" : "partial";
+
+        saveCloudSyncStatus({
+          status,
+          updatedAt: new Date().toISOString(),
+          results,
         });
 
         window.dispatchEvent(
           new CustomEvent(CLOUD_DATA_SYNCED_EVENT, {
             detail: {
               source: "cloud-sync",
+              status,
+              results,
             },
           })
         );
       } catch (error) {
         console.error("클라우드 데이터 동기화 실패:", error);
+        saveCloudSyncStatus({
+          status: "failed",
+          updatedAt: new Date().toISOString(),
+          results: [
+            {
+              table: "all",
+              ok: false,
+              message:
+                error instanceof Error
+                  ? error.message
+                  : "알 수 없는 동기화 오류",
+            },
+          ],
+        });
       } finally {
         isSyncingRef.current = false;
       }

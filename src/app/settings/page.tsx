@@ -1,5 +1,6 @@
 import AccountManager from "@/components/AccountManager";
 import BottomNavigation from "@/components/BottomNavigation";
+import CloudSyncStatusCard from "@/components/CloudSyncStatusCard";
 import LocalDataTransfer from "@/components/LocalDataTransfer";
 import MobileInstallGuide from "@/components/MobileInstallGuide";
 import UserStatusBadge from "@/components/UserStatusBadge";
@@ -22,6 +23,7 @@ export default function SettingsPage() {
 
       <div className="space-y-5">
         <AccountManager />
+        <CloudSyncStatusCard />
 
         <section className="app-card p-5">
           <h2 className="text-lg font-black text-slate-900">기본값</h2>

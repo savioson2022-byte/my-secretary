@@ -8,6 +8,7 @@ import type {
   TravelTimeRule,
 } from "@/types/calendar";
 import type { DayOfWeek, RoutineSchedule } from "@/types/routine";
+import type { CloudSyncDomainResult } from "@/lib/dataSyncEvents";
 
 type SyncableItem = {
   id: string;
@@ -402,6 +403,57 @@ const syncDomains: Array<SyncDomain<SyncableItem, { id: string }>> = [
   },
 ];
 
+async function syncDomainWithCloud({
+  supabase,
+  userId,
+  domain,
+}: {
+  supabase: SupabaseClient;
+  userId: string;
+  domain: SyncDomain<SyncableItem, { id: string }>;
+}) {
+  const localItems = readLocalArray<SyncableItem>(domain.key);
+  const availableColumns = await getAvailableOptionalColumns({
+    supabase,
+    table: domain.table,
+    optionalColumns: domain.optionalColumns,
+  });
+  const { data, error } = await supabase
+    .from(domain.table)
+    .select("*")
+    .eq("user_id", userId);
+
+  if (error) {
+    throw error;
+  }
+
+  const remoteItems = ((data ?? []) as Record<string, unknown>[]).map((row) =>
+    domain.fromRow(row)
+  );
+  const mergedItems = mergeByUpdatedAt(localItems, remoteItems);
+
+  if (mergedItems.length > 0) {
+    const rows = mergedItems
+      .filter((item) => isUuid(item.id))
+      .map((item) => domain.toRow(item, userId, availableColumns));
+
+    if (rows.length === 0) {
+      writeLocalArraySilently(domain.key, mergedItems);
+      return;
+    }
+
+    const { error: upsertError } = await supabase
+      .from(domain.table)
+      .upsert(rows, { onConflict: "id" });
+
+    if (upsertError) {
+      throw upsertError;
+    }
+  }
+
+  writeLocalArraySilently(domain.key, mergedItems);
+}
+
 export async function syncLocalDataWithCloud({
   supabase,
   userId,
@@ -409,46 +461,34 @@ export async function syncLocalDataWithCloud({
   supabase: SupabaseClient;
   userId: string;
 }) {
+  const results: CloudSyncDomainResult[] = [];
+
   for (const domain of syncDomains) {
-    const localItems = readLocalArray<SyncableItem>(domain.key);
-    const availableColumns = await getAvailableOptionalColumns({
-      supabase,
-      table: domain.table,
-      optionalColumns: domain.optionalColumns,
-    });
-    const { data, error } = await supabase
-      .from(domain.table)
-      .select("*")
-      .eq("user_id", userId);
+    try {
+      await syncDomainWithCloud({
+        supabase,
+        userId,
+        domain,
+      });
+      results.push({
+        table: domain.table,
+        ok: true,
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "알 수 없는 동기화 오류";
 
-    if (error) {
-      throw error;
+      console.error(
+        `클라우드 데이터 동기화 실패: ${domain.table}`,
+        error
+      );
+      results.push({
+        table: domain.table,
+        ok: false,
+        message,
+      });
     }
-
-    const remoteItems = ((data ?? []) as Record<string, unknown>[]).map((row) =>
-      domain.fromRow(row)
-    );
-    const mergedItems = mergeByUpdatedAt(localItems, remoteItems);
-
-    if (mergedItems.length > 0) {
-      const rows = mergedItems
-        .filter((item) => isUuid(item.id))
-        .map((item) => domain.toRow(item, userId, availableColumns));
-
-      if (rows.length === 0) {
-        writeLocalArraySilently(domain.key, mergedItems);
-        continue;
-      }
-
-      const { error: upsertError } = await supabase
-        .from(domain.table)
-        .upsert(rows, { onConflict: "id" });
-
-      if (upsertError) {
-        throw upsertError;
-      }
-    }
-
-    writeLocalArraySilently(domain.key, mergedItems);
   }
+
+  return results;
 }
