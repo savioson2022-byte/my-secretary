@@ -259,6 +259,8 @@ function RoutineScheduleManager({
   const [selectedMobileDateText, setSelectedMobileDateText] = useState(() =>
     getTodayText()
   );
+  const [hasSelectedMobileDateManually, setHasSelectedMobileDateManually] =
+    useState(false);
 
   useEffect(() => {
     function refreshSchedules() {
@@ -701,10 +703,56 @@ function RoutineScheduleManager({
     selectedMobileDay,
     toDateText(selectedMobileDate)
   );
+  const weeklyMobileSummaries = useMemo(() => {
+    return DAYS.map((day, index) => {
+      const date = weekDates[index];
+      const dateText = toDateText(date);
+      const itemsForDate = getDailyScheduleItems(day, dateText);
+
+      return {
+        day,
+        date,
+        dateText,
+        items: itemsForDate,
+      };
+    });
+  }, [routines, singleSchedules, weekDates]);
+  const weeklyMobileItems = weeklyMobileSummaries.flatMap((summary) =>
+    summary.items.map((item) => ({
+      ...item,
+      day: summary.day,
+      dateText: summary.dateText,
+      date: summary.date,
+    }))
+  );
   const showWeeklyCalendar = true;
   const canEditCalendar = variant !== "weekly";
   const showAvailabilityAndSuggestions = variant !== "management";
   const showScheduleManagement = variant !== "weekly";
+
+  useEffect(() => {
+    if (hasSelectedMobileDateManually) return;
+
+    const currentSummary = weeklyMobileSummaries.find((summary) => {
+      return summary.dateText === selectedMobileDateText;
+    });
+
+    if (currentSummary && currentSummary.items.length > 0) {
+      return;
+    }
+
+    const nextSummaryWithItems = weeklyMobileSummaries.find((summary) => {
+      return summary.items.length > 0;
+    });
+
+    if (nextSummaryWithItems) {
+      setSelectedMobileDateText(nextSummaryWithItems.dateText);
+    }
+  }, [
+    hasSelectedMobileDateManually,
+    selectedMobileDateText,
+    weeklyMobileSummaries,
+  ]);
 
   return (
     <section className="space-y-6">
@@ -756,7 +804,10 @@ function RoutineScheduleManager({
                 <button
                   key={dateText}
                   type="button"
-                  onClick={() => setSelectedMobileDateText(dateText)}
+                  onClick={() => {
+                    setSelectedMobileDateText(dateText);
+                    setHasSelectedMobileDateManually(true);
+                  }}
                   className={`min-w-[78px] rounded-3xl px-3 py-3 text-left transition ${
                     isSelected
                       ? "bg-slate-950 text-white shadow-[0_14px_28px_rgba(15,23,42,0.18)]"
@@ -784,6 +835,49 @@ function RoutineScheduleManager({
               );
             })}
           </div>
+
+          {weeklyMobileItems.length > 0 && (
+            <div className="mt-4 rounded-[28px] bg-white p-4 ring-1 ring-slate-100">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <h3 className="text-sm font-black text-slate-900">
+                  이번 주 일정
+                </h3>
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-500">
+                  {weeklyMobileItems.length}개
+                </span>
+              </div>
+              <div className="space-y-2">
+                {weeklyMobileItems.slice(0, 6).map((item) => (
+                  <button
+                    key={`${item.dateText}-${item.id}`}
+                    type="button"
+                    onClick={() => {
+                      setSelectedMobileDateText(item.dateText);
+                      setHasSelectedMobileDateManually(true);
+                    }}
+                    className="flex w-full items-center gap-3 rounded-2xl bg-slate-50 p-3 text-left ring-1 ring-slate-100"
+                  >
+                    <span
+                      className="h-10 w-1.5 shrink-0 rounded-full"
+                      style={{ backgroundColor: item.color }}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-black text-slate-900">
+                        {item.title}
+                      </p>
+                      <p className="mt-0.5 truncate text-xs font-semibold text-slate-500">
+                        {formatMonthDay(item.date)} {item.day}요일 ·{" "}
+                        {item.startTime} ~ {item.endTime}
+                      </p>
+                    </div>
+                    <span className="rounded-full bg-white px-2 py-1 text-[11px] font-black text-slate-500">
+                      {item.type}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="mt-4 rounded-[28px] bg-slate-50 p-4 ring-1 ring-slate-100">
             <div className="flex items-start justify-between gap-3">
@@ -901,6 +995,12 @@ function RoutineScheduleManager({
                     </div>
                   );
                 })}
+
+                {selectedMobileItems.length === 0 && (
+                  <div className="absolute inset-x-4 top-16 rounded-3xl bg-slate-50 p-4 text-center text-sm font-bold leading-6 text-slate-400 ring-1 ring-slate-100">
+                    선택한 요일에는 아직 표시할 일정이 없습니다.
+                  </div>
+                )}
               </div>
             </div>
 
