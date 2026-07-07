@@ -21,6 +21,15 @@ const TRAVEL_MODE_OPTIONS: Array<{ value: TravelMode; label: string }> = [
   { value: "car", label: "자차" },
 ];
 
+const ENERGY_PATTERN_OPTIONS: Array<{
+  value: NonNullable<UserProfile["energyPattern"]>;
+  label: string;
+}> = [
+  { value: "morning", label: "오전형" },
+  { value: "balanced", label: "균형형" },
+  { value: "night", label: "저녁형" },
+];
+
 const OAUTH_PROVIDERS: Array<{
   provider: OAuthProvider | "naver";
   label: string;
@@ -141,6 +150,17 @@ export default function AccountManager() {
     travelTimeAutoCalculationEnabled,
     setTravelTimeAutoCalculationEnabled,
   ] = useState(true);
+  const [energyPattern, setEnergyPattern] =
+    useState<NonNullable<UserProfile["energyPattern"]>>("balanced");
+  const [workoutPreferredStartTime, setWorkoutPreferredStartTime] =
+    useState("17:00");
+  const [workoutPreferredEndTime, setWorkoutPreferredEndTime] =
+    useState("21:30");
+  const [reservationPreferredStartTime, setReservationPreferredStartTime] =
+    useState("10:00");
+  const [reservationPreferredEndTime, setReservationPreferredEndTime] =
+    useState("20:00");
+  const [needsShowerAfterWorkout, setNeedsShowerAfterWorkout] = useState(true);
   const [deviceName, setDeviceName] = useState("");
   const [devices, setDevices] = useState<RegisteredDevice[]>([]);
   const [localProfile, setLocalProfile] = useState<UserProfile | null>(null);
@@ -159,6 +179,20 @@ export default function AccountManager() {
     setTravelTimeAutoCalculationEnabled(
       savedProfile?.travelTimeAutoCalculationEnabled ?? true
     );
+    setEnergyPattern(savedProfile?.energyPattern ?? "balanced");
+    setWorkoutPreferredStartTime(
+      savedProfile?.workoutPreferredStartTime ?? "17:00"
+    );
+    setWorkoutPreferredEndTime(
+      savedProfile?.workoutPreferredEndTime ?? "21:30"
+    );
+    setReservationPreferredStartTime(
+      savedProfile?.reservationPreferredStartTime ?? "10:00"
+    );
+    setReservationPreferredEndTime(
+      savedProfile?.reservationPreferredEndTime ?? "20:00"
+    );
+    setNeedsShowerAfterWorkout(savedProfile?.needsShowerAfterWorkout ?? true);
     setDeviceName(getDefaultDeviceName());
 
     if (!supabase) {
@@ -415,6 +449,12 @@ export default function AccountManager() {
       classificationPreference: classificationPreference.trim(),
       preferredTravelMode,
       travelTimeAutoCalculationEnabled,
+      energyPattern,
+      workoutPreferredStartTime,
+      workoutPreferredEndTime,
+      reservationPreferredStartTime,
+      reservationPreferredEndTime,
+      needsShowerAfterWorkout,
       rememberDevice: true,
     });
     setLocalProfile(nextLocalProfile);
@@ -699,6 +739,97 @@ export default function AccountManager() {
                   {mode.label}
                 </button>
               ))}
+            </div>
+          </div>
+          <div className="rounded-3xl bg-slate-50 p-4 ring-1 ring-slate-100">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-black text-slate-900">
+                  추천 기준
+                </h3>
+                <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
+                  시간작업 추천에서 에너지 수준, 운동 가능 시간, 예약 가능한
+                  낮 시간대를 함께 고려합니다.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setNeedsShowerAfterWorkout((current) => !current)}
+                className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-black transition ${
+                  needsShowerAfterWorkout
+                    ? "bg-emerald-600 text-white"
+                    : "bg-white text-slate-500 ring-1 ring-slate-200"
+                }`}
+              >
+                샤워 {needsShowerAfterWorkout ? "고려" : "제외"}
+              </button>
+            </div>
+
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              {ENERGY_PATTERN_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setEnergyPattern(option.value)}
+                  className={`rounded-2xl px-3 py-3 text-sm font-black transition ${
+                    energyPattern === option.value
+                      ? "bg-slate-950 text-white"
+                      : "bg-white text-slate-500 ring-1 ring-slate-100"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-2xl bg-white p-3 ring-1 ring-slate-100">
+                <p className="text-xs font-black text-slate-500">
+                  운동 추천 시간
+                </p>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <input
+                    type="time"
+                    value={workoutPreferredStartTime}
+                    onChange={(event) =>
+                      setWorkoutPreferredStartTime(event.target.value)
+                    }
+                    className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold outline-none focus:border-blue-400"
+                  />
+                  <input
+                    type="time"
+                    value={workoutPreferredEndTime}
+                    onChange={(event) =>
+                      setWorkoutPreferredEndTime(event.target.value)
+                    }
+                    className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold outline-none focus:border-blue-400"
+                  />
+                </div>
+              </div>
+
+              <div className="rounded-2xl bg-white p-3 ring-1 ring-slate-100">
+                <p className="text-xs font-black text-slate-500">
+                  예약 추천 시간
+                </p>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <input
+                    type="time"
+                    value={reservationPreferredStartTime}
+                    onChange={(event) =>
+                      setReservationPreferredStartTime(event.target.value)
+                    }
+                    className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold outline-none focus:border-blue-400"
+                  />
+                  <input
+                    type="time"
+                    value={reservationPreferredEndTime}
+                    onChange={(event) =>
+                      setReservationPreferredEndTime(event.target.value)
+                    }
+                    className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold outline-none focus:border-blue-400"
+                  />
+                </div>
+              </div>
             </div>
           </div>
           <button

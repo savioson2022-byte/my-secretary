@@ -4,6 +4,7 @@ import PostcodeAddressSearch from "@/components/PostcodeAddressSearch";
 import ScheduleColorPicker from "@/components/ScheduleColorPicker";
 import {
   getSavedPlaces,
+  inferSavedPlaceType,
   saveSavedPlace,
   updateSavedPlace,
 } from "@/lib/placeStorage";
@@ -155,6 +156,7 @@ export default function SingleScheduleList({
         name: trimmedPlaceName,
         address: trimmedAddress,
         postalCode: editPlacePostalCode.trim() || undefined,
+        placeType: inferSavedPlaceType(trimmedPlaceName, existingPlace.memo),
         updatedAt: now,
       });
     } else {
@@ -163,6 +165,7 @@ export default function SingleScheduleList({
         name: trimmedPlaceName,
         address: trimmedAddress,
         postalCode: editPlacePostalCode.trim() || undefined,
+        placeType: inferSavedPlaceType(trimmedPlaceName),
         memo: "",
         latitude: null,
         longitude: null,

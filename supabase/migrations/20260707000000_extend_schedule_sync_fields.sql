@@ -14,4 +14,5 @@ alter table public.single_schedules
   add column if not exists travel_mode text;
 
 alter table public.places
-  add column if not exists postal_code text;
+  add column if not exists postal_code text,
+  add column if not exists place_type text;

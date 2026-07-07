@@ -1,9 +1,15 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { suggestTimeTaskSchedules } from "@/lib/taskScheduleSuggestion";
+import { getCloudDataSyncedEventName } from "@/lib/dataSyncEvents";
+import { getLocalDataUpdatedEventName } from "@/lib/localStorageRepository";
+import { getSavedPlaces } from "@/lib/placeStorage";
+import { getUserProfile } from "@/lib/userProfileStorage";
 import { AssistantItem } from "@/types/assistant";
-import { SingleSchedule } from "@/types/calendar";
+import { SavedPlace, SingleSchedule } from "@/types/calendar";
 import { RoutineSchedule } from "@/types/routine";
+import { UserProfile } from "@/types/userProfile";
 
 type TimeTaskSuggestionViewProps = {
   items: AssistantItem[];
@@ -20,10 +26,43 @@ export default function TimeTaskSuggestionView({
   compact = false,
   maxItems,
 }: TimeTaskSuggestionViewProps) {
+  const [savedPlaces, setSavedPlaces] = useState<SavedPlace[]>([]);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+
+  useEffect(() => {
+    function refreshRecommendationContext() {
+      setSavedPlaces(getSavedPlaces());
+      setUserProfile(getUserProfile());
+    }
+
+    refreshRecommendationContext();
+    window.addEventListener(
+      getCloudDataSyncedEventName(),
+      refreshRecommendationContext
+    );
+    window.addEventListener(
+      getLocalDataUpdatedEventName(),
+      refreshRecommendationContext
+    );
+
+    return () => {
+      window.removeEventListener(
+        getCloudDataSyncedEventName(),
+        refreshRecommendationContext
+      );
+      window.removeEventListener(
+        getLocalDataUpdatedEventName(),
+        refreshRecommendationContext
+      );
+    };
+  }, []);
+
   const suggestions = suggestTimeTaskSchedules({
     items,
     routines,
     singleSchedules,
+    savedPlaces,
+    userProfile,
   });
   const visibleSuggestions =
     typeof maxItems === "number" ? suggestions.slice(0, maxItems) : suggestions;
@@ -78,6 +117,11 @@ export default function TimeTaskSuggestionView({
                     {suggestion.date} {suggestion.dayOfWeek}요일{" "}
                     {suggestion.startTime} ~ {suggestion.endTime}
                   </p>
+                  {suggestion.placeName && (
+                    <p className="mt-0.5 truncate text-xs font-black text-blue-500">
+                      {suggestion.placeName} 기준
+                    </p>
+                  )}
                 </div>
                 <span className="text-xs font-black text-slate-400">
                   {suggestion.kind === "reservation-candidate" ? "예약" : `${suggestion.estimatedMinutes}분`}
@@ -140,6 +184,19 @@ export default function TimeTaskSuggestionView({
               <p className="mt-3 text-sm leading-6 text-slate-600">
                 {suggestion.reason}
               </p>
+
+              {suggestion.appliedRules.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {suggestion.appliedRules.map((rule) => (
+                    <span
+                      key={`${suggestion.itemId}-${rule}`}
+                      className="rounded-full bg-white px-3 py-1 text-xs font-black text-slate-500 ring-1 ring-slate-100"
+                    >
+                      {rule}
+                    </span>
+                  ))}
+                </div>
+              )}
             </article>
           ))}
         </div>

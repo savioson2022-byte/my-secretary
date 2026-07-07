@@ -4,6 +4,11 @@ import { getScopedStorageKey } from "@/lib/authScopedStorage";
 
 const DEFAULT_TRAVEL_MODE = "transit";
 const DEFAULT_TRAVEL_TIME_AUTO_CALCULATION = true;
+const DEFAULT_ENERGY_PATTERN = "balanced";
+const DEFAULT_WORKOUT_START_TIME = "17:00";
+const DEFAULT_WORKOUT_END_TIME = "21:30";
+const DEFAULT_RESERVATION_START_TIME = "10:00";
+const DEFAULT_RESERVATION_END_TIME = "20:00";
 
 function createId() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -41,9 +46,26 @@ export function saveUserProfile(
     | "updatedAt"
     | "preferredTravelMode"
     | "travelTimeAutoCalculationEnabled"
+    | "energyPattern"
+    | "workoutPreferredStartTime"
+    | "workoutPreferredEndTime"
+    | "reservationPreferredStartTime"
+    | "reservationPreferredEndTime"
+    | "needsShowerAfterWorkout"
   > &
     Partial<Pick<UserProfile, "preferredTravelMode">> &
     Partial<Pick<UserProfile, "travelTimeAutoCalculationEnabled">> &
+    Partial<
+      Pick<
+        UserProfile,
+        | "energyPattern"
+        | "workoutPreferredStartTime"
+        | "workoutPreferredEndTime"
+        | "reservationPreferredStartTime"
+        | "reservationPreferredEndTime"
+        | "needsShowerAfterWorkout"
+      >
+    > &
     Partial<Pick<UserProfile, "id" | "createdAt" | "updatedAt">>
 ) {
   const now = new Date().toISOString();
@@ -56,6 +78,16 @@ export function saveUserProfile(
     travelTimeAutoCalculationEnabled:
       profile.travelTimeAutoCalculationEnabled ??
       DEFAULT_TRAVEL_TIME_AUTO_CALCULATION,
+    energyPattern: profile.energyPattern ?? DEFAULT_ENERGY_PATTERN,
+    workoutPreferredStartTime:
+      profile.workoutPreferredStartTime ?? DEFAULT_WORKOUT_START_TIME,
+    workoutPreferredEndTime:
+      profile.workoutPreferredEndTime ?? DEFAULT_WORKOUT_END_TIME,
+    reservationPreferredStartTime:
+      profile.reservationPreferredStartTime ?? DEFAULT_RESERVATION_START_TIME,
+    reservationPreferredEndTime:
+      profile.reservationPreferredEndTime ?? DEFAULT_RESERVATION_END_TIME,
+    needsShowerAfterWorkout: profile.needsShowerAfterWorkout ?? true,
     rememberDevice: profile.rememberDevice,
     createdAt: profile.createdAt ?? now,
     updatedAt: now,

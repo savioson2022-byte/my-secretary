@@ -7,6 +7,7 @@ import ScheduleColorPicker from "@/components/ScheduleColorPicker";
 import { getCloudDataSyncedEventName } from "@/lib/dataSyncEvents";
 import {
   getSavedPlaces,
+  inferSavedPlaceType,
   saveSavedPlace,
   updateSavedPlace,
 } from "@/lib/placeStorage";
@@ -376,6 +377,7 @@ function RoutineScheduleManager({
         name: trimmedPlaceName,
         address: trimmedAddress,
         postalCode: placePostalCode.trim() || undefined,
+        placeType: inferSavedPlaceType(trimmedPlaceName, existingPlace.memo),
         updatedAt: now,
       });
       return;
@@ -386,6 +388,7 @@ function RoutineScheduleManager({
       name: trimmedPlaceName,
       address: trimmedAddress,
       postalCode: placePostalCode.trim() || undefined,
+      placeType: inferSavedPlaceType(trimmedPlaceName),
       memo: "",
       latitude: null,
       longitude: null,

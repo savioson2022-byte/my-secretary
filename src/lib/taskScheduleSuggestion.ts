@@ -8,8 +8,10 @@ import {
   toDateOnlyString,
 } from "@/lib/availability";
 import { AssistantItem } from "@/types/assistant";
-import { SingleSchedule } from "@/types/calendar";
+import { SavedPlace, SingleSchedule } from "@/types/calendar";
 import { RoutineSchedule } from "@/types/routine";
+import { UserProfile } from "@/types/userProfile";
+import { getScheduleBlocksForDate } from "@/lib/travelTime";
 
 export type TimeTaskSuggestion = {
   itemId: string;
@@ -20,8 +22,25 @@ export type TimeTaskSuggestion = {
   startTime: string;
   endTime: string;
   estimatedMinutes: number;
+  placeName: string | null;
+  score: number;
   reason: string;
+  appliedRules: string[];
 };
+
+type TaskContext = {
+  isWorkout: boolean;
+  isReservation: boolean;
+  isBeautyReservation: boolean;
+  targetPlace: SavedPlace | null;
+};
+
+type Candidate = TimeTaskSuggestion & {
+  startMinutes: number;
+};
+
+const DEFAULT_TRAVEL_BUFFER_MINUTES = 25;
+const SHOWER_BUFFER_MINUTES = 30;
 
 function getSchedulableMinutes(item: AssistantItem) {
   if (item.processType === "시간작업" && item.estimatedMinutes) {
@@ -42,6 +61,221 @@ function getSchedulableMinutes(item: AssistantItem) {
 
 function getSuggestionKind(item: AssistantItem): TimeTaskSuggestion["kind"] {
   return item.actionType === "예약" ? "reservation-candidate" : "time-task";
+}
+
+function includesAny(text: string, keywords: string[]) {
+  return keywords.some((keyword) => text.includes(keyword));
+}
+
+function normalizeSearchText(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function inferPlaceTypeFromText(text: string): SavedPlace["placeType"] {
+  if (includesAny(text, ["헬스", "gym", "피트니스", "운동"])) return "gym";
+  if (includesAny(text, ["미용", "헤어", "커트", "머리"])) return "salon";
+  if (includesAny(text, ["학교", "학원"])) return "school";
+  if (includesAny(text, ["집", "자택"])) return "home";
+  if (includesAny(text, ["회사", "사무실"])) return "work";
+  if (includesAny(text, ["가게", "매장", "마트", "샵"])) return "shop";
+
+  return "other";
+}
+
+function getPlaceType(place: SavedPlace) {
+  return (
+    place.placeType ??
+    inferPlaceTypeFromText(`${place.name} ${place.address} ${place.memo}`)
+  );
+}
+
+function inferTaskContext({
+  item,
+  savedPlaces,
+}: {
+  item: AssistantItem;
+  savedPlaces: SavedPlace[];
+}): TaskContext {
+  const text = normalizeSearchText(`${item.title} ${item.originalText}`);
+  const isWorkout =
+    item.actionType === "운동" ||
+    includesAny(text, ["운동", "헬스", "pt", "피티", "러닝", "수영"]);
+  const isBeautyReservation =
+    item.actionType === "예약" &&
+    includesAny(text, ["머리", "커트", "미용", "헤어", "염색", "펌"]);
+  const isReservation = item.actionType === "예약";
+  const preferredPlaceType = isWorkout
+    ? "gym"
+    : isBeautyReservation
+      ? "salon"
+      : null;
+  const targetPlace =
+    savedPlaces.find((place) => {
+      if (preferredPlaceType && getPlaceType(place) === preferredPlaceType) {
+        return true;
+      }
+
+      const placeText = normalizeSearchText(`${place.name} ${place.memo}`);
+      return (
+        place.name.trim().length >= 2 &&
+        (text.includes(normalizeSearchText(place.name)) ||
+          placeText
+            .split(/\s+/)
+            .filter((token) => token.length >= 2)
+            .some((token) => text.includes(token)))
+      );
+    }) ?? null;
+
+  return {
+    isWorkout,
+    isReservation,
+    isBeautyReservation,
+    targetPlace,
+  };
+}
+
+function getAllowedWindow({
+  context,
+  userProfile,
+}: {
+  context: TaskContext;
+  userProfile?: UserProfile | null;
+}) {
+  if (context.isWorkout) {
+    return {
+      startTime: userProfile?.workoutPreferredStartTime ?? "17:00",
+      endTime: userProfile?.workoutPreferredEndTime ?? "21:30",
+      label: "운동 선호 시간대",
+    };
+  }
+
+  if (context.isReservation) {
+    return {
+      startTime: userProfile?.reservationPreferredStartTime ?? "10:00",
+      endTime: userProfile?.reservationPreferredEndTime ?? "20:00",
+      label: context.isBeautyReservation
+        ? "미용실 일반 영업 시간대"
+        : "예약 가능성이 높은 낮 시간대",
+    };
+  }
+
+  if (userProfile?.energyPattern === "morning") {
+    return {
+      startTime: "08:00",
+      endTime: "18:00",
+      label: "오전형 에너지 패턴",
+    };
+  }
+
+  if (userProfile?.energyPattern === "night") {
+    return {
+      startTime: "11:00",
+      endTime: "23:00",
+      label: "저녁형 에너지 패턴",
+    };
+  }
+
+  return {
+    startTime: "08:00",
+    endTime: "22:00",
+    label: "기본 생활 시간대",
+  };
+}
+
+function getTravelBuffers({
+  date,
+  candidateStartTime,
+  candidateEndTime,
+  targetPlace,
+  routines,
+  singleSchedules,
+}: {
+  date: string;
+  candidateStartTime: string;
+  candidateEndTime: string;
+  targetPlace: SavedPlace | null;
+  routines: RoutineSchedule[];
+  singleSchedules: SingleSchedule[];
+}) {
+  if (!targetPlace) {
+    return {
+      beforeMinutes: 0,
+      afterMinutes: 0,
+      labels: [] as string[],
+    };
+  }
+
+  const blocks = getScheduleBlocksForDate({
+    date,
+    routines,
+    singleSchedules,
+  });
+  const startMinutes = timeToMinutes(candidateStartTime);
+  const endMinutes = timeToMinutes(candidateEndTime);
+  const previousBlock = [...blocks]
+    .reverse()
+    .find((block) => timeToMinutes(block.endTime) <= startMinutes);
+  const nextBlock = blocks.find((block) => timeToMinutes(block.startTime) >= endMinutes);
+  const targetPlaceName = normalizeSearchText(targetPlace.name);
+  const beforeMinutes =
+    previousBlock &&
+    normalizeSearchText(previousBlock.placeName) !== targetPlaceName
+      ? DEFAULT_TRAVEL_BUFFER_MINUTES
+      : 0;
+  const afterMinutes =
+    nextBlock && normalizeSearchText(nextBlock.placeName) !== targetPlaceName
+      ? DEFAULT_TRAVEL_BUFFER_MINUTES
+      : 0;
+
+  return {
+    beforeMinutes,
+    afterMinutes,
+    labels: [
+      beforeMinutes > 0
+        ? `이전 일정 위치에서 ${targetPlace.name}까지 이동 여유 ${beforeMinutes}분`
+        : null,
+      afterMinutes > 0
+        ? `${targetPlace.name}에서 다음 일정 위치까지 이동 여유 ${afterMinutes}분`
+        : null,
+    ].filter((label): label is string => Boolean(label)),
+  };
+}
+
+function getEnergyScore({
+  startMinutes,
+  context,
+  userProfile,
+}: {
+  startMinutes: number;
+  context: TaskContext;
+  userProfile?: UserProfile | null;
+}) {
+  if (context.isWorkout) {
+    const idealStart = timeToMinutes(
+      userProfile?.workoutPreferredStartTime ?? "17:00"
+    );
+    const distance = Math.abs(startMinutes - idealStart);
+    return Math.max(0, 40 - Math.floor(distance / 30) * 5);
+  }
+
+  if (context.isReservation) {
+    const idealStart = context.isBeautyReservation ? timeToMinutes("14:00") : timeToMinutes("11:00");
+    const distance = Math.abs(startMinutes - idealStart);
+    return Math.max(0, 30 - Math.floor(distance / 60) * 4);
+  }
+
+  if (userProfile?.energyPattern === "morning") {
+    return startMinutes < timeToMinutes("12:00") ? 25 : 10;
+  }
+
+  if (userProfile?.energyPattern === "night") {
+    return startMinutes >= timeToMinutes("18:00") ? 25 : 10;
+  }
+
+  return startMinutes >= timeToMinutes("10:00") &&
+    startMinutes <= timeToMinutes("18:00")
+    ? 20
+    : 8;
 }
 
 function isValidDateText(dateText: string | null) {
@@ -68,10 +302,14 @@ export function suggestTimeTaskSchedule({
   item,
   routines,
   singleSchedules,
+  savedPlaces = [],
+  userProfile = null,
 }: {
   item: AssistantItem;
   routines: RoutineSchedule[];
   singleSchedules: SingleSchedule[];
+  savedPlaces?: SavedPlace[];
+  userProfile?: UserProfile | null;
 }): TimeTaskSuggestion | null {
   if (item.status !== "미완료") {
     return null;
@@ -83,6 +321,21 @@ export function suggestTimeTaskSchedule({
   }
 
   const searchDates = getSearchDates(item);
+  const context = inferTaskContext({
+    item,
+    savedPlaces,
+  });
+  const allowedWindow = getAllowedWindow({
+    context,
+    userProfile,
+  });
+  const allowedStartMinutes = timeToMinutes(allowedWindow.startTime);
+  const allowedEndMinutes = timeToMinutes(allowedWindow.endTime);
+  const extraTaskBuffer =
+    context.isWorkout && (userProfile?.needsShowerAfterWorkout ?? true)
+      ? SHOWER_BUFFER_MINUTES
+      : 0;
+  const candidates: Candidate[] = [];
 
   for (const date of searchDates) {
     const freeBlocks = calculateFreeTimeBlocksForDate({
@@ -91,46 +344,103 @@ export function suggestTimeTaskSchedule({
       singleSchedules,
     });
 
-    const availableBlock = freeBlocks.find((block) => {
-      return block.minutes >= estimatedMinutes;
-    });
+    for (const block of freeBlocks) {
+      const blockStartMinutes = timeToMinutes(block.startTime);
+      const blockEndMinutes = timeToMinutes(block.endTime);
+      const startMinutes = Math.max(blockStartMinutes, allowedStartMinutes);
+      const taskEndMinutes = startMinutes + estimatedMinutes;
 
-    if (!availableBlock) {
-      continue;
+      if (taskEndMinutes > Math.min(blockEndMinutes, allowedEndMinutes)) {
+        continue;
+      }
+
+      const candidateStartTime = minutesToTime(startMinutes);
+      const candidateEndTime = minutesToTime(taskEndMinutes);
+      const travelBuffers = getTravelBuffers({
+        date,
+        candidateStartTime,
+        candidateEndTime,
+        targetPlace: context.targetPlace,
+        routines,
+        singleSchedules,
+      });
+      const requiredMinutes =
+        estimatedMinutes +
+        extraTaskBuffer +
+        travelBuffers.beforeMinutes +
+        travelBuffers.afterMinutes;
+      const adjustedStartMinutes = startMinutes + travelBuffers.beforeMinutes;
+      const adjustedEndMinutes = adjustedStartMinutes + estimatedMinutes;
+
+      if (
+        adjustedStartMinutes < blockStartMinutes ||
+        adjustedEndMinutes + extraTaskBuffer + travelBuffers.afterMinutes >
+          blockEndMinutes ||
+        adjustedEndMinutes > allowedEndMinutes
+      ) {
+        continue;
+      }
+
+      const dayOfWeek = getDayOfWeekFromDateText(date);
+      const kind = getSuggestionKind(item);
+      const score =
+        50 +
+        getEnergyScore({
+          startMinutes: adjustedStartMinutes,
+          context,
+          userProfile,
+        }) +
+        (context.targetPlace ? 15 : 0) +
+        (block.minutes >= requiredMinutes + 30 ? 10 : 0);
+      const appliedRules = [
+        allowedWindow.label,
+        context.targetPlace ? `선호/저장 장소: ${context.targetPlace.name}` : null,
+        extraTaskBuffer > 0 ? `운동 후 샤워/정리 여유 ${extraTaskBuffer}분` : null,
+        ...travelBuffers.labels,
+      ].filter((rule): rule is string => Boolean(rule));
+
+      candidates.push({
+        itemId: item.id,
+        title: item.title,
+        kind,
+        date,
+        dayOfWeek,
+        startTime: minutesToTime(adjustedStartMinutes),
+        endTime: minutesToTime(adjustedEndMinutes),
+        estimatedMinutes,
+        placeName: context.targetPlace?.name ?? null,
+        score,
+        appliedRules,
+        startMinutes: adjustedStartMinutes,
+        reason:
+          kind === "reservation-candidate"
+            ? `${allowedWindow.label}와 저장된 동선을 고려해 ${date} ${dayOfWeek}요일 ${minutesToTime(adjustedStartMinutes)}~${minutesToTime(adjustedEndMinutes)}을 예약 후보로 추천합니다.`
+            : `${allowedWindow.label}, 에너지 수준, 앞뒤 일정 위치를 고려해 ${date} ${dayOfWeek}요일 ${minutesToTime(adjustedStartMinutes)}~${minutesToTime(adjustedEndMinutes)}에 배치할 수 있습니다.`,
+      });
     }
-
-    const startMinutes = timeToMinutes(availableBlock.startTime);
-    const endMinutes = startMinutes + estimatedMinutes;
-    const dayOfWeek = getDayOfWeekFromDateText(date);
-    const kind = getSuggestionKind(item);
-
-    return {
-      itemId: item.id,
-      title: item.title,
-      kind,
-      date,
-      dayOfWeek,
-      startTime: availableBlock.startTime,
-      endTime: minutesToTime(endMinutes),
-      estimatedMinutes,
-      reason:
-        kind === "reservation-candidate"
-          ? `${date} ${dayOfWeek}요일의 ${availableBlock.startTime}~${availableBlock.endTime} 빈 시간 안에서 예약 후보 시간을 잡을 수 있습니다. 실제 예약 API가 연결되면 이 시간대를 기준으로 예약 가능 시간을 확인할 수 있습니다.`
-          : `${date} ${dayOfWeek}요일의 ${availableBlock.startTime}~${availableBlock.endTime} 빈 시간 안에 예상 시간 ${estimatedMinutes}분 작업을 넣을 수 있습니다. 정기 일정과 단기 일정을 모두 제외한 추천입니다.`,
-    };
   }
 
-  return null;
+  return (
+    candidates.sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      if (a.date !== b.date) return a.date.localeCompare(b.date);
+      return a.startMinutes - b.startMinutes;
+    })[0] ?? null
+  );
 }
 
 export function suggestTimeTaskSchedules({
   items,
   routines,
   singleSchedules,
+  savedPlaces = [],
+  userProfile = null,
 }: {
   items: AssistantItem[];
   routines: RoutineSchedule[];
   singleSchedules: SingleSchedule[];
+  savedPlaces?: SavedPlace[];
+  userProfile?: UserProfile | null;
 }): TimeTaskSuggestion[] {
   return items
     .map((item) =>
@@ -138,6 +448,8 @@ export function suggestTimeTaskSchedules({
         item,
         routines,
         singleSchedules,
+        savedPlaces,
+        userProfile,
       })
     )
     .filter((suggestion): suggestion is TimeTaskSuggestion => {

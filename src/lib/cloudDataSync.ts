@@ -328,7 +328,7 @@ const syncDomains: Array<SyncDomain<SyncableItem, { id: string }>> = [
   {
     key: STORAGE_KEYS.savedPlaces,
     table: "places",
-    optionalColumns: ["postal_code"],
+    optionalColumns: ["postal_code", "place_type"],
     toRow(item, userId, availableColumns) {
       const place = item as SavedPlace;
 
@@ -347,10 +347,15 @@ const syncDomains: Array<SyncDomain<SyncableItem, { id: string }>> = [
       };
 
       if (availableColumns.has("postal_code")) {
-        return {
-          ...row,
+        Object.assign(row, {
           postal_code: place.postalCode ?? "",
-        };
+        });
+      }
+
+      if (availableColumns.has("place_type")) {
+        Object.assign(row, {
+          place_type: place.placeType ?? null,
+        });
       }
 
       return row;
@@ -361,6 +366,7 @@ const syncDomains: Array<SyncDomain<SyncableItem, { id: string }>> = [
         name: asText(row.name),
         address: asText(row.address),
         postalCode: asText(row.postal_code),
+        placeType: asNullableText(row.place_type) ?? undefined,
         memo: asText(row.memo),
         provider: asNullableText(row.provider),
         providerPlaceId: asNullableText(row.provider_place_id),
