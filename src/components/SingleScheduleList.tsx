@@ -1,5 +1,8 @@
 "use client";
 
+import PlaceKeywordSearch, {
+  PlaceSearchResult,
+} from "@/components/PlaceKeywordSearch";
 import PostcodeAddressSearch from "@/components/PostcodeAddressSearch";
 import ScheduleColorPicker from "@/components/ScheduleColorPicker";
 import {
@@ -73,6 +76,8 @@ export default function SingleScheduleList({
   const [editPlaceName, setEditPlaceName] = useState("");
   const [editPlaceAddress, setEditPlaceAddress] = useState("");
   const [editPlacePostalCode, setEditPlacePostalCode] = useState("");
+  const [editSelectedPlaceInfo, setEditSelectedPlaceInfo] =
+    useState<PlaceSearchResult | null>(null);
   const [editTravelMode, setEditTravelMode] =
     useState<TravelMode>(getDefaultTravelMode);
   const [editMemo, setEditMemo] = useState("");
@@ -107,6 +112,7 @@ export default function SingleScheduleList({
     setEditPlaceName(schedule.placeName);
     setEditPlaceAddress(schedule.placeAddress ?? "");
     setEditPlacePostalCode(schedule.placePostalCode ?? "");
+    setEditSelectedPlaceInfo(null);
     setEditTravelMode(schedule.travelMode ?? getDefaultTravelMode());
     setEditMemo(schedule.memo);
     setEditColor(getScheduleColor(schedule.color, DEFAULT_SINGLE_SCHEDULE_COLOR));
@@ -121,6 +127,7 @@ export default function SingleScheduleList({
     setEditPlaceName("");
     setEditPlaceAddress("");
     setEditPlacePostalCode("");
+    setEditSelectedPlaceInfo(null);
     setEditTravelMode(getDefaultTravelMode());
     setEditMemo("");
     setEditColor(DEFAULT_SINGLE_SCHEDULE_COLOR);
@@ -128,6 +135,7 @@ export default function SingleScheduleList({
 
   function handlePlaceNameChange(nextPlaceName: string) {
     setEditPlaceName(nextPlaceName);
+    setEditSelectedPlaceInfo(null);
 
     const savedPlace = getSavedPlaceByName(savedPlaces, nextPlaceName);
 
@@ -137,6 +145,13 @@ export default function SingleScheduleList({
 
     setEditPlaceAddress(savedPlace.address);
     setEditPlacePostalCode(savedPlace.postalCode ?? "");
+  }
+
+  function handlePlaceSearchSelect(place: PlaceSearchResult) {
+    setEditSelectedPlaceInfo(place);
+    setEditPlaceName(place.name);
+    setEditPlaceAddress(place.address);
+    setEditPlacePostalCode("");
   }
 
   function savePlaceIfNeeded() {
@@ -156,7 +171,25 @@ export default function SingleScheduleList({
         name: trimmedPlaceName,
         address: trimmedAddress,
         postalCode: editPlacePostalCode.trim() || undefined,
-        placeType: inferSavedPlaceType(trimmedPlaceName, existingPlace.memo),
+        placeType:
+          editSelectedPlaceInfo?.placeType ??
+          inferSavedPlaceType(trimmedPlaceName, existingPlace.memo),
+        categoryName:
+          editSelectedPlaceInfo?.categoryName ?? existingPlace.categoryName,
+        phone: editSelectedPlaceInfo?.phone ?? existingPlace.phone,
+        placeUrl: editSelectedPlaceInfo?.placeUrl ?? existingPlace.placeUrl,
+        businessHoursStart:
+          editSelectedPlaceInfo?.businessHoursStart ??
+          existingPlace.businessHoursStart,
+        businessHoursEnd:
+          editSelectedPlaceInfo?.businessHoursEnd ??
+          existingPlace.businessHoursEnd,
+        latitude: editSelectedPlaceInfo?.latitude ?? existingPlace.latitude,
+        longitude: editSelectedPlaceInfo?.longitude ?? existingPlace.longitude,
+        provider: editSelectedPlaceInfo?.provider ?? existingPlace.provider,
+        providerPlaceId:
+          editSelectedPlaceInfo?.providerPlaceId ??
+          existingPlace.providerPlaceId,
         updatedAt: now,
       });
     } else {
@@ -165,12 +198,19 @@ export default function SingleScheduleList({
         name: trimmedPlaceName,
         address: trimmedAddress,
         postalCode: editPlacePostalCode.trim() || undefined,
-        placeType: inferSavedPlaceType(trimmedPlaceName),
+        placeType:
+          editSelectedPlaceInfo?.placeType ??
+          inferSavedPlaceType(trimmedPlaceName),
+        categoryName: editSelectedPlaceInfo?.categoryName,
+        phone: editSelectedPlaceInfo?.phone,
+        placeUrl: editSelectedPlaceInfo?.placeUrl,
+        businessHoursStart: editSelectedPlaceInfo?.businessHoursStart,
+        businessHoursEnd: editSelectedPlaceInfo?.businessHoursEnd,
         memo: "",
-        latitude: null,
-        longitude: null,
-        provider: "daum-postcode",
-        providerPlaceId: null,
+        latitude: editSelectedPlaceInfo?.latitude ?? null,
+        longitude: editSelectedPlaceInfo?.longitude ?? null,
+        provider: editSelectedPlaceInfo?.provider ?? "daum-postcode",
+        providerPlaceId: editSelectedPlaceInfo?.providerPlaceId ?? null,
         createdAt: now,
         updatedAt: now,
       });
@@ -317,6 +357,7 @@ export default function SingleScheduleList({
                             onSelect={({ address, postalCode, detailHint }) => {
                               setEditPlaceAddress(address);
                               setEditPlacePostalCode(postalCode);
+                              setEditSelectedPlaceInfo(null);
 
                               if (!editPlaceName.trim() && detailHint) {
                                 setEditPlaceName(detailHint.split(",")[0]);
@@ -351,6 +392,13 @@ export default function SingleScheduleList({
                           }
                           placeholder="우편번호 검색 후 도로명 주소가 들어옵니다"
                           className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-emerald-400"
+                        />
+                      </div>
+
+                      <div className="mt-3">
+                        <PlaceKeywordSearch
+                          defaultQuery={editPlaceName}
+                          onSelect={handlePlaceSearchSelect}
                         />
                       </div>
 

@@ -2,6 +2,9 @@
 
 import TimeTaskSuggestionView from "@/components/TimeTaskSuggestionView";
 import WeeklyAvailabilityView from "@/components/WeeklyAvailabilityView";
+import PlaceKeywordSearch, {
+  PlaceSearchResult,
+} from "@/components/PlaceKeywordSearch";
 import PostcodeAddressSearch from "@/components/PostcodeAddressSearch";
 import ScheduleColorPicker from "@/components/ScheduleColorPicker";
 import { getCloudDataSyncedEventName } from "@/lib/dataSyncEvents";
@@ -246,6 +249,8 @@ function RoutineScheduleManager({
   const [placeName, setPlaceName] = useState("");
   const [placeAddress, setPlaceAddress] = useState("");
   const [placePostalCode, setPlacePostalCode] = useState("");
+  const [selectedPlaceInfo, setSelectedPlaceInfo] =
+    useState<PlaceSearchResult | null>(null);
   const [memo, setMemo] = useState("");
   const [color, setColor] = useState(DEFAULT_ROUTINE_SCHEDULE_COLOR);
 
@@ -351,6 +356,7 @@ function RoutineScheduleManager({
 
   function handlePlaceNameChange(nextPlaceName: string) {
     setPlaceName(nextPlaceName);
+    setSelectedPlaceInfo(null);
 
     const savedPlace = getSavedPlaceByName(nextPlaceName);
 
@@ -358,6 +364,13 @@ function RoutineScheduleManager({
       setPlaceAddress(savedPlace.address);
       setPlacePostalCode(savedPlace.postalCode ?? "");
     }
+  }
+
+  function handlePlaceSearchSelect(place: PlaceSearchResult) {
+    setSelectedPlaceInfo(place);
+    setPlaceName(place.name);
+    setPlaceAddress(place.address);
+    setPlacePostalCode("");
   }
 
   function saveRoutinePlaceIfNeeded() {
@@ -377,7 +390,22 @@ function RoutineScheduleManager({
         name: trimmedPlaceName,
         address: trimmedAddress,
         postalCode: placePostalCode.trim() || undefined,
-        placeType: inferSavedPlaceType(trimmedPlaceName, existingPlace.memo),
+        placeType:
+          selectedPlaceInfo?.placeType ??
+          inferSavedPlaceType(trimmedPlaceName, existingPlace.memo),
+        categoryName: selectedPlaceInfo?.categoryName ?? existingPlace.categoryName,
+        phone: selectedPlaceInfo?.phone ?? existingPlace.phone,
+        placeUrl: selectedPlaceInfo?.placeUrl ?? existingPlace.placeUrl,
+        businessHoursStart:
+          selectedPlaceInfo?.businessHoursStart ??
+          existingPlace.businessHoursStart,
+        businessHoursEnd:
+          selectedPlaceInfo?.businessHoursEnd ?? existingPlace.businessHoursEnd,
+        latitude: selectedPlaceInfo?.latitude ?? existingPlace.latitude,
+        longitude: selectedPlaceInfo?.longitude ?? existingPlace.longitude,
+        provider: selectedPlaceInfo?.provider ?? existingPlace.provider,
+        providerPlaceId:
+          selectedPlaceInfo?.providerPlaceId ?? existingPlace.providerPlaceId,
         updatedAt: now,
       });
       return;
@@ -388,12 +416,18 @@ function RoutineScheduleManager({
       name: trimmedPlaceName,
       address: trimmedAddress,
       postalCode: placePostalCode.trim() || undefined,
-      placeType: inferSavedPlaceType(trimmedPlaceName),
+      placeType:
+        selectedPlaceInfo?.placeType ?? inferSavedPlaceType(trimmedPlaceName),
+      categoryName: selectedPlaceInfo?.categoryName,
+      phone: selectedPlaceInfo?.phone,
+      placeUrl: selectedPlaceInfo?.placeUrl,
+      businessHoursStart: selectedPlaceInfo?.businessHoursStart,
+      businessHoursEnd: selectedPlaceInfo?.businessHoursEnd,
       memo: "",
-      latitude: null,
-      longitude: null,
-      provider: "daum-postcode",
-      providerPlaceId: null,
+      latitude: selectedPlaceInfo?.latitude ?? null,
+      longitude: selectedPlaceInfo?.longitude ?? null,
+      provider: selectedPlaceInfo?.provider ?? "daum-postcode",
+      providerPlaceId: selectedPlaceInfo?.providerPlaceId ?? null,
       createdAt: now,
       updatedAt: now,
     });
@@ -533,6 +567,7 @@ function RoutineScheduleManager({
     setPlaceName("");
     setPlaceAddress("");
     setPlacePostalCode("");
+    setSelectedPlaceInfo(null);
     setMemo("");
     setColor(DEFAULT_ROUTINE_SCHEDULE_COLOR);
     setStartDate("");
@@ -1563,6 +1598,7 @@ function RoutineScheduleManager({
                   onSelect={({ address, postalCode, detailHint }) => {
                     setPlaceAddress(address);
                     setPlacePostalCode(postalCode);
+                    setSelectedPlaceInfo(null);
 
                     if (!placeName.trim() && detailHint) {
                       setPlaceName(detailHint.split(",")[0]);
@@ -1595,6 +1631,13 @@ function RoutineScheduleManager({
                 onChange={(event) => setPlaceAddress(event.target.value)}
                 placeholder="우편번호 검색 후 도로명 주소가 들어옵니다"
                 className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-emerald-400"
+              />
+            </div>
+
+            <div className="mt-3">
+              <PlaceKeywordSearch
+                defaultQuery={placeName}
+                onSelect={handlePlaceSearchSelect}
               />
             </div>
 

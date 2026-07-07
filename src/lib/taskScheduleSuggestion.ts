@@ -141,6 +141,17 @@ function getAllowedWindow({
   context: TaskContext;
   userProfile?: UserProfile | null;
 }) {
+  if (
+    context.targetPlace?.businessHoursStart &&
+    context.targetPlace.businessHoursEnd
+  ) {
+    return {
+      startTime: context.targetPlace.businessHoursStart,
+      endTime: context.targetPlace.businessHoursEnd,
+      label: `${context.targetPlace.name} 기본 영업 시간대`,
+    };
+  }
+
   if (context.isWorkout) {
     return {
       startTime: userProfile?.workoutPreferredStartTime ?? "17:00",

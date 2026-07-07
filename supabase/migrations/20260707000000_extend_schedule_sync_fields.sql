@@ -15,4 +15,9 @@ alter table public.single_schedules
 
 alter table public.places
   add column if not exists postal_code text,
-  add column if not exists place_type text;
+  add column if not exists place_type text,
+  add column if not exists category_name text,
+  add column if not exists phone text,
+  add column if not exists place_url text,
+  add column if not exists business_hours_start time,
+  add column if not exists business_hours_end time;

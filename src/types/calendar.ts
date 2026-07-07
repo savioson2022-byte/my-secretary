@@ -94,6 +94,11 @@ export type SavedPlace = {
   address: string;
   postalCode?: string;
   placeType?: "home" | "work" | "school" | "gym" | "salon" | "shop" | "other";
+  categoryName?: string;
+  phone?: string;
+  placeUrl?: string;
+  businessHoursStart?: string;
+  businessHoursEnd?: string;
   memo: string;
   latitude?: number | null;
   longitude?: number | null;
