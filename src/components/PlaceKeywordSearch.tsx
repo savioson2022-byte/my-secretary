@@ -51,6 +51,8 @@ export default function PlaceKeywordSearch({
       );
       const data = (await response.json()) as {
         places?: PlaceSearchResult[];
+        missingKeys?: string[];
+        errors?: string[];
         error?: string;
       };
 
@@ -63,6 +65,10 @@ export default function PlaceKeywordSearch({
       setPlaces(data.places ?? []);
       if ((data.places ?? []).length === 0) {
         setMessage("검색 결과가 없습니다.");
+      } else if (data.missingKeys && data.missingKeys.length > 0) {
+        setMessage(
+          "일부 검색 제공자는 아직 키가 없어 제외됐습니다. 검색 결과는 사용 가능한 API 기준입니다."
+        );
       }
     } catch {
       setMessage("장소 검색 중 오류가 발생했습니다.");
@@ -115,6 +121,11 @@ export default function PlaceKeywordSearch({
                 {place.categoryName && (
                   <span className="rounded-full bg-white px-2 py-1 text-[11px] font-black text-slate-500">
                     {place.categoryName.split(">").at(-1)?.trim()}
+                  </span>
+                )}
+                {place.provider && (
+                  <span className="rounded-full bg-white px-2 py-1 text-[11px] font-black text-emerald-600">
+                    {place.provider === "naver" ? "네이버" : "카카오"}
                   </span>
                 )}
                 {place.businessHoursStart && place.businessHoursEnd && (
