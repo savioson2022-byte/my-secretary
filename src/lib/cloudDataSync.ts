@@ -72,6 +72,12 @@ function asTravelMode(value: unknown): TravelMode | undefined {
   return undefined;
 }
 
+function asTextArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+
+  return value.filter((item): item is string => typeof item === "string");
+}
+
 async function getAvailableOptionalColumns({
   supabase,
   table,
@@ -206,6 +212,7 @@ const syncDomains: Array<SyncDomain<SyncableItem, { id: string }>> = [
       "place_address",
       "place_postal_code",
       "travel_mode",
+      "cancelled_dates",
     ],
     toRow(item, userId, availableColumns) {
       const routine = item as RoutineSchedule;
@@ -238,6 +245,9 @@ const syncDomains: Array<SyncDomain<SyncableItem, { id: string }>> = [
         ...(availableColumns.has("travel_mode")
           ? { travel_mode: routine.travelMode ?? null }
           : {}),
+        ...(availableColumns.has("cancelled_dates")
+          ? { cancelled_dates: routine.cancelledDates ?? [] }
+          : {}),
       };
     },
     fromRow(row) {
@@ -253,6 +263,7 @@ const syncDomains: Array<SyncDomain<SyncableItem, { id: string }>> = [
         travelMode: asTravelMode(row.travel_mode),
         memo: asText(row.memo),
         color: asNullableText(row.color) ?? undefined,
+        cancelledDates: asTextArray(row.cancelled_dates),
         startDate: asNullableText(row.start_date),
         endDate: asNullableText(row.end_date),
         isActive: asBoolean(row.is_active, true),

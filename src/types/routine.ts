@@ -17,6 +17,9 @@ export type RoutineSchedule = {
   // 월간/주간 캘린더에서 표시할 사용자 지정 색상
   color?: string;
 
+  // 정기 일정 자체는 유지하지만 특정 날짜만 예외적으로 취소할 때 사용
+  cancelledDates?: string[];
+
   // 정기 시간표가 시작되는 날짜
   // 예: "2026-03-02"
   // 기간 제한이 없으면 null

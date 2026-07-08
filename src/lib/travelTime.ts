@@ -78,6 +78,10 @@ function isRoutineActiveOnDate(routine: RoutineSchedule, dateText: string) {
     return false;
   }
 
+  if (routine.cancelledDates?.includes(dateText)) {
+    return false;
+  }
+
   return true;
 }
 

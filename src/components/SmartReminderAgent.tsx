@@ -50,6 +50,7 @@ function isRoutineActiveToday(routine: RoutineSchedule, dateText: string) {
   if (routine.isActive === false) return false;
   if (routine.startDate && routine.startDate > dateText) return false;
   if (routine.endDate && routine.endDate < dateText) return false;
+  if (routine.cancelledDates?.includes(dateText)) return false;
 
   return true;
 }

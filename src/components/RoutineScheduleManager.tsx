@@ -2,6 +2,7 @@
 
 import TimeTaskSuggestionView from "@/components/TimeTaskSuggestionView";
 import WeeklyAvailabilityView from "@/components/WeeklyAvailabilityView";
+import SingleScheduleList from "@/components/SingleScheduleList";
 import PlaceKeywordSearch, {
   PlaceSearchResult,
 } from "@/components/PlaceKeywordSearch";
@@ -27,6 +28,7 @@ import {
   getSoftColorStyle,
 } from "@/lib/scheduleColors";
 import {
+  deleteSingleSchedule,
   getSingleScheduleUpdatedEventName,
   getSingleSchedules,
 } from "@/lib/singleScheduleStorage";
@@ -60,6 +62,12 @@ type RoutineTimeSlot = {
 type RoutineScheduleManagerProps = {
   items: AssistantItem[];
   variant?: "weekly" | "management" | "all";
+};
+
+type RoutineGroup = {
+  key: string;
+  title: string;
+  routines: RoutineSchedule[];
 };
 
 function createId() {
@@ -220,6 +228,13 @@ function formatMonthDay(date: Date) {
   return `${date.getMonth() + 1}/${date.getDate()}`;
 }
 
+function getDayOfWeekFromDateText(dateText: string): DayOfWeek {
+  const dayIndex = new Date(`${dateText}T00:00:00`).getDay();
+  const daysByDateIndex: DayOfWeek[] = ["일", "월", "화", "수", "목", "금", "토"];
+
+  return daysByDateIndex[dayIndex] ?? "월";
+}
+
 function isRoutineActiveOnDate(routine: RoutineSchedule, dateText: string) {
   if (routine.isActive === false) return false;
 
@@ -231,7 +246,85 @@ function isRoutineActiveOnDate(routine: RoutineSchedule, dateText: string) {
     return false;
   }
 
+  if (routine.cancelledDates?.includes(dateText)) {
+    return false;
+  }
+
   return true;
+}
+
+function getRoutineGroupKey(routine: RoutineSchedule) {
+  return routine.title.trim().toLowerCase() || routine.id;
+}
+
+function groupRoutinesByTitle(routines: RoutineSchedule[]): RoutineGroup[] {
+  const groups = new Map<string, RoutineGroup>();
+
+  routines.forEach((routine) => {
+    const key = getRoutineGroupKey(routine);
+    const existingGroup = groups.get(key);
+
+    if (existingGroup) {
+      existingGroup.routines.push(routine);
+      return;
+    }
+
+    groups.set(key, {
+      key,
+      title: routine.title,
+      routines: [routine],
+    });
+  });
+
+  return Array.from(groups.values())
+    .map((group) => ({
+      ...group,
+      routines: [...group.routines].sort((a, b) => {
+        const aValue = `${DAYS.indexOf(a.dayOfWeek)}-${a.startTime}`;
+        const bValue = `${DAYS.indexOf(b.dayOfWeek)}-${b.startTime}`;
+
+        return aValue.localeCompare(bValue);
+      }),
+    }))
+    .sort((a, b) => a.title.localeCompare(b.title, "ko"));
+}
+
+function getTimeSlotsFromRoutines(routines: RoutineSchedule[]): RoutineTimeSlot[] {
+  const slots = new Map<string, RoutineTimeSlot>();
+
+  routines.forEach((routine) => {
+    const key = `${routine.startTime}-${routine.endTime}`;
+    const existingSlot = slots.get(key);
+
+    if (existingSlot) {
+      if (!existingSlot.days.includes(routine.dayOfWeek)) {
+        existingSlot.days = [...existingSlot.days, routine.dayOfWeek].sort(
+          (a, b) => DAYS.indexOf(a) - DAYS.indexOf(b)
+        );
+      }
+      return;
+    }
+
+    slots.set(key, {
+      id: createId(),
+      days: [routine.dayOfWeek],
+      startTime: routine.startTime,
+      endTime: routine.endTime,
+    });
+  });
+
+  return Array.from(slots.values()).sort((a, b) => {
+    const aValue = `${DAYS.indexOf(a.days[0])}-${a.startTime}`;
+    const bValue = `${DAYS.indexOf(b.days[0])}-${b.startTime}`;
+
+    return aValue.localeCompare(bValue);
+  });
+}
+
+function getCancelledDatesForGroup(group: RoutineGroup) {
+  return Array.from(
+    new Set(group.routines.flatMap((routine) => routine.cancelledDates ?? []))
+  ).sort();
 }
 
 function RoutineScheduleManager({
@@ -256,6 +349,26 @@ function RoutineScheduleManager({
 
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [editingRoutineGroupKey, setEditingRoutineGroupKey] = useState<
+    string | null
+  >(null);
+  const [editRoutineTitle, setEditRoutineTitle] = useState("");
+  const [editRoutineTimeSlots, setEditRoutineTimeSlots] = useState<
+    RoutineTimeSlot[]
+  >(() => [createDefaultTimeSlot()]);
+  const [editRoutineStartDate, setEditRoutineStartDate] = useState("");
+  const [editRoutineEndDate, setEditRoutineEndDate] = useState("");
+  const [editRoutinePlaceName, setEditRoutinePlaceName] = useState("");
+  const [editRoutinePlaceAddress, setEditRoutinePlaceAddress] = useState("");
+  const [editRoutinePlacePostalCode, setEditRoutinePlacePostalCode] =
+    useState("");
+  const [editRoutineMemo, setEditRoutineMemo] = useState("");
+  const [editRoutineColor, setEditRoutineColor] = useState(
+    DEFAULT_ROUTINE_SCHEDULE_COLOR
+  );
+  const [cancelDateByGroupKey, setCancelDateByGroupKey] = useState<
+    Record<string, string>
+  >({});
 
   const [dragSelection, setDragSelection] = useState<DragSelection | null>(
     null
@@ -321,6 +434,12 @@ function RoutineScheduleManager({
       return routine.isActive === false || isRoutineEnded(routine);
     });
   }, [routines]);
+  const activeRoutineGroups = useMemo(() => {
+    return groupRoutinesByTitle(activeRoutines);
+  }, [activeRoutines]);
+  const endedRoutineGroups = useMemo(() => {
+    return groupRoutinesByTitle(endedRoutines);
+  }, [endedRoutines]);
 
   const placeNameOptions = useMemo(() => {
     const names = new Set<string>();
@@ -449,8 +568,41 @@ function RoutineScheduleManager({
     );
   }
 
+  function updateEditRoutineTimeSlot(
+    slotId: string,
+    nextPartialSlot: Partial<Omit<RoutineTimeSlot, "id">>
+  ) {
+    setEditRoutineTimeSlots((currentSlots) =>
+      currentSlots.map((slot) => {
+        if (slot.id !== slotId) return slot;
+
+        return {
+          ...slot,
+          ...nextPartialSlot,
+        };
+      })
+    );
+  }
+
   function toggleTimeSlotDay(slotId: string, day: DayOfWeek) {
     setTimeSlots((currentSlots) =>
+      currentSlots.map((slot) => {
+        if (slot.id !== slotId) return slot;
+
+        const nextDays = slot.days.includes(day)
+          ? slot.days.filter((currentDay) => currentDay !== day)
+          : [...slot.days, day];
+
+        return {
+          ...slot,
+          days: nextDays.sort((a, b) => DAYS.indexOf(a) - DAYS.indexOf(b)),
+        };
+      })
+    );
+  }
+
+  function toggleEditRoutineTimeSlotDay(slotId: string, day: DayOfWeek) {
+    setEditRoutineTimeSlots((currentSlots) =>
       currentSlots.map((slot) => {
         if (slot.id !== slotId) return slot;
 
@@ -477,8 +629,29 @@ function RoutineScheduleManager({
     ]);
   }
 
+  function addEditRoutineTimeSlot() {
+    setEditRoutineTimeSlots((currentSlots) => [
+      ...currentSlots,
+      {
+        ...createDefaultTimeSlot(),
+        startTime: currentSlots[currentSlots.length - 1]?.startTime ?? "09:00",
+        endTime: currentSlots[currentSlots.length - 1]?.endTime ?? "10:00",
+      },
+    ]);
+  }
+
   function removeTimeSlot(slotId: string) {
     setTimeSlots((currentSlots) => {
+      if (currentSlots.length === 1) {
+        return currentSlots;
+      }
+
+      return currentSlots.filter((slot) => slot.id !== slotId);
+    });
+  }
+
+  function removeEditRoutineTimeSlot(slotId: string) {
+    setEditRoutineTimeSlots((currentSlots) => {
       if (currentSlots.length === 1) {
         return currentSlots;
       }
@@ -577,6 +750,158 @@ function RoutineScheduleManager({
 
   function handleDelete(id: string) {
     deleteRoutineSchedule(id);
+    setRoutines(getRoutineSchedules());
+  }
+
+  function handleDeleteSingleSchedule(id: string) {
+    deleteSingleSchedule(id);
+    setSingleSchedules(getSingleSchedules());
+  }
+
+  function startEditRoutineGroup(group: RoutineGroup) {
+    const firstRoutine = group.routines[0];
+    if (!firstRoutine) return;
+
+    setEditingRoutineGroupKey(group.key);
+    setEditRoutineTitle(firstRoutine.title);
+    setEditRoutineTimeSlots(getTimeSlotsFromRoutines(group.routines));
+    setEditRoutineStartDate(firstRoutine.startDate ?? "");
+    setEditRoutineEndDate(firstRoutine.endDate ?? "");
+    setEditRoutinePlaceName(firstRoutine.placeName);
+    setEditRoutinePlaceAddress(firstRoutine.placeAddress ?? "");
+    setEditRoutinePlacePostalCode(firstRoutine.placePostalCode ?? "");
+    setEditRoutineMemo(firstRoutine.memo);
+    setEditRoutineColor(
+      getScheduleColor(firstRoutine.color, DEFAULT_ROUTINE_SCHEDULE_COLOR)
+    );
+  }
+
+  function cancelEditRoutineGroup() {
+    setEditingRoutineGroupKey(null);
+    setEditRoutineTitle("");
+    setEditRoutineTimeSlots([createDefaultTimeSlot()]);
+    setEditRoutineStartDate("");
+    setEditRoutineEndDate("");
+    setEditRoutinePlaceName("");
+    setEditRoutinePlaceAddress("");
+    setEditRoutinePlacePostalCode("");
+    setEditRoutineMemo("");
+    setEditRoutineColor(DEFAULT_ROUTINE_SCHEDULE_COLOR);
+  }
+
+  function saveRoutineGroupEdit(group: RoutineGroup) {
+    if (!editRoutineTitle.trim()) {
+      alert("정기 일정 제목을 입력해줘.");
+      return;
+    }
+
+    if (!editRoutinePlaceName.trim()) {
+      alert("위치를 입력해줘.");
+      return;
+    }
+
+    if (editRoutineStartDate && editRoutineEndDate && editRoutineStartDate > editRoutineEndDate) {
+      alert("종료일은 시작일보다 늦거나 같아야 해.");
+      return;
+    }
+
+    const invalidSlot = editRoutineTimeSlots.find((slot) => {
+      return slot.days.length === 0 || slot.startTime >= slot.endTime;
+    });
+
+    if (invalidSlot) {
+      alert("각 시간대마다 요일을 하나 이상 고르고, 종료 시간을 시작 시간보다 늦게 설정해줘.");
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const cancelledDates = getCancelledDatesForGroup(group);
+
+    group.routines.forEach((routine) => deleteRoutineSchedule(routine.id));
+
+    editRoutineTimeSlots
+      .flatMap((slot) =>
+        slot.days.map((selectedDay) => ({
+          id: createId(),
+          title: editRoutineTitle.trim(),
+          dayOfWeek: selectedDay,
+          startTime: slot.startTime,
+          endTime: slot.endTime,
+          placeName: editRoutinePlaceName.trim(),
+          placeAddress: editRoutinePlaceAddress.trim() || undefined,
+          placePostalCode: editRoutinePlacePostalCode.trim() || undefined,
+          memo: editRoutineMemo.trim(),
+          color: editRoutineColor,
+          cancelledDates: cancelledDates.filter((dateText) => {
+            return getDayOfWeekFromDateText(dateText) === selectedDay;
+          }),
+          startDate: editRoutineStartDate || null,
+          endDate: editRoutineEndDate || null,
+          isActive: true,
+          createdAt: now,
+          updatedAt: now,
+        }))
+      )
+      .forEach(saveRoutineSchedule);
+
+    setRoutines(getRoutineSchedules());
+    cancelEditRoutineGroup();
+  }
+
+  function handleDeleteRoutineGroup(group: RoutineGroup) {
+    const shouldDelete = window.confirm(
+      `"${group.title}" 정기 일정의 모든 요일/시간대를 삭제할까요?`
+    );
+
+    if (!shouldDelete) return;
+
+    group.routines.forEach((routine) => deleteRoutineSchedule(routine.id));
+    setRoutines(getRoutineSchedules());
+
+    if (editingRoutineGroupKey === group.key) {
+      cancelEditRoutineGroup();
+    }
+  }
+
+  function cancelRoutineGroupOnDate(group: RoutineGroup) {
+    const dateText = cancelDateByGroupKey[group.key] || getTodayText();
+    const dayOfWeek = getDayOfWeekFromDateText(dateText);
+    let changed = false;
+
+    group.routines.forEach((routine) => {
+      if (routine.dayOfWeek !== dayOfWeek) return;
+
+      const cancelledDates = routine.cancelledDates ?? [];
+      if (cancelledDates.includes(dateText)) return;
+
+      changed = true;
+      updateRoutineSchedule({
+        ...routine,
+        cancelledDates: [...cancelledDates, dateText].sort(),
+        updatedAt: new Date().toISOString(),
+      });
+    });
+
+    if (!changed) {
+      alert("선택한 날짜에 해당하는 반복 일정이 없거나 이미 취소됐습니다.");
+    }
+
+    setRoutines(getRoutineSchedules());
+  }
+
+  function restoreRoutineGroupDate(group: RoutineGroup, dateText: string) {
+    group.routines.forEach((routine) => {
+      if (!routine.cancelledDates?.includes(dateText)) return;
+
+      updateRoutineSchedule({
+        ...routine,
+        cancelledDates: routine.cancelledDates.filter(
+          (cancelledDate) => cancelledDate !== dateText
+        ),
+        updatedAt: new Date().toISOString(),
+      });
+    });
+
     setRoutines(getRoutineSchedules());
   }
 
@@ -1676,102 +2001,365 @@ function RoutineScheduleManager({
 
       </section>
 
+      <SingleScheduleList
+        schedules={singleSchedules}
+        onDelete={handleDeleteSingleSchedule}
+      />
+
       <section className="rounded-3xl bg-white p-5 shadow-soft ring-1 ring-slate-100">
         <div className="space-y-3">
-          <h3 className="text-sm font-black text-slate-800">활성 정기 일정</h3>
+          <div>
+            <h3 className="text-sm font-black text-slate-800">
+              정기 일정 묶음
+            </h3>
+            <p className="mt-1 text-xs font-bold leading-5 text-slate-500">
+              같은 제목의 정기 일정을 한 묶음으로 관리합니다. 전체 삭제와 특정
+              날짜만 취소는 서로 다른 작업입니다.
+            </p>
+          </div>
 
-          {activeRoutines.length === 0 ? (
+          {activeRoutineGroups.length === 0 ? (
             <p className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">
               현재 활성화된 정기 일정이 없습니다.
             </p>
           ) : (
-            activeRoutines.map((routine) => (
+            activeRoutineGroups.map((group) => {
+              const firstRoutine = group.routines[0];
+              const isEditingGroup = editingRoutineGroupKey === group.key;
+              const cancelledDates = getCancelledDatesForGroup(group);
+
+              if (!firstRoutine) return null;
+
+              return (
+                <div
+                  key={group.key}
+                  className="rounded-2xl border border-slate-100 bg-slate-50 p-4"
+                >
+                  {isEditingGroup ? (
+                    <div className="space-y-4">
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <input
+                          value={editRoutineTitle}
+                          onChange={(event) =>
+                            setEditRoutineTitle(event.target.value)
+                          }
+                          placeholder="일정 제목"
+                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-emerald-400"
+                        />
+                        <input
+                          value={editRoutinePlaceName}
+                          onChange={(event) =>
+                            setEditRoutinePlaceName(event.target.value)
+                          }
+                          placeholder="장소 이름"
+                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-emerald-400"
+                        />
+                      </div>
+
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <input
+                          value={editRoutinePlaceAddress}
+                          onChange={(event) =>
+                            setEditRoutinePlaceAddress(event.target.value)
+                          }
+                          placeholder="주소"
+                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-emerald-400"
+                        />
+                        <input
+                          value={editRoutinePlacePostalCode}
+                          onChange={(event) =>
+                            setEditRoutinePlacePostalCode(event.target.value)
+                          }
+                          placeholder="우편번호"
+                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-emerald-400"
+                        />
+                      </div>
+
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <input
+                          type="date"
+                          value={editRoutineStartDate}
+                          onChange={(event) =>
+                            setEditRoutineStartDate(event.target.value)
+                          }
+                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-emerald-400"
+                        />
+                        <input
+                          type="date"
+                          value={editRoutineEndDate}
+                          onChange={(event) =>
+                            setEditRoutineEndDate(event.target.value)
+                          }
+                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-emerald-400"
+                        />
+                      </div>
+
+                      <div className="rounded-3xl bg-white p-3 ring-1 ring-slate-100">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-xs font-black text-slate-500">
+                            요일 및 시간대
+                          </p>
+                          <button
+                            type="button"
+                            onClick={addEditRoutineTimeSlot}
+                            className="rounded-xl bg-slate-950 px-3 py-2 text-xs font-black text-white"
+                          >
+                            시간대 추가
+                          </button>
+                        </div>
+
+                        <div className="mt-3 space-y-3">
+                          {editRoutineTimeSlots.map((slot, index) => (
+                            <div
+                              key={slot.id}
+                              className="rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-100"
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <p className="text-xs font-black text-slate-500">
+                                  시간대 {index + 1}
+                                </p>
+                                {editRoutineTimeSlots.length > 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      removeEditRoutineTimeSlot(slot.id)
+                                    }
+                                    className="rounded-full bg-white px-3 py-1 text-xs font-black text-rose-500 ring-1 ring-rose-100"
+                                  >
+                                    삭제
+                                  </button>
+                                )}
+                              </div>
+
+                              <div className="mt-3 grid grid-cols-7 gap-1">
+                                {DAYS.map((day) => {
+                                  const isSelected = slot.days.includes(day);
+
+                                  return (
+                                    <button
+                                      key={`${slot.id}-${day}`}
+                                      type="button"
+                                      onClick={() =>
+                                        toggleEditRoutineTimeSlotDay(
+                                          slot.id,
+                                          day
+                                        )
+                                      }
+                                      className={`rounded-2xl px-2 py-3 text-sm font-black transition ${
+                                        isSelected
+                                          ? "bg-slate-950 text-white"
+                                          : "bg-white text-slate-500 ring-1 ring-slate-200"
+                                      }`}
+                                    >
+                                      {day}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+
+                              <div className="mt-3 grid grid-cols-2 gap-3">
+                                <input
+                                  type="time"
+                                  step={600}
+                                  value={slot.startTime}
+                                  onChange={(event) =>
+                                    updateEditRoutineTimeSlot(slot.id, {
+                                      startTime: event.target.value,
+                                    })
+                                  }
+                                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-emerald-400"
+                                />
+                                <input
+                                  type="time"
+                                  step={600}
+                                  value={slot.endTime}
+                                  onChange={(event) =>
+                                    updateEditRoutineTimeSlot(slot.id, {
+                                      endTime: event.target.value,
+                                    })
+                                  }
+                                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-emerald-400"
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <input
+                        value={editRoutineMemo}
+                        onChange={(event) =>
+                          setEditRoutineMemo(event.target.value)
+                        }
+                        placeholder="메모"
+                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-emerald-400"
+                      />
+
+                      <ScheduleColorPicker
+                        label="캘린더 색인"
+                        value={editRoutineColor}
+                        onChange={setEditRoutineColor}
+                      />
+
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => saveRoutineGroupEdit(group)}
+                          className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white hover:bg-slate-700"
+                        >
+                          묶음 저장
+                        </button>
+                        <button
+                          type="button"
+                          onClick={cancelEditRoutineGroup}
+                          className="rounded-xl bg-white px-4 py-2 text-xs font-bold text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
+                        >
+                          편집 취소
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteRoutineGroup(group)}
+                          className="rounded-xl bg-white px-4 py-2 text-xs font-bold text-red-500 ring-1 ring-red-100 hover:bg-red-50"
+                        >
+                          이 정기 일정 전체 삭제
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="font-black text-slate-900">
+                            {group.title}
+                          </p>
+                          <p className="mt-1 text-sm text-slate-600">
+                            위치: {firstRoutine.placeName || "위치 미입력"}
+                          </p>
+                          <p className="mt-1 text-sm text-slate-500">
+                            기간: {firstRoutine.startDate ?? "제한 없음"} ~{" "}
+                            {firstRoutine.endDate ?? "제한 없음"}
+                          </p>
+                        </div>
+
+                        <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
+                          <button
+                            type="button"
+                            onClick={() => startEditRoutineGroup(group)}
+                            className="rounded-xl bg-white px-3 py-2 text-xs font-bold text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
+                          >
+                            묶음 편집
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteRoutineGroup(group)}
+                            className="rounded-xl bg-white px-3 py-2 text-xs font-bold text-red-500 ring-1 ring-red-100 hover:bg-red-50"
+                          >
+                            전체 삭제
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="grid gap-2 md:grid-cols-2">
+                        {getTimeSlotsFromRoutines(group.routines).map((slot) => (
+                          <div
+                            key={`${group.key}-${slot.startTime}-${slot.endTime}`}
+                            className="rounded-2xl bg-white p-3 text-sm font-bold text-slate-600 ring-1 ring-slate-100"
+                          >
+                            <p className="text-slate-900">
+                              {slot.days.join(", ")}요일
+                            </p>
+                            <p className="mt-1">
+                              {slot.startTime} ~ {slot.endTime}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="rounded-3xl bg-white p-3 ring-1 ring-slate-100">
+                        <p className="text-xs font-black text-slate-500">
+                          특정 날짜만 취소
+                        </p>
+                        <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                          <input
+                            type="date"
+                            value={
+                              cancelDateByGroupKey[group.key] ?? getTodayText()
+                            }
+                            onChange={(event) =>
+                              setCancelDateByGroupKey((current) => ({
+                                ...current,
+                                [group.key]: event.target.value,
+                              }))
+                            }
+                            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-emerald-400"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => cancelRoutineGroupOnDate(group)}
+                            className="rounded-2xl bg-amber-50 px-4 py-3 text-sm font-black text-amber-700 ring-1 ring-amber-100"
+                          >
+                            이 날짜만 취소
+                          </button>
+                        </div>
+
+                        {cancelledDates.length > 0 && (
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {cancelledDates.map((dateText) => (
+                              <button
+                                key={`${group.key}-${dateText}`}
+                                type="button"
+                                onClick={() =>
+                                  restoreRoutineGroupDate(group, dateText)
+                                }
+                                className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-500 transition hover:bg-emerald-50 hover:text-emerald-700"
+                              >
+                                {dateText} 취소됨 · 복구
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {endedRoutineGroups.length > 0 && (
+          <div className="mt-6 space-y-3">
+            <h3 className="text-sm font-black text-slate-800">
+              종료된 정기 일정 묶음
+            </h3>
+
+            {endedRoutineGroups.map((group) => (
               <div
-                key={routine.id}
-                className="rounded-2xl border border-slate-100 bg-slate-50 p-4"
+                key={group.key}
+                className="rounded-2xl border border-slate-100 bg-slate-100 p-4 opacity-70"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="font-black text-slate-900">
-                      {routine.title}
-                    </p>
-                    <p className="mt-1 text-sm text-slate-600">
-                      {routine.dayOfWeek}요일 {routine.startTime} ~{" "}
-                      {routine.endTime}
-                    </p>
-                    <p className="mt-1 text-sm text-slate-600">
-                      위치: {routine.placeName}
-                    </p>
-                    <p className="mt-1 text-sm text-slate-500">
-                      기간: {routine.startDate ?? "제한 없음"} ~{" "}
-                      {routine.endDate ?? "제한 없음"}
-                    </p>
-                    {routine.memo && (
-                      <p className="mt-1 text-sm text-slate-500">
-                        메모: {routine.memo}
-                      </p>
-                    )}
-                    <div className="mt-3">
-                      <ScheduleColorPicker
-                        value={getScheduleColor(
-                          routine.color,
-                          DEFAULT_ROUTINE_SCHEDULE_COLOR
-                        )}
-                        onChange={(nextColor) =>
-                          handleRoutineColorChange(routine, nextColor)
-                        }
-                      />
+                    <p className="font-black text-slate-700">{group.title}</p>
+                    <div className="mt-2 space-y-1">
+                      {getTimeSlotsFromRoutines(group.routines).map((slot) => (
+                        <p
+                          key={`${group.key}-ended-${slot.startTime}-${slot.endTime}`}
+                          className="text-sm text-slate-500"
+                        >
+                          {slot.days.join(", ")}요일 {slot.startTime} ~{" "}
+                          {slot.endTime}
+                        </p>
+                      ))}
                     </div>
                   </div>
 
                   <button
                     type="button"
-                    onClick={() => handleDelete(routine.id)}
+                    onClick={() => handleDeleteRoutineGroup(group)}
                     className="shrink-0 rounded-xl bg-white px-3 py-2 text-xs font-bold text-red-500 ring-1 ring-red-100 hover:bg-red-50"
                   >
-                    삭제
-                  </button>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-
-        {endedRoutines.length > 0 && (
-          <div className="mt-6 space-y-3">
-            <h3 className="text-sm font-black text-slate-800">
-              종료된 정기 일정
-            </h3>
-
-            {endedRoutines.map((routine) => (
-              <div
-                key={routine.id}
-                className="rounded-2xl border border-slate-100 bg-slate-100 p-4 opacity-70"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-black text-slate-700">
-                      {routine.title}
-                    </p>
-                    <p className="mt-1 text-sm text-slate-500">
-                      {routine.dayOfWeek}요일 {routine.startTime} ~{" "}
-                      {routine.endTime}
-                    </p>
-                    <p className="mt-1 text-sm text-slate-500">
-                      위치: {routine.placeName}
-                    </p>
-                    <p className="mt-1 text-sm text-slate-500">
-                      기간: {routine.startDate ?? "제한 없음"} ~{" "}
-                      {routine.endDate ?? "제한 없음"}
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(routine.id)}
-                    className="shrink-0 rounded-xl bg-white px-3 py-2 text-xs font-bold text-red-500 ring-1 ring-red-100 hover:bg-red-50"
-                  >
-                    삭제
+                    전체 삭제
                   </button>
                 </div>
               </div>

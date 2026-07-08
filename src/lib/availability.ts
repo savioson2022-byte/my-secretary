@@ -108,6 +108,10 @@ export function isRoutineActiveOnDate(
     return false;
   }
 
+  if (routine.cancelledDates?.includes(dateText)) {
+    return false;
+  }
+
   return true;
 }
 
