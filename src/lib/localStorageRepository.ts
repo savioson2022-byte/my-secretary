@@ -8,6 +8,12 @@ export type LocalStorageRepository<TItem extends { id: string }> = {
 };
 
 const LOCAL_DATA_UPDATED_EVENT = "assistant-local-data-updated";
+const DELETED_ITEM_LOG_SUFFIX = "::deleted";
+
+export type DeletedItemRecord = {
+  id: string;
+  deletedAt: string;
+};
 
 export function isBrowser() {
   return typeof window !== "undefined";
@@ -59,6 +65,43 @@ export function writeLocalStorageArray<TItem>(key: string, value: TItem[]) {
   );
 }
 
+function getDeletedItemLogKey(key: string) {
+  return `${key}${DELETED_ITEM_LOG_SUFFIX}`;
+}
+
+export function readDeletedItemRecords(key: string): DeletedItemRecord[] {
+  return readLocalStorageArray<DeletedItemRecord>(getDeletedItemLogKey(key));
+}
+
+function writeDeletedItemRecords(key: string, records: DeletedItemRecord[]) {
+  writeLocalStorageArray(getDeletedItemLogKey(key), records);
+}
+
+function rememberDeletedItem(key: string, id: string) {
+  const records = readDeletedItemRecords(key);
+  const nextRecord = {
+    id,
+    deletedAt: new Date().toISOString(),
+  };
+  const nextRecords = [
+    nextRecord,
+    ...records.filter((record) => record.id !== id),
+  ];
+
+  writeDeletedItemRecords(key, nextRecords);
+}
+
+function forgetDeletedItem(key: string, id: string) {
+  const records = readDeletedItemRecords(key);
+  const nextRecords = records.filter((record) => record.id !== id);
+
+  if (nextRecords.length === records.length) {
+    return;
+  }
+
+  writeDeletedItemRecords(key, nextRecords);
+}
+
 export function createLocalStorageRepository<TItem extends { id: string }>(
   key: string
 ): LocalStorageRepository<TItem> {
@@ -68,10 +111,12 @@ export function createLocalStorageRepository<TItem extends { id: string }>(
     },
 
     create(item) {
+      forgetDeletedItem(key, item.id);
       writeLocalStorageArray(key, [item, ...readLocalStorageArray<TItem>(key)]);
     },
 
     update(updatedItem) {
+      forgetDeletedItem(key, updatedItem.id);
       const nextItems = readLocalStorageArray<TItem>(key).map((item) => {
         if (item.id === updatedItem.id) {
           return updatedItem;
@@ -84,6 +129,7 @@ export function createLocalStorageRepository<TItem extends { id: string }>(
     },
 
     delete(id) {
+      rememberDeletedItem(key, id);
       const nextItems = readLocalStorageArray<TItem>(key).filter((item) => {
         return item.id !== id;
       });

@@ -10,6 +10,7 @@ import type {
 import type { DayOfWeek, RoutineSchedule } from "@/types/routine";
 import type { CloudSyncDomainResult } from "@/lib/dataSyncEvents";
 import { getScopedStorageKey } from "@/lib/authScopedStorage";
+import { readDeletedItemRecords } from "@/lib/localStorageRepository";
 
 type SyncableItem = {
   id: string;
@@ -475,11 +476,29 @@ async function syncDomainWithCloud({
   domain: SyncDomain<SyncableItem, { id: string }>;
 }) {
   const localItems = readLocalArray<SyncableItem>(domain.key);
+  const deletedItemRecords = readDeletedItemRecords(domain.key);
+  const deletedIds = new Set(deletedItemRecords.map((record) => record.id));
+  const remoteDeletedIds = deletedItemRecords
+    .map((record) => record.id)
+    .filter(isUuid);
   const availableColumns = await getAvailableOptionalColumns({
     supabase,
     table: domain.table,
     optionalColumns: domain.optionalColumns,
   });
+
+  if (remoteDeletedIds.length > 0) {
+    const { error: deleteError } = await supabase
+      .from(domain.table)
+      .delete()
+      .eq("user_id", userId)
+      .in("id", remoteDeletedIds);
+
+    if (deleteError) {
+      throw deleteError;
+    }
+  }
+
   const { data, error } = await supabase
     .from(domain.table)
     .select("*")
@@ -492,7 +511,10 @@ async function syncDomainWithCloud({
   const remoteItems = ((data ?? []) as Record<string, unknown>[]).map((row) =>
     domain.fromRow(row)
   );
-  const mergedItems = mergeByUpdatedAt(localItems, remoteItems);
+  const mergedItems = mergeByUpdatedAt(
+    localItems.filter((item) => !deletedIds.has(item.id)),
+    remoteItems.filter((item) => !deletedIds.has(item.id))
+  );
 
   if (mergedItems.length > 0) {
     const rows = mergedItems

@@ -327,6 +327,26 @@ function getCancelledDatesForGroup(group: RoutineGroup) {
   ).sort();
 }
 
+function getDateTextsInRange(startDate: string, endDate: string) {
+  const start = new Date(`${startDate}T00:00:00`);
+  const end = new Date(`${endDate}T00:00:00`);
+  const dateTexts: string[] = [];
+
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return dateTexts;
+  }
+
+  for (
+    let currentDate = start;
+    currentDate <= end;
+    currentDate = addDays(currentDate, 1)
+  ) {
+    dateTexts.push(toDateText(currentDate));
+  }
+
+  return dateTexts;
+}
+
 function RoutineScheduleManager({
   items,
   variant = "all",
@@ -366,8 +386,8 @@ function RoutineScheduleManager({
   const [editRoutineColor, setEditRoutineColor] = useState(
     DEFAULT_ROUTINE_SCHEDULE_COLOR
   );
-  const [cancelDateByGroupKey, setCancelDateByGroupKey] = useState<
-    Record<string, string>
+  const [cancelRangeByGroupKey, setCancelRangeByGroupKey] = useState<
+    Record<string, { startDate: string; endDate: string }>
   >({});
 
   const [dragSelection, setDragSelection] = useState<DragSelection | null>(
@@ -863,27 +883,53 @@ function RoutineScheduleManager({
     }
   }
 
-  function cancelRoutineGroupOnDate(group: RoutineGroup) {
-    const dateText = cancelDateByGroupKey[group.key] || getTodayText();
-    const dayOfWeek = getDayOfWeekFromDateText(dateText);
+  function cancelRoutineGroupInRange(group: RoutineGroup) {
+    const range = cancelRangeByGroupKey[group.key] ?? {
+      startDate: getTodayText(),
+      endDate: getTodayText(),
+    };
+    const startDate = range.startDate || getTodayText();
+    const endDate = range.endDate || startDate;
+
+    if (startDate > endDate) {
+      alert("취소 종료일은 시작일보다 늦거나 같아야 해.");
+      return;
+    }
+
+    const datesByDay = getDateTextsInRange(startDate, endDate).reduce(
+      (result, dateText) => {
+        const dayOfWeek = getDayOfWeekFromDateText(dateText);
+        const currentDates = result.get(dayOfWeek) ?? [];
+
+        result.set(dayOfWeek, [...currentDates, dateText]);
+
+        return result;
+      },
+      new Map<DayOfWeek, string[]>()
+    );
     let changed = false;
 
     group.routines.forEach((routine) => {
-      if (routine.dayOfWeek !== dayOfWeek) return;
+      const targetDates = datesByDay.get(routine.dayOfWeek) ?? [];
+      if (targetDates.length === 0) return;
 
       const cancelledDates = routine.cancelledDates ?? [];
-      if (cancelledDates.includes(dateText)) return;
+      const nextCancelledDates = Array.from(
+        new Set([...cancelledDates, ...targetDates])
+      ).sort();
+
+      if (nextCancelledDates.length === cancelledDates.length) return;
 
       changed = true;
       updateRoutineSchedule({
         ...routine,
-        cancelledDates: [...cancelledDates, dateText].sort(),
+        cancelledDates: nextCancelledDates,
         updatedAt: new Date().toISOString(),
       });
     });
 
     if (!changed) {
-      alert("선택한 날짜에 해당하는 반복 일정이 없거나 이미 취소됐습니다.");
+      alert("선택한 기간에 해당하는 반복 일정이 없거나 이미 취소됐습니다.");
     }
 
     setRoutines(getRoutineSchedules());
@@ -2277,28 +2323,54 @@ function RoutineScheduleManager({
 
                       <div className="rounded-3xl bg-white p-3 ring-1 ring-slate-100">
                         <p className="text-xs font-black text-slate-500">
-                          특정 날짜만 취소
+                          특정 기간만 취소
                         </p>
-                        <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                        <div className="mt-2 grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
                           <input
                             type="date"
                             value={
-                              cancelDateByGroupKey[group.key] ?? getTodayText()
+                              cancelRangeByGroupKey[group.key]?.startDate ??
+                              getTodayText()
                             }
                             onChange={(event) =>
-                              setCancelDateByGroupKey((current) => ({
+                              setCancelRangeByGroupKey((current) => ({
                                 ...current,
-                                [group.key]: event.target.value,
+                                [group.key]: {
+                                  startDate: event.target.value,
+                                  endDate:
+                                    current[group.key]?.endDate ??
+                                    event.target.value,
+                                },
+                              }))
+                            }
+                            className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-emerald-400"
+                          />
+                          <input
+                            type="date"
+                            value={
+                              cancelRangeByGroupKey[group.key]?.endDate ??
+                              cancelRangeByGroupKey[group.key]?.startDate ??
+                              getTodayText()
+                            }
+                            onChange={(event) =>
+                              setCancelRangeByGroupKey((current) => ({
+                                ...current,
+                                [group.key]: {
+                                  startDate:
+                                    current[group.key]?.startDate ??
+                                    getTodayText(),
+                                  endDate: event.target.value,
+                                },
                               }))
                             }
                             className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-emerald-400"
                           />
                           <button
                             type="button"
-                            onClick={() => cancelRoutineGroupOnDate(group)}
+                            onClick={() => cancelRoutineGroupInRange(group)}
                             className="rounded-2xl bg-amber-50 px-4 py-3 text-sm font-black text-amber-700 ring-1 ring-amber-100"
                           >
-                            이 날짜만 취소
+                            기간 취소
                           </button>
                         </div>
 
