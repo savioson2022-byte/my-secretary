@@ -8,7 +8,10 @@ import type {
   TravelTimeRule,
 } from "@/types/calendar";
 import type { DayOfWeek, RoutineSchedule } from "@/types/routine";
-import type { CloudSyncDomainResult } from "@/lib/dataSyncEvents";
+import {
+  getCloudSyncStatus,
+  type CloudSyncDomainResult,
+} from "@/lib/dataSyncEvents";
 import { getScopedStorageKey } from "@/lib/authScopedStorage";
 import { readDeletedItemRecords } from "@/lib/localStorageRepository";
 
@@ -47,6 +50,33 @@ function readLocalArray<TItem>(key: string): TItem[] {
 function writeLocalArraySilently<TItem>(key: string, value: TItem[]) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(getScopedStorageKey(key), JSON.stringify(value));
+}
+
+function getKnownRemoteIdsKey(key: string) {
+  return `${key}::known-remote-ids`;
+}
+
+function readKnownRemoteIds(key: string): string[] {
+  return readLocalArray<string>(getKnownRemoteIdsKey(key)).filter(
+    (id): id is string => typeof id === "string"
+  );
+}
+
+function writeKnownRemoteIds(key: string, ids: string[]) {
+  writeLocalArraySilently(getKnownRemoteIdsKey(key), Array.from(new Set(ids)));
+}
+
+function isOlderThanPreviousSuccessfulSync(item: SyncableItem) {
+  const previousSyncStatus = getCloudSyncStatus();
+
+  if (!previousSyncStatus || previousSyncStatus.status !== "success") {
+    return false;
+  }
+
+  return (
+    new Date(item.updatedAt).getTime() <=
+    new Date(previousSyncStatus.updatedAt).getTime()
+  );
 }
 
 function asText(value: unknown, fallback = "") {
@@ -478,6 +508,7 @@ async function syncDomainWithCloud({
   const localItems = readLocalArray<SyncableItem>(domain.key);
   const deletedItemRecords = readDeletedItemRecords(domain.key);
   const deletedIds = new Set(deletedItemRecords.map((record) => record.id));
+  const knownRemoteIds = new Set(readKnownRemoteIds(domain.key));
   const remoteDeletedIds = deletedItemRecords
     .map((record) => record.id)
     .filter(isUuid);
@@ -511,9 +542,21 @@ async function syncDomainWithCloud({
   const remoteItems = ((data ?? []) as Record<string, unknown>[]).map((row) =>
     domain.fromRow(row)
   );
+  const currentRemoteIds = new Set(remoteItems.map((item) => item.id));
+  const remotelyDeletedIds = localItems
+    .filter((item) => {
+      if (currentRemoteIds.has(item.id)) return false;
+
+      return (
+        knownRemoteIds.has(item.id) ||
+        (isUuid(item.id) && isOlderThanPreviousSuccessfulSync(item))
+      );
+    })
+    .map((item) => item.id);
+  const allDeletedIds = new Set([...deletedIds, ...remotelyDeletedIds]);
   const mergedItems = mergeByUpdatedAt(
-    localItems.filter((item) => !deletedIds.has(item.id)),
-    remoteItems.filter((item) => !deletedIds.has(item.id))
+    localItems.filter((item) => !allDeletedIds.has(item.id)),
+    remoteItems.filter((item) => !allDeletedIds.has(item.id))
   );
 
   if (mergedItems.length > 0) {
@@ -536,6 +579,10 @@ async function syncDomainWithCloud({
   }
 
   writeLocalArraySilently(domain.key, mergedItems);
+  writeKnownRemoteIds(
+    domain.key,
+    mergedItems.filter((item) => isUuid(item.id)).map((item) => item.id)
+  );
 }
 
 export async function syncLocalDataWithCloud({

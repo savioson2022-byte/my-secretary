@@ -28,7 +28,7 @@ import {
   FilterType,
 } from "@/types/assistant";
 import { SingleSchedule } from "@/types/calendar";
-import { RoutineSchedule } from "@/types/routine";
+import { DayOfWeek, RoutineSchedule } from "@/types/routine";
 import { UserProfile } from "@/types/userProfile";
 
 function createId() {
@@ -67,6 +67,31 @@ function isImportantTodayItem(item: AssistantItem) {
     isTodayOrPast(item.dueDate) ||
     isTodayOrPast(item.reminderDate)
   );
+}
+
+function getTodayText() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const date = String(today.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${date}`;
+}
+
+function getDayOfWeekFromDateText(dateText: string): DayOfWeek {
+  const dayIndex = new Date(`${dateText}T00:00:00`).getDay();
+  const daysByDateIndex: DayOfWeek[] = ["일", "월", "화", "수", "목", "금", "토"];
+
+  return daysByDateIndex[dayIndex] ?? "월";
+}
+
+function isRoutineActiveOnDate(routine: RoutineSchedule, dateText: string) {
+  if (routine.isActive === false) return false;
+  if (routine.startDate && routine.startDate > dateText) return false;
+  if (routine.endDate && routine.endDate < dateText) return false;
+  if (routine.cancelledDates?.includes(dateText)) return false;
+
+  return true;
 }
 
 const previewSchedules = [
@@ -132,6 +157,39 @@ export default function Home() {
   const todayItems = useMemo(() => {
     return items.filter(isImportantTodayItem);
   }, [items]);
+  const todayScheduleItems = useMemo(() => {
+    const todayText = getTodayText();
+    const todayDay = getDayOfWeekFromDateText(todayText);
+    const routineItems = routines
+      .filter((routine) => {
+        return (
+          routine.dayOfWeek === todayDay &&
+          isRoutineActiveOnDate(routine, todayText)
+        );
+      })
+      .map((routine) => ({
+        time: routine.startTime,
+        title: routine.title,
+        detail: `${routine.startTime} - ${routine.endTime} · ${
+          routine.placeName || "위치 미입력"
+        }`,
+        tag: "정기",
+      }));
+    const singleItems = singleSchedules
+      .filter((schedule) => schedule.date === todayText)
+      .map((schedule) => ({
+        time: schedule.startTime,
+        title: schedule.title,
+        detail: `${schedule.startTime} - ${schedule.endTime} · ${
+          schedule.placeName || "위치 미입력"
+        }`,
+        tag: "단기",
+      }));
+
+    return [...routineItems, ...singleItems].sort((a, b) => {
+      return a.time.localeCompare(b.time);
+    });
+  }, [routines, singleSchedules]);
 
   const filteredItems = useMemo(() => {
     return items.filter((item) => matchesFilter(item, selectedFilter));
@@ -335,7 +393,9 @@ export default function Home() {
               </div>
 
               <div className="space-y-2">
-                {(todayItems.length > 0
+                {(todayScheduleItems.length > 0
+                  ? todayScheduleItems.slice(0, 3)
+                  : todayItems.length > 0
                   ? todayItems.slice(0, 3).map((item) => ({
                       time: item.scheduleStartTime ?? item.dueDate ?? "오늘",
                       title: item.title,
