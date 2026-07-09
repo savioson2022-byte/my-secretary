@@ -77,6 +77,9 @@ export type AssistantItemWithoutId = {
    * 기록 저장 시 단기 일정으로 등록될 경우 캘린더에 표시할 색상
    */
   color?: string;
+  ideaGroupId?: string | null;
+  ideaGroupTitle?: string | null;
+  ideaSubcategory?: string | null;
 };
 
 export type AssistantItem = AssistantItemWithoutId & {

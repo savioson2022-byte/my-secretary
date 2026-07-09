@@ -5,10 +5,12 @@ import { suggestTimeTaskSchedules } from "@/lib/taskScheduleSuggestion";
 import { getCloudDataSyncedEventName } from "@/lib/dataSyncEvents";
 import { getLocalDataUpdatedEventName } from "@/lib/localStorageRepository";
 import { getSavedPlaces } from "@/lib/placeStorage";
+import { saveSingleSchedule } from "@/lib/singleScheduleStorage";
 import {
   getSuggestionFeedbacks,
   saveSuggestionFeedbackForSuggestion,
 } from "@/lib/suggestionFeedbackStorage";
+import { updateItem } from "@/lib/storage";
 import { getUserProfile } from "@/lib/userProfileStorage";
 import { AssistantItem } from "@/types/assistant";
 import { SavedPlace, SingleSchedule } from "@/types/calendar";
@@ -40,6 +42,16 @@ export default function TimeTaskSuggestionView({
     SuggestionFeedback[]
   >([]);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
+  const [editingSuggestionId, setEditingSuggestionId] = useState<string | null>(
+    null
+  );
+  const [draftSuggestion, setDraftSuggestion] = useState({
+    title: "",
+    date: "",
+    startTime: "",
+    endTime: "",
+    placeName: "",
+  });
 
   useEffect(() => {
     function refreshRecommendationContext() {
@@ -104,6 +116,77 @@ export default function TimeTaskSuggestionView({
           ? "이 장소는 다음 추천에서 덜 사용하도록 기억해둘게요."
           : "비슷한 추천은 점수를 낮춰볼게요."
     );
+  }
+
+  function createId() {
+    if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+      return crypto.randomUUID();
+    }
+
+    return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  }
+
+  function getSuggestionKey(suggestion: (typeof suggestions)[number]) {
+    return `${suggestion.itemId}-${suggestion.date}-${suggestion.startTime}`;
+  }
+
+  function startEditingSuggestion(suggestion: (typeof suggestions)[number]) {
+    setEditingSuggestionId(getSuggestionKey(suggestion));
+    setDraftSuggestion({
+      title: suggestion.title,
+      date: suggestion.date,
+      startTime: suggestion.startTime,
+      endTime: suggestion.endTime,
+      placeName: suggestion.placeName ?? "",
+    });
+  }
+
+  function confirmSuggestion(suggestion: (typeof suggestions)[number]) {
+    const sourceItem = items.find((item) => item.id === suggestion.itemId);
+    const isEditing = editingSuggestionId === getSuggestionKey(suggestion);
+    const title = isEditing ? draftSuggestion.title.trim() : suggestion.title;
+    const date = isEditing ? draftSuggestion.date : suggestion.date;
+    const startTime = isEditing ? draftSuggestion.startTime : suggestion.startTime;
+    const endTime = isEditing ? draftSuggestion.endTime : suggestion.endTime;
+    const placeName = isEditing
+      ? draftSuggestion.placeName.trim()
+      : suggestion.placeName ?? "";
+
+    if (!title || !date || !startTime || !endTime) {
+      setFeedbackMessage("확정하려면 제목, 날짜, 시작/종료 시간이 필요해요.");
+      return;
+    }
+
+    const now = new Date().toISOString();
+
+    saveSingleSchedule({
+      id: createId(),
+      title,
+      date,
+      startTime,
+      endTime,
+      placeName,
+      memo: suggestion.reason,
+      color: sourceItem?.color,
+      sourceItemId: suggestion.itemId,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    if (sourceItem) {
+      updateItem({
+        ...sourceItem,
+        title,
+        dueDate: date,
+        scheduleStartTime: startTime,
+        scheduleEndTime: endTime,
+        status: "완료",
+        updatedAt: now,
+      });
+    }
+
+    setEditingSuggestionId(null);
+    setFeedbackMessage("추천을 확정해서 단기 일정에 저장했어.");
   }
 
   function getCurrentFeedback(suggestion: (typeof suggestions)[number]) {
@@ -208,6 +291,72 @@ export default function TimeTaskSuggestionView({
                     </p>
                   )}
                   <FeedbackButtons suggestion={suggestion} small />
+                  <div className="mt-2 flex gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => confirmSuggestion(suggestion)}
+                      className="rounded-full bg-blue-600 px-3 py-1 text-[11px] font-black text-white"
+                    >
+                      확정
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => startEditingSuggestion(suggestion)}
+                      className="rounded-full bg-white px-3 py-1 text-[11px] font-black text-slate-500 ring-1 ring-slate-100"
+                    >
+                      수정
+                    </button>
+                  </div>
+                  {editingSuggestionId === getSuggestionKey(suggestion) && (
+                    <div className="mt-2 grid gap-1.5">
+                      <input
+                        value={draftSuggestion.title}
+                        onChange={(event) =>
+                          setDraftSuggestion((current) => ({
+                            ...current,
+                            title: event.target.value,
+                          }))
+                        }
+                        className="rounded-xl border border-slate-200 px-2 py-1.5 text-xs font-bold outline-none focus:border-blue-400"
+                        placeholder="제목"
+                      />
+                      <div className="grid grid-cols-3 gap-1.5">
+                        <input
+                          type="date"
+                          value={draftSuggestion.date}
+                          onChange={(event) =>
+                            setDraftSuggestion((current) => ({
+                              ...current,
+                              date: event.target.value,
+                            }))
+                          }
+                          className="rounded-xl border border-slate-200 px-2 py-1.5 text-xs font-bold outline-none focus:border-blue-400"
+                        />
+                        <input
+                          type="time"
+                          value={draftSuggestion.startTime}
+                          onChange={(event) =>
+                            setDraftSuggestion((current) => ({
+                              ...current,
+                              startTime: event.target.value,
+                            }))
+                          }
+                          className="rounded-xl border border-slate-200 px-2 py-1.5 text-xs font-bold outline-none focus:border-blue-400"
+                        />
+                        <input
+                          type="time"
+                          value={draftSuggestion.endTime}
+                          onChange={(event) =>
+                            setDraftSuggestion((current) => ({
+                              ...current,
+                              endTime: event.target.value,
+                            }))
+                          }
+                          className="rounded-xl border border-slate-200 px-2 py-1.5 text-xs font-bold outline-none focus:border-blue-400"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <span className="text-xs font-black text-slate-400">
                   {suggestion.kind === "reservation-candidate" ? "예약" : `${suggestion.estimatedMinutes}분`}
@@ -289,7 +438,83 @@ export default function TimeTaskSuggestionView({
                 </div>
               )}
 
+              {editingSuggestionId === getSuggestionKey(suggestion) && (
+                <div className="mt-4 grid gap-2 rounded-2xl bg-white p-3 ring-1 ring-slate-100 sm:grid-cols-2">
+                  <input
+                    value={draftSuggestion.title}
+                    onChange={(event) =>
+                      setDraftSuggestion((current) => ({
+                        ...current,
+                        title: event.target.value,
+                      }))
+                    }
+                    className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold outline-none focus:border-blue-400"
+                    placeholder="제목"
+                  />
+                  <input
+                    type="date"
+                    value={draftSuggestion.date}
+                    onChange={(event) =>
+                      setDraftSuggestion((current) => ({
+                        ...current,
+                        date: event.target.value,
+                      }))
+                    }
+                    className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold outline-none focus:border-blue-400"
+                  />
+                  <input
+                    type="time"
+                    value={draftSuggestion.startTime}
+                    onChange={(event) =>
+                      setDraftSuggestion((current) => ({
+                        ...current,
+                        startTime: event.target.value,
+                      }))
+                    }
+                    className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold outline-none focus:border-blue-400"
+                  />
+                  <input
+                    type="time"
+                    value={draftSuggestion.endTime}
+                    onChange={(event) =>
+                      setDraftSuggestion((current) => ({
+                        ...current,
+                        endTime: event.target.value,
+                      }))
+                    }
+                    className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold outline-none focus:border-blue-400"
+                  />
+                  <input
+                    value={draftSuggestion.placeName}
+                    onChange={(event) =>
+                      setDraftSuggestion((current) => ({
+                        ...current,
+                        placeName: event.target.value,
+                      }))
+                    }
+                    className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold outline-none focus:border-blue-400 sm:col-span-2"
+                    placeholder="장소"
+                  />
+                </div>
+              )}
+
               <FeedbackButtons suggestion={suggestion} />
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => confirmSuggestion(suggestion)}
+                  className="rounded-full bg-blue-600 px-4 py-2 text-xs font-black text-white"
+                >
+                  이대로 확정
+                </button>
+                <button
+                  type="button"
+                  onClick={() => startEditingSuggestion(suggestion)}
+                  className="rounded-full bg-white px-4 py-2 text-xs font-black text-slate-600 ring-1 ring-slate-100"
+                >
+                  수정 후 확정
+                </button>
+              </div>
             </article>
           ))}
         </div>

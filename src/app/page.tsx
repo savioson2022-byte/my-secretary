@@ -14,6 +14,7 @@ import { aiClassifyInput } from "@/lib/aiClassifyInput";
 import { classifyInput } from "@/lib/classifyInput";
 import { buildClassificationContext } from "@/lib/classificationContext";
 import { getCloudDataSyncedEventName } from "@/lib/dataSyncEvents";
+import { getLocalDataUpdatedEventName } from "@/lib/localStorageRepository";
 import { getRoutineSchedules } from "@/lib/routineStorage";
 import { createSingleScheduleFromItem } from "@/lib/singleScheduleFromItem";
 import {
@@ -145,10 +146,15 @@ export default function Home() {
     setVoiceIntent(searchParams.get("voice") === "1");
 
     window.addEventListener(getCloudDataSyncedEventName(), refreshLocalData);
+    window.addEventListener(getLocalDataUpdatedEventName(), refreshLocalData);
 
     return () => {
       window.removeEventListener(
         getCloudDataSyncedEventName(),
+        refreshLocalData
+      );
+      window.removeEventListener(
+        getLocalDataUpdatedEventName(),
         refreshLocalData
       );
     };

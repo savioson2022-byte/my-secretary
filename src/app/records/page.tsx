@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import BottomNavigation from "@/components/BottomNavigation";
 import ItemCard from "@/components/ItemCard";
 import UserStatusBadge from "@/components/UserStatusBadge";
+import { groupIdeaWithAi } from "@/lib/ideaGrouping";
 import { deleteItem, getItems, saveItem, updateItem } from "@/lib/storage";
 import { AssistantItem } from "@/types/assistant";
 
@@ -28,6 +29,8 @@ function createIdeaTitle(text: string) {
 export default function RecordsPage() {
   const [items, setItems] = useState<AssistantItem[]>([]);
   const [ideaText, setIdeaText] = useState("");
+  const [isOrganizingIdea, setIsOrganizingIdea] = useState(false);
+  const [ideaMessage, setIdeaMessage] = useState<string | null>(null);
 
   useEffect(() => {
     setItems(getItems());
@@ -39,7 +42,37 @@ export default function RecordsPage() {
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }, [items]);
 
-  function handleSaveIdea(event: FormEvent<HTMLFormElement>) {
+  const groupedIdeaItems = useMemo(() => {
+    const groupMap = new Map<
+      string,
+      {
+        id: string;
+        title: string;
+        items: AssistantItem[];
+      }
+    >();
+
+    ideaItems.forEach((item) => {
+      const groupId = item.ideaGroupId ?? item.id;
+      const groupTitle = item.ideaGroupTitle ?? item.title;
+      const group = groupMap.get(groupId) ?? {
+        id: groupId,
+        title: groupTitle,
+        items: [],
+      };
+
+      group.items.push(item);
+      groupMap.set(groupId, group);
+    });
+
+    return Array.from(groupMap.values()).sort((a, b) => {
+      const aLatest = a.items[0]?.createdAt ?? "";
+      const bLatest = b.items[0]?.createdAt ?? "";
+      return bLatest.localeCompare(aLatest);
+    });
+  }, [ideaItems]);
+
+  async function handleSaveIdea(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     const trimmedText = ideaText.trim();
@@ -49,6 +82,13 @@ export default function RecordsPage() {
       return;
     }
 
+    setIsOrganizingIdea(true);
+    setIdeaMessage(null);
+
+    const grouping = await groupIdeaWithAi({
+      text: trimmedText,
+      existingIdeas: items,
+    });
     const now = new Date().toISOString();
     const newItem: AssistantItem = {
       id: createId(),
@@ -63,6 +103,9 @@ export default function RecordsPage() {
       estimatedMinutes: null,
       dueDate: null,
       reminderDate: null,
+      ideaGroupId: grouping.ideaGroupId,
+      ideaGroupTitle: grouping.ideaGroupTitle,
+      ideaSubcategory: grouping.ideaSubcategory,
       createdAt: now,
       updatedAt: now,
     };
@@ -70,6 +113,12 @@ export default function RecordsPage() {
     saveItem(newItem);
     setItems(getItems());
     setIdeaText("");
+    setIdeaMessage(
+      grouping.matchedExisting
+        ? `"${grouping.ideaGroupTitle}" 주제에 이어서 저장했어.`
+        : `"${grouping.ideaGroupTitle}" 새 주제로 저장했어.`
+    );
+    setIsOrganizingIdea(false);
   }
 
   function handleComplete(item: AssistantItem) {
@@ -111,10 +160,16 @@ export default function RecordsPage() {
           />
           <button
             type="submit"
-            className="w-full rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white transition hover:bg-slate-700"
+            disabled={isOrganizingIdea}
+            className="w-full rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white transition hover:bg-slate-700 disabled:bg-slate-300"
           >
-            아이디어 저장
+            {isOrganizingIdea ? "아이디어 정리 중" : "아이디어 저장"}
           </button>
+          {ideaMessage && (
+            <p className="rounded-2xl bg-blue-50 px-4 py-3 text-sm font-bold text-blue-700 ring-1 ring-blue-100">
+              {ideaMessage}
+            </p>
+          )}
         </form>
       </section>
 
@@ -131,13 +186,35 @@ export default function RecordsPage() {
             아직 저장된 아이디어가 없습니다.
           </p>
         ) : (
-          ideaItems.map((item) => (
-            <ItemCard
-              key={item.id}
-              item={item}
-              onComplete={handleComplete}
-              onDelete={handleDelete}
-            />
+          groupedIdeaItems.map((group) => (
+            <article
+              key={group.id}
+              className="rounded-3xl bg-white p-4 shadow-soft ring-1 ring-slate-100"
+            >
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-base font-black text-slate-950">
+                    {group.title}
+                  </h3>
+                  <p className="mt-1 text-xs font-black text-slate-400">
+                    {group.items.length}개의 연결된 기록
+                  </p>
+                </div>
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-500">
+                  {group.items[0]?.ideaSubcategory ?? "아이디어"}
+                </span>
+              </div>
+              <div className="space-y-3">
+                {group.items.map((item) => (
+                  <ItemCard
+                    key={item.id}
+                    item={item}
+                    onComplete={handleComplete}
+                    onDelete={handleDelete}
+                  />
+                ))}
+              </div>
+            </article>
           ))
         )}
       </section>

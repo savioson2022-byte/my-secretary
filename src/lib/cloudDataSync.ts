@@ -177,7 +177,7 @@ const syncDomains: Array<SyncDomain<SyncableItem, { id: string }>> = [
   {
     key: STORAGE_KEYS.assistantItems,
     table: "assistant_items",
-    optionalColumns: ["color"],
+    optionalColumns: ["color", "idea_group_id", "idea_group_title", "idea_subcategory"],
     toRow(item, userId, availableColumns) {
       const assistantItem = item as AssistantItem;
 
@@ -202,10 +202,27 @@ const syncDomains: Array<SyncDomain<SyncableItem, { id: string }>> = [
       };
 
       if (availableColumns.has("color")) {
-        return {
-          ...row,
+        Object.assign(row, {
           color: assistantItem.color ?? null,
-        };
+        });
+      }
+
+      if (availableColumns.has("idea_group_id")) {
+        Object.assign(row, {
+          idea_group_id: assistantItem.ideaGroupId ?? null,
+        });
+      }
+
+      if (availableColumns.has("idea_group_title")) {
+        Object.assign(row, {
+          idea_group_title: assistantItem.ideaGroupTitle ?? null,
+        });
+      }
+
+      if (availableColumns.has("idea_subcategory")) {
+        Object.assign(row, {
+          idea_subcategory: assistantItem.ideaSubcategory ?? null,
+        });
       }
 
       return row;
@@ -231,6 +248,9 @@ const syncDomains: Array<SyncDomain<SyncableItem, { id: string }>> = [
           ? toTimeText(row.schedule_end_time)
           : null,
         color: asNullableText(row.color) ?? undefined,
+        ideaGroupId: asNullableText(row.idea_group_id),
+        ideaGroupTitle: asNullableText(row.idea_group_title),
+        ideaSubcategory: asNullableText(row.idea_subcategory),
         createdAt: asText(row.created_at),
         updatedAt: asText(row.updated_at),
       } as AssistantItem;

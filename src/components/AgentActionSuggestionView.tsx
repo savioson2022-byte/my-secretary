@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { updateItem } from "@/lib/storage";
 import type { AssistantItem } from "@/types/assistant";
 
 type AgentActionSuggestionViewProps = {
@@ -31,6 +33,14 @@ export default function AgentActionSuggestionView({
   compact = false,
   maxItems,
 }: AgentActionSuggestionViewProps) {
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [draft, setDraft] = useState({
+    title: "",
+    originalText: "",
+    dueDate: "",
+    estimatedMinutes: "",
+  });
+  const [message, setMessage] = useState<string | null>(null);
   const agentItems = items.filter((item) => {
     return (
       item.status === "미완료" &&
@@ -39,6 +49,51 @@ export default function AgentActionSuggestionView({
   });
   const visibleItems =
     typeof maxItems === "number" ? agentItems.slice(0, maxItems) : agentItems;
+
+  function startEdit(item: AssistantItem) {
+    setEditingItemId(item.id);
+    setDraft({
+      title: item.title,
+      originalText: item.originalText,
+      dueDate: item.dueDate ?? "",
+      estimatedMinutes: item.estimatedMinutes
+        ? String(item.estimatedMinutes)
+        : "",
+    });
+  }
+
+  function saveDraft(item: AssistantItem, status: AssistantItem["status"]) {
+    const estimatedMinutes = Number(draft.estimatedMinutes);
+
+    updateItem({
+      ...item,
+      title: draft.title.trim() || item.title,
+      originalText: draft.originalText.trim() || item.originalText,
+      dueDate: draft.dueDate || null,
+      estimatedMinutes:
+        Number.isFinite(estimatedMinutes) && estimatedMinutes > 0
+          ? estimatedMinutes
+          : item.estimatedMinutes,
+      status,
+      updatedAt: new Date().toISOString(),
+    });
+
+    setEditingItemId(null);
+    setMessage(
+      status === "완료"
+        ? "확정된 준비 항목으로 저장했어."
+        : "잠시 보류 상태로 저장했어."
+    );
+  }
+
+  function quickConfirm(item: AssistantItem) {
+    updateItem({
+      ...item,
+      status: "완료",
+      updatedAt: new Date().toISOString(),
+    });
+    setMessage("에이전트 준비 항목을 확정했어.");
+  }
 
   if (agentItems.length === 0) {
     if (compact) return null;
@@ -69,6 +124,11 @@ export default function AgentActionSuggestionView({
           {agentItems.length}개
         </span>
       </div>
+      {message && (
+        <p className="mb-3 rounded-2xl bg-violet-50 px-4 py-3 text-sm font-bold text-violet-700 ring-1 ring-violet-100">
+          {message}
+        </p>
+      )}
 
       <div className="space-y-2">
         {visibleItems.map((item) => (
@@ -94,6 +154,92 @@ export default function AgentActionSuggestionView({
                 {getActionGuide(item)}
               </p>
             )}
+            {editingItemId === item.id && (
+              <div className="mt-3 grid gap-2 rounded-2xl bg-white p-3 ring-1 ring-slate-100 sm:grid-cols-2">
+                <input
+                  value={draft.title}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      title: event.target.value,
+                    }))
+                  }
+                  className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold outline-none focus:border-violet-400"
+                  placeholder="제목"
+                />
+                <input
+                  type="date"
+                  value={draft.dueDate}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      dueDate: event.target.value,
+                    }))
+                  }
+                  className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold outline-none focus:border-violet-400"
+                />
+                <input
+                  type="number"
+                  min="5"
+                  step="5"
+                  value={draft.estimatedMinutes}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      estimatedMinutes: event.target.value,
+                    }))
+                  }
+                  className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold outline-none focus:border-violet-400"
+                  placeholder="예상 분"
+                />
+                <input
+                  value={draft.originalText}
+                  onChange={(event) =>
+                    setDraft((current) => ({
+                      ...current,
+                      originalText: event.target.value,
+                    }))
+                  }
+                  className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-bold outline-none focus:border-violet-400"
+                  placeholder="요청 내용"
+                />
+              </div>
+            )}
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() =>
+                  editingItemId === item.id
+                    ? saveDraft(item, "완료")
+                    : quickConfirm(item)
+                }
+                className="rounded-full bg-violet-600 px-3 py-1.5 text-xs font-black text-white"
+              >
+                확정
+              </button>
+              <button
+                type="button"
+                onClick={() => startEdit(item)}
+                className="rounded-full bg-white px-3 py-1.5 text-xs font-black text-slate-600 ring-1 ring-slate-100"
+              >
+                수정
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  editingItemId === item.id
+                    ? saveDraft(item, "보류")
+                    : updateItem({
+                        ...item,
+                        status: "보류",
+                        updatedAt: new Date().toISOString(),
+                      })
+                }
+                className="rounded-full bg-white px-3 py-1.5 text-xs font-black text-slate-400 ring-1 ring-slate-100"
+              >
+                보류
+              </button>
+            </div>
           </article>
         ))}
       </div>
