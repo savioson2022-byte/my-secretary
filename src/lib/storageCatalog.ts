@@ -5,6 +5,7 @@ export type StorageDomain =
   | "routine-schedules"
   | "single-schedules"
   | "places"
+  | "suggestion-feedback"
   | "travel-time-rules"
   | "travel-time-estimates"
   | "user-profile"
@@ -67,6 +68,15 @@ export const STORAGE_CATALOG: StorageCatalogItem[] = [
     priority: "middle",
     userScoped: true,
     note: "할 일, 일정, 아이디어, 기타 기록 원본이다.",
+  },
+  {
+    domain: "suggestion-feedback",
+    label: "추천 피드백",
+    localStorageKey: STORAGE_KEYS.suggestionFeedback,
+    supabaseTable: STORAGE_TO_SUPABASE_TABLE[STORAGE_KEYS.suggestionFeedback],
+    priority: "middle",
+    userScoped: true,
+    note: "추천 시간이 맞았는지, 장소가 맞았는지의 사용자 피드백을 저장한다.",
   },
   {
     domain: "travel-time-rules",

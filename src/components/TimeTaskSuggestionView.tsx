@@ -5,10 +5,18 @@ import { suggestTimeTaskSchedules } from "@/lib/taskScheduleSuggestion";
 import { getCloudDataSyncedEventName } from "@/lib/dataSyncEvents";
 import { getLocalDataUpdatedEventName } from "@/lib/localStorageRepository";
 import { getSavedPlaces } from "@/lib/placeStorage";
+import {
+  getSuggestionFeedbacks,
+  saveSuggestionFeedbackForSuggestion,
+} from "@/lib/suggestionFeedbackStorage";
 import { getUserProfile } from "@/lib/userProfileStorage";
 import { AssistantItem } from "@/types/assistant";
 import { SavedPlace, SingleSchedule } from "@/types/calendar";
 import { RoutineSchedule } from "@/types/routine";
+import type {
+  SuggestionFeedback,
+  SuggestionFeedbackType,
+} from "@/types/suggestionFeedback";
 import { UserProfile } from "@/types/userProfile";
 
 type TimeTaskSuggestionViewProps = {
@@ -28,11 +36,16 @@ export default function TimeTaskSuggestionView({
 }: TimeTaskSuggestionViewProps) {
   const [savedPlaces, setSavedPlaces] = useState<SavedPlace[]>([]);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [suggestionFeedbacks, setSuggestionFeedbacks] = useState<
+    SuggestionFeedback[]
+  >([]);
+  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
 
   useEffect(() => {
     function refreshRecommendationContext() {
       setSavedPlaces(getSavedPlaces());
       setUserProfile(getUserProfile());
+      setSuggestionFeedbacks(getSuggestionFeedbacks());
     }
 
     refreshRecommendationContext();
@@ -63,6 +76,7 @@ export default function TimeTaskSuggestionView({
     singleSchedules,
     savedPlaces,
     userProfile,
+    suggestionFeedbacks,
   });
   const visibleSuggestions =
     typeof maxItems === "number" ? suggestions.slice(0, maxItems) : suggestions;
@@ -73,6 +87,77 @@ export default function TimeTaskSuggestionView({
       (item.processType === "시간작업" || item.actionType === "예약")
     );
   });
+
+  function handleFeedback(
+    suggestion: (typeof suggestions)[number],
+    feedbackType: SuggestionFeedbackType
+  ) {
+    saveSuggestionFeedbackForSuggestion({
+      suggestion,
+      feedbackType,
+    });
+    setSuggestionFeedbacks(getSuggestionFeedbacks());
+    setFeedbackMessage(
+      feedbackType === "good"
+        ? "좋은 추천으로 기억해둘게요."
+        : feedbackType === "wrong_place"
+          ? "이 장소는 다음 추천에서 덜 사용하도록 기억해둘게요."
+          : "비슷한 추천은 점수를 낮춰볼게요."
+    );
+  }
+
+  function getCurrentFeedback(suggestion: (typeof suggestions)[number]) {
+    return suggestionFeedbacks.find((feedback) => {
+      return (
+        feedback.itemId === suggestion.itemId &&
+        feedback.suggestionDate === suggestion.date &&
+        feedback.suggestionStartTime === suggestion.startTime &&
+        feedback.suggestionEndTime === suggestion.endTime &&
+        (feedback.placeName ?? "") === (suggestion.placeName ?? "")
+      );
+    });
+  }
+
+  function FeedbackButtons({
+    suggestion,
+    small = false,
+  }: {
+    suggestion: (typeof suggestions)[number];
+    small?: boolean;
+  }) {
+    const currentFeedback = getCurrentFeedback(suggestion);
+    const buttons: Array<{
+      type: SuggestionFeedbackType;
+      label: string;
+    }> = [
+      { type: "good", label: "좋음" },
+      { type: "bad", label: "별로" },
+      { type: "wrong_place", label: "장소 아님" },
+    ];
+
+    return (
+      <div className={`flex flex-wrap gap-1.5 ${small ? "mt-2" : "mt-4"}`}>
+        {buttons.map((button) => {
+          const isActive = currentFeedback?.feedbackType === button.type;
+
+          return (
+            <button
+              key={`${suggestion.itemId}-${button.type}`}
+              type="button"
+              onClick={() => handleFeedback(suggestion, button.type)}
+              className={`rounded-full px-3 py-1 text-[11px] font-black transition ${
+                isActive
+                  ? "bg-blue-600 text-white"
+                  : "bg-white text-slate-500 ring-1 ring-slate-100 hover:text-blue-600"
+              }`}
+            >
+              {button.label}
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
 
   if (compact) {
     return (
@@ -122,6 +207,7 @@ export default function TimeTaskSuggestionView({
                       {suggestion.placeName} 기준
                     </p>
                   )}
+                  <FeedbackButtons suggestion={suggestion} small />
                 </div>
                 <span className="text-xs font-black text-slate-400">
                   {suggestion.kind === "reservation-candidate" ? "예약" : `${suggestion.estimatedMinutes}분`}
@@ -144,6 +230,11 @@ export default function TimeTaskSuggestionView({
           정기 일정과 단기 일정을 모두 제외한 뒤, 시간작업과 예약 후보를 넣을
           수 있는 빈 시간을 추천합니다.
         </p>
+        {feedbackMessage && (
+          <p className="mt-3 rounded-2xl bg-blue-50 px-4 py-3 text-sm font-bold text-blue-700 ring-1 ring-blue-100">
+            {feedbackMessage}
+          </p>
+        )}
       </div>
 
       {timeTasks.length === 0 ? (
@@ -197,6 +288,8 @@ export default function TimeTaskSuggestionView({
                   ))}
                 </div>
               )}
+
+              <FeedbackButtons suggestion={suggestion} />
             </article>
           ))}
         </div>

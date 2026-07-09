@@ -10,6 +10,7 @@ import {
 import { AssistantItem } from "@/types/assistant";
 import { SavedPlace, SingleSchedule } from "@/types/calendar";
 import { RoutineSchedule } from "@/types/routine";
+import type { SuggestionFeedback } from "@/types/suggestionFeedback";
 import { UserProfile } from "@/types/userProfile";
 import { getScheduleBlocksForDate } from "@/lib/travelTime";
 
@@ -332,6 +333,62 @@ function getEnergyScore({
     : 8;
 }
 
+function getFeedbackAdjustment({
+  item,
+  date,
+  startTime,
+  endTime,
+  placeName,
+  suggestionFeedbacks,
+}: {
+  item: AssistantItem;
+  date: string;
+  startTime: string;
+  endTime: string;
+  placeName: string | null;
+  suggestionFeedbacks: SuggestionFeedback[];
+}) {
+  const relevantFeedbacks = suggestionFeedbacks
+    .filter((feedback) => feedback.itemId === item.id)
+    .sort((a, b) => {
+      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    })
+    .slice(0, 8);
+
+  let adjustment = 0;
+  const labels: string[] = [];
+
+  for (const feedback of relevantFeedbacks) {
+    const samePlace = (feedback.placeName ?? "") === (placeName ?? "");
+    const sameDate = feedback.suggestionDate === date;
+    const sameTime =
+      feedback.suggestionStartTime === startTime &&
+      feedback.suggestionEndTime === endTime;
+
+    if (feedback.feedbackType === "good") {
+      adjustment += samePlace ? 16 : 8;
+      labels.push("이전 긍정 피드백 반영");
+      continue;
+    }
+
+    if (feedback.feedbackType === "bad") {
+      adjustment -= sameDate || sameTime ? 24 : 12;
+      labels.push("이전 부정 피드백 반영");
+      continue;
+    }
+
+    if (feedback.feedbackType === "wrong_place" && samePlace) {
+      adjustment -= 36;
+      labels.push("장소가 맞지 않았던 피드백 반영");
+    }
+  }
+
+  return {
+    adjustment,
+    labels: Array.from(new Set(labels)),
+  };
+}
+
 function isValidDateText(dateText: string | null) {
   if (!dateText) {
     return false;
@@ -358,12 +415,14 @@ export function suggestTimeTaskSchedule({
   singleSchedules,
   savedPlaces = [],
   userProfile = null,
+  suggestionFeedbacks = [],
 }: {
   item: AssistantItem;
   routines: RoutineSchedule[];
   singleSchedules: SingleSchedule[];
   savedPlaces?: SavedPlace[];
   userProfile?: UserProfile | null;
+  suggestionFeedbacks?: SuggestionFeedback[];
 }): TimeTaskSuggestion | null {
   if (item.status !== "미완료") {
     return null;
@@ -442,6 +501,14 @@ export function suggestTimeTaskSchedule({
 
       const dayOfWeek = getDayOfWeekFromDateText(date);
       const kind = getSuggestionKind(item);
+      const feedbackAdjustment = getFeedbackAdjustment({
+        item,
+        date,
+        startTime: minutesToTime(adjustedStartMinutes),
+        endTime: minutesToTime(adjustedEndMinutes),
+        placeName: context.targetPlace?.name ?? null,
+        suggestionFeedbacks,
+      });
       const score =
         50 +
         getEnergyScore({
@@ -450,12 +517,14 @@ export function suggestTimeTaskSchedule({
           userProfile,
         }) +
         (context.targetPlace ? 15 : 0) +
-        (block.minutes >= requiredMinutes + 30 ? 10 : 0);
+        (block.minutes >= requiredMinutes + 30 ? 10 : 0) +
+        feedbackAdjustment.adjustment;
       const appliedRules = [
         allowedWindow.label,
         context.targetPlace ? `선호/저장 장소: ${context.targetPlace.name}` : null,
         extraTaskBuffer > 0 ? `방문 후 샤워/정리 여유 ${extraTaskBuffer}분` : null,
         ...travelBuffers.labels,
+        ...feedbackAdjustment.labels,
       ].filter((rule): rule is string => Boolean(rule));
 
       candidates.push({
@@ -494,12 +563,14 @@ export function suggestTimeTaskSchedules({
   singleSchedules,
   savedPlaces = [],
   userProfile = null,
+  suggestionFeedbacks = [],
 }: {
   items: AssistantItem[];
   routines: RoutineSchedule[];
   singleSchedules: SingleSchedule[];
   savedPlaces?: SavedPlace[];
   userProfile?: UserProfile | null;
+  suggestionFeedbacks?: SuggestionFeedback[];
 }): TimeTaskSuggestion[] {
   return items
     .map((item) =>
@@ -509,6 +580,7 @@ export function suggestTimeTaskSchedules({
         singleSchedules,
         savedPlaces,
         userProfile,
+        suggestionFeedbacks,
       })
     )
     .filter((suggestion): suggestion is TimeTaskSuggestion => {

@@ -7,6 +7,7 @@ import type {
   TravelMode,
   TravelTimeRule,
 } from "@/types/calendar";
+import type { SuggestionFeedback } from "@/types/suggestionFeedback";
 import type { DayOfWeek, RoutineSchedule } from "@/types/routine";
 import {
   getCloudSyncStatus,
@@ -499,6 +500,53 @@ const syncDomains: Array<SyncDomain<SyncableItem, { id: string }>> = [
         createdAt: asText(row.created_at),
         updatedAt: asText(row.updated_at),
       } as SavedPlace;
+    },
+  },
+  {
+    key: STORAGE_KEYS.suggestionFeedback,
+    table: "suggestion_feedback",
+    toRow(item, userId) {
+      const feedback = item as SuggestionFeedback;
+
+      return {
+        id: feedback.id,
+        user_id: userId,
+        item_id: feedback.itemId,
+        item_title: feedback.itemTitle,
+        suggestion_kind: feedback.suggestionKind,
+        suggestion_date: feedback.suggestionDate,
+        suggestion_start_time: feedback.suggestionStartTime,
+        suggestion_end_time: feedback.suggestionEndTime,
+        estimated_minutes: feedback.estimatedMinutes,
+        place_name: feedback.placeName,
+        feedback_type: feedback.feedbackType,
+        note: feedback.note,
+        created_at: feedback.createdAt,
+        updated_at: feedback.updatedAt,
+      };
+    },
+    fromRow(row) {
+      return {
+        id: asText(row.id),
+        itemId: asText(row.item_id),
+        itemTitle: asText(row.item_title),
+        suggestionKind: asText(
+          row.suggestion_kind,
+          "time-task"
+        ) as SuggestionFeedback["suggestionKind"],
+        suggestionDate: asText(row.suggestion_date),
+        suggestionStartTime: toTimeText(row.suggestion_start_time),
+        suggestionEndTime: toTimeText(row.suggestion_end_time),
+        estimatedMinutes: Number(row.estimated_minutes) || 0,
+        placeName: asNullableText(row.place_name),
+        feedbackType: asText(
+          row.feedback_type,
+          "good"
+        ) as SuggestionFeedback["feedbackType"],
+        note: asText(row.note),
+        createdAt: asText(row.created_at),
+        updatedAt: asText(row.updated_at),
+      } as SuggestionFeedback;
     },
   },
   {
