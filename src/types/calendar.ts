@@ -99,6 +99,10 @@ export type SavedPlace = {
   placeUrl?: string;
   businessHoursStart?: string;
   businessHoursEnd?: string;
+  preferredVisitStartTime?: string;
+  preferredVisitEndTime?: string;
+  typicalStayMinutes?: number;
+  needsShowerAfterVisit?: boolean;
   memo: string;
   latitude?: number | null;
   longitude?: number | null;

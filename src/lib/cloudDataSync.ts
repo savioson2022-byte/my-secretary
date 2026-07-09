@@ -378,6 +378,10 @@ const syncDomains: Array<SyncDomain<SyncableItem, { id: string }>> = [
       "place_url",
       "business_hours_start",
       "business_hours_end",
+      "preferred_visit_start_time",
+      "preferred_visit_end_time",
+      "typical_stay_minutes",
+      "needs_shower_after_visit",
     ],
     toRow(item, userId, availableColumns) {
       const place = item as SavedPlace;
@@ -438,6 +442,30 @@ const syncDomains: Array<SyncDomain<SyncableItem, { id: string }>> = [
         });
       }
 
+      if (availableColumns.has("preferred_visit_start_time")) {
+        Object.assign(row, {
+          preferred_visit_start_time: place.preferredVisitStartTime ?? null,
+        });
+      }
+
+      if (availableColumns.has("preferred_visit_end_time")) {
+        Object.assign(row, {
+          preferred_visit_end_time: place.preferredVisitEndTime ?? null,
+        });
+      }
+
+      if (availableColumns.has("typical_stay_minutes")) {
+        Object.assign(row, {
+          typical_stay_minutes: place.typicalStayMinutes ?? null,
+        });
+      }
+
+      if (availableColumns.has("needs_shower_after_visit")) {
+        Object.assign(row, {
+          needs_shower_after_visit: place.needsShowerAfterVisit ?? null,
+        });
+      }
+
       return row;
     },
     fromRow(row) {
@@ -453,6 +481,16 @@ const syncDomains: Array<SyncDomain<SyncableItem, { id: string }>> = [
         businessHoursStart:
           asNullableText(row.business_hours_start) ?? undefined,
         businessHoursEnd: asNullableText(row.business_hours_end) ?? undefined,
+        preferredVisitStartTime:
+          asNullableText(row.preferred_visit_start_time) ?? undefined,
+        preferredVisitEndTime:
+          asNullableText(row.preferred_visit_end_time) ?? undefined,
+        typicalStayMinutes:
+          asNullableNumber(row.typical_stay_minutes) ?? undefined,
+        needsShowerAfterVisit:
+          typeof row.needs_shower_after_visit === "boolean"
+            ? row.needs_shower_after_visit
+            : undefined,
         memo: asText(row.memo),
         provider: asNullableText(row.provider),
         providerPlaceId: asNullableText(row.provider_place_id),

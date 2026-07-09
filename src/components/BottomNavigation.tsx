@@ -24,6 +24,11 @@ const LINKS = [
     label: "일정관리",
     icon: "M4 6h16M4 12h10M4 18h16M17 10l3 3-3 3",
   },
+  {
+    href: "/places",
+    label: "장소",
+    icon: "M12 21s7-4.7 7-11a7 7 0 1 0-14 0c0 6.3 7 11 7 11ZM12 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z",
+  },
 ];
 
 export default function BottomNavigation() {
@@ -31,14 +36,15 @@ export default function BottomNavigation() {
 
   return (
     <nav className="sticky bottom-0 z-30 -mx-4 mt-6 border-t border-slate-100 bg-white/92 px-4 pb-3 pt-2 backdrop-blur md:rounded-b-[38px]">
-      <div className="grid grid-cols-4 gap-1">
+      <div className="grid grid-cols-5 gap-1">
         {LINKS.map((link) => {
           const isActive =
             pathname === link.href ||
             (link.href === "/calendar/monthly" &&
               pathname.startsWith("/calendar")) ||
             (link.href === "/schedule/manage" &&
-              pathname.startsWith("/schedule"));
+              pathname.startsWith("/schedule")) ||
+            (link.href === "/places" && pathname.startsWith("/places"));
 
           return (
             <Link

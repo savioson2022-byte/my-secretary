@@ -3,6 +3,7 @@ import BottomNavigation from "@/components/BottomNavigation";
 import CloudSyncStatusCard from "@/components/CloudSyncStatusCard";
 import LocalDataTransfer from "@/components/LocalDataTransfer";
 import MobileInstallGuide from "@/components/MobileInstallGuide";
+import SavedPlaceManager from "@/components/SavedPlaceManager";
 import UserStatusBadge from "@/components/UserStatusBadge";
 
 export default function SettingsPage() {
@@ -46,6 +47,7 @@ export default function SettingsPage() {
         </section>
 
         <MobileInstallGuide />
+        <SavedPlaceManager />
         <LocalDataTransfer />
       </div>
 

@@ -59,6 +59,26 @@ function getSchedulableMinutes(item: AssistantItem) {
   return null;
 }
 
+function getEffectiveSchedulableMinutes({
+  item,
+  context,
+}: {
+  item: AssistantItem;
+  context: TaskContext;
+}) {
+  const minutes = getSchedulableMinutes(item);
+
+  if (!minutes) {
+    return null;
+  }
+
+  if (!item.estimatedMinutes && context.targetPlace?.typicalStayMinutes) {
+    return context.targetPlace.typicalStayMinutes;
+  }
+
+  return minutes;
+}
+
 function getSuggestionKind(item: AssistantItem): TimeTaskSuggestion["kind"] {
   return item.actionType === "예약" ? "reservation-candidate" : "time-task";
 }
@@ -141,6 +161,17 @@ function getAllowedWindow({
   context: TaskContext;
   userProfile?: UserProfile | null;
 }) {
+  if (
+    context.targetPlace?.preferredVisitStartTime &&
+    context.targetPlace.preferredVisitEndTime
+  ) {
+    return {
+      startTime: context.targetPlace.preferredVisitStartTime,
+      endTime: context.targetPlace.preferredVisitEndTime,
+      label: `${context.targetPlace.name} 선호 방문 시간대`,
+    };
+  }
+
   if (
     context.targetPlace?.businessHoursStart &&
     context.targetPlace.businessHoursEnd
@@ -262,6 +293,14 @@ function getEnergyScore({
   userProfile?: UserProfile | null;
 }) {
   if (context.isWorkout) {
+    const preferredIdealStart = context.targetPlace?.preferredVisitStartTime
+      ? timeToMinutes(context.targetPlace.preferredVisitStartTime)
+      : null;
+    if (preferredIdealStart !== null) {
+      const distance = Math.abs(startMinutes - preferredIdealStart);
+      return Math.max(0, 45 - Math.floor(distance / 30) * 5);
+    }
+
     const idealStart = timeToMinutes(
       userProfile?.workoutPreferredStartTime ?? "17:00"
     );
@@ -270,7 +309,11 @@ function getEnergyScore({
   }
 
   if (context.isReservation) {
-    const idealStart = context.isBeautyReservation ? timeToMinutes("14:00") : timeToMinutes("11:00");
+    const idealStart = context.targetPlace?.preferredVisitStartTime
+      ? timeToMinutes(context.targetPlace.preferredVisitStartTime)
+      : context.isBeautyReservation
+        ? timeToMinutes("14:00")
+        : timeToMinutes("11:00");
     const distance = Math.abs(startMinutes - idealStart);
     return Math.max(0, 30 - Math.floor(distance / 60) * 4);
   }
@@ -326,16 +369,20 @@ export function suggestTimeTaskSchedule({
     return null;
   }
 
-  const estimatedMinutes = getSchedulableMinutes(item);
-  if (!estimatedMinutes) {
-    return null;
-  }
-
   const searchDates = getSearchDates(item);
   const context = inferTaskContext({
     item,
     savedPlaces,
   });
+  const estimatedMinutes = getEffectiveSchedulableMinutes({
+    item,
+    context,
+  });
+
+  if (!estimatedMinutes) {
+    return null;
+  }
+
   const allowedWindow = getAllowedWindow({
     context,
     userProfile,
@@ -343,7 +390,8 @@ export function suggestTimeTaskSchedule({
   const allowedStartMinutes = timeToMinutes(allowedWindow.startTime);
   const allowedEndMinutes = timeToMinutes(allowedWindow.endTime);
   const extraTaskBuffer =
-    context.isWorkout && (userProfile?.needsShowerAfterWorkout ?? true)
+    (context.targetPlace?.needsShowerAfterVisit ??
+      (context.isWorkout && (userProfile?.needsShowerAfterWorkout ?? true)))
       ? SHOWER_BUFFER_MINUTES
       : 0;
   const candidates: Candidate[] = [];
@@ -406,7 +454,7 @@ export function suggestTimeTaskSchedule({
       const appliedRules = [
         allowedWindow.label,
         context.targetPlace ? `선호/저장 장소: ${context.targetPlace.name}` : null,
-        extraTaskBuffer > 0 ? `운동 후 샤워/정리 여유 ${extraTaskBuffer}분` : null,
+        extraTaskBuffer > 0 ? `방문 후 샤워/정리 여유 ${extraTaskBuffer}분` : null,
         ...travelBuffers.labels,
       ].filter((rule): rule is string => Boolean(rule));
 
