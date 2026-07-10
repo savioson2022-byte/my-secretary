@@ -161,6 +161,11 @@ export default function AccountManager() {
   const [reservationPreferredEndTime, setReservationPreferredEndTime] =
     useState("20:00");
   const [needsShowerAfterWorkout, setNeedsShowerAfterWorkout] = useState(true);
+  const [instantActionAutoOpenEnabled, setInstantActionAutoOpenEnabled] =
+    useState(true);
+  const [unresolvedDigestEnabled, setUnresolvedDigestEnabled] = useState(true);
+  const [unresolvedDigestSnoozedUntil, setUnresolvedDigestSnoozedUntil] =
+    useState<string | null>(null);
   const [deviceName, setDeviceName] = useState("");
   const [devices, setDevices] = useState<RegisteredDevice[]>([]);
   const [localProfile, setLocalProfile] = useState<UserProfile | null>(null);
@@ -193,6 +198,13 @@ export default function AccountManager() {
       savedProfile?.reservationPreferredEndTime ?? "20:00"
     );
     setNeedsShowerAfterWorkout(savedProfile?.needsShowerAfterWorkout ?? true);
+    setInstantActionAutoOpenEnabled(
+      savedProfile?.instantActionAutoOpenEnabled ?? true
+    );
+    setUnresolvedDigestEnabled(savedProfile?.unresolvedDigestEnabled ?? true);
+    setUnresolvedDigestSnoozedUntil(
+      savedProfile?.unresolvedDigestSnoozedUntil ?? null
+    );
     setDeviceName(getDefaultDeviceName());
 
     if (!supabase) {
@@ -455,9 +467,19 @@ export default function AccountManager() {
       reservationPreferredStartTime,
       reservationPreferredEndTime,
       needsShowerAfterWorkout,
+      instantActionAutoOpenEnabled,
+      unresolvedDigestEnabled,
+      unresolvedDigestSnoozedUntil,
       rememberDevice: true,
     });
     setLocalProfile(nextLocalProfile);
+  }
+
+  function snoozeUnresolvedDigest(days: number) {
+    const nextDate = new Date();
+    nextDate.setDate(nextDate.getDate() + days);
+    setUnresolvedDigestSnoozedUntil(nextDate.toISOString());
+    setUnresolvedDigestEnabled(false);
   }
 
   async function handleRegisterCurrentDevice() {
@@ -698,6 +720,85 @@ export default function AccountManager() {
             placeholder="사용자별 AI 분류 기준"
             className="min-h-24 w-full resize-none rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold leading-6 outline-none focus:border-blue-400"
           />
+          <div className="rounded-3xl bg-slate-50 p-4 ring-1 ring-slate-100">
+            <h3 className="text-sm font-black text-slate-900">
+              앱 사용 방식
+            </h3>
+            <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
+              분류는 단기일정, 메모, 즉시처리로 단순화합니다. 구매와 예약은
+              즉시처리 안에서 에이전트가 준비합니다.
+            </p>
+
+            <div className="mt-3 space-y-2">
+              <label className="flex items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3 ring-1 ring-slate-100">
+                <span>
+                  <span className="block text-sm font-black text-slate-900">
+                    즉시처리 자동 사용
+                  </span>
+                  <span className="mt-1 block text-xs font-semibold leading-5 text-slate-500">
+                    켜두면 구매, 예약, 연락 요청을 에이전트 준비함에서 바로
+                    처리 후보로 보여줍니다.
+                  </span>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={instantActionAutoOpenEnabled}
+                  onChange={(event) =>
+                    setInstantActionAutoOpenEnabled(event.target.checked)
+                  }
+                  className="h-5 w-5 shrink-0 accent-blue-600"
+                />
+              </label>
+
+              <label className="flex items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3 ring-1 ring-slate-100">
+                <span>
+                  <span className="block text-sm font-black text-slate-900">
+                    미확정 일정 알림
+                  </span>
+                  <span className="mt-1 block text-xs font-semibold leading-5 text-slate-500">
+                    날짜나 실행 여부가 확정되지 않은 단기일정/즉시처리를 아침과
+                    저녁에 다시 알려줍니다.
+                  </span>
+                </span>
+                <input
+                  type="checkbox"
+                  checked={unresolvedDigestEnabled}
+                  onChange={(event) => {
+                    setUnresolvedDigestEnabled(event.target.checked);
+                    if (event.target.checked) {
+                      setUnresolvedDigestSnoozedUntil(null);
+                    }
+                  }}
+                  className="h-5 w-5 shrink-0 accent-blue-600"
+                />
+              </label>
+
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => snoozeUnresolvedDigest(1)}
+                  className="rounded-full bg-white px-3 py-1.5 text-xs font-black text-slate-500 ring-1 ring-slate-100"
+                >
+                  오늘 알림 멈추기
+                </button>
+                <button
+                  type="button"
+                  onClick={() => snoozeUnresolvedDigest(7)}
+                  className="rounded-full bg-white px-3 py-1.5 text-xs font-black text-slate-500 ring-1 ring-slate-100"
+                >
+                  7일간 멈추기
+                </button>
+                {unresolvedDigestSnoozedUntil && (
+                  <span className="rounded-full bg-amber-50 px-3 py-1.5 text-xs font-black text-amber-700">
+                    {new Date(unresolvedDigestSnoozedUntil).toLocaleDateString(
+                      "ko-KR"
+                    )}
+                    까지 멈춤
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
           <div className="rounded-3xl bg-slate-50 p-4 ring-1 ring-slate-100">
             <div className="flex items-start justify-between gap-3">
               <div>

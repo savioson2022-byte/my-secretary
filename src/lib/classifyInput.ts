@@ -111,20 +111,13 @@ function detectProcessType(
   text: string,
   actionType: AssistantItemWithoutId["actionType"]
 ): AssistantItemWithoutId["processType"] {
-  if (
-    actionType === "구매" &&
-    /(쿠팡|주문|구매|결제|사줘|시켜줘|시켜|사야|장보기)/.test(text)
-  ) {
-    return "에이전트위임";
-  }
-
   // 반복되는 고정 일정
   if (
     /(매일|매주|매달|월마다|주마다|반복|꾸준히|정기적으로|월요일마다|화요일마다|수요일마다|목요일마다|금요일마다|토요일마다|일요일마다)/.test(
       text
     )
   ) {
-    return "정기시간표";
+    return "메모";
   }
 
   // 날짜/시간이 있는 확정 일정
@@ -147,7 +140,7 @@ function detectProcessType(
 
   // 생각 저장
   if (actionType === "아이디어") {
-    return "아이디어";
+    return "메모";
   }
 
   // 정보 저장
@@ -162,7 +155,7 @@ function detectProcessType(
     actionType === "정리" ||
     actionType === "운동"
   ) {
-    return "시간작업";
+    return "메모";
   }
 
   return "메모";

@@ -8,7 +8,6 @@ import ClassificationResult from "@/components/ClassificationResult";
 import FilterBar from "@/components/FilterBar";
 import InputBox from "@/components/InputBox";
 import ItemCard from "@/components/ItemCard";
-import TimeTaskSuggestionView from "@/components/TimeTaskSuggestionView";
 import UserStatusBadge from "@/components/UserStatusBadge";
 import { aiClassifyInput } from "@/lib/aiClassifyInput";
 import { classifyInput } from "@/lib/classifyInput";
@@ -198,16 +197,18 @@ export default function Home() {
     );
   }, [todayScheduleItems]);
 
-  const pendingTimeTaskCount = useMemo(() => {
+  const openMemoCount = useMemo(() => {
     return items.filter((item) => {
       return (
         item.status === "미완료" &&
-        (item.processType === "시간작업" || item.actionType === "예약")
+        (item.processType === "메모" || item.processType === "아이디어")
       );
     }).length;
   }, [items]);
 
   const pendingAgentCount = useMemo(() => {
+    if (userProfile?.instantActionAutoOpenEnabled === false) return 0;
+
     return items.filter((item) => {
       return (
         item.status === "미완료" &&
@@ -216,7 +217,7 @@ export default function Home() {
           item.actionType === "예약")
       );
     }).length;
-  }, [items]);
+  }, [items, userProfile]);
 
   const inboxItemCount = useMemo(() => {
     return items.filter((item) => {
@@ -422,7 +423,7 @@ export default function Home() {
               {[
                 ["일정", todayScheduleItems.length, "/calendar/monthly"],
                 ["중요", todayItems.length, "/records"],
-                ["추천", pendingTimeTaskCount, "/calendar/weekly"],
+                ["메모", openMemoCount, "/records"],
                 ["준비", pendingAgentCount, "/records"],
               ].map(([label, count, href]) => (
                 <Link
@@ -526,14 +527,6 @@ export default function Home() {
               </div>
             </section>
           )}
-
-          <TimeTaskSuggestionView
-            items={items}
-            routines={routines}
-            singleSchedules={singleSchedules}
-            compact
-            maxItems={2}
-          />
 
           <AgentActionSuggestionView items={items} compact maxItems={2} />
         </div>

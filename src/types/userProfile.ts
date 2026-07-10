@@ -13,6 +13,9 @@ export type UserProfile = {
   reservationPreferredStartTime?: string;
   reservationPreferredEndTime?: string;
   needsShowerAfterWorkout?: boolean;
+  instantActionAutoOpenEnabled?: boolean;
+  unresolvedDigestEnabled?: boolean;
+  unresolvedDigestSnoozedUntil?: string | null;
   rememberDevice: boolean;
   createdAt: string;
   updatedAt: string;

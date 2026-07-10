@@ -11,8 +11,10 @@ import {
   updatePurchaseHistory,
 } from "@/lib/purchaseHistoryStorage";
 import { updateItem } from "@/lib/storage";
+import { getUserProfile } from "@/lib/userProfileStorage";
 import type { AssistantItem } from "@/types/assistant";
 import type { PurchaseHistoryItem } from "@/types/purchaseHistory";
+import type { UserProfile } from "@/types/userProfile";
 import type {
   ProductSearchPreference,
   ProductSearchResult,
@@ -120,11 +122,15 @@ export default function AgentActionSuggestionView({
   const [purchaseHistories, setPurchaseHistories] = useState<
     PurchaseHistoryItem[]
   >([]);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [purchaseAssistantDrafts, setPurchaseAssistantDrafts] = useState<
     Record<string, PurchaseAssistantDraft>
   >({});
+  const instantActionEnabled =
+    userProfile?.instantActionAutoOpenEnabled ?? true;
   const agentItems = items.filter((item) => {
     return (
+      instantActionEnabled &&
       item.status === "미완료" &&
       (item.processType === "에이전트위임" ||
         item.actionType === "구매" ||
@@ -137,6 +143,7 @@ export default function AgentActionSuggestionView({
   useEffect(() => {
     function refreshPurchaseHistories() {
       setPurchaseHistories(getPurchaseHistories());
+      setUserProfile(getUserProfile());
     }
 
     refreshPurchaseHistories();
@@ -666,8 +673,9 @@ export default function AgentActionSuggestionView({
       <section className="app-card p-5">
         <h2 className="text-lg font-black text-slate-900">에이전트 준비함</h2>
         <p className="mt-2 text-sm leading-6 text-slate-500">
-          “쿠팡에서 시켜줘”, “네이버로 예약해줘” 같은 요청이 저장되면 이곳에서
-          필요한 확인사항을 모아볼 수 있습니다.
+          {instantActionEnabled
+            ? "“쿠팡에서 시켜줘”, “네이버로 예약해줘” 같은 요청이 저장되면 이곳에서 필요한 확인사항을 모아볼 수 있습니다."
+            : "즉시처리 자동 사용이 꺼져 있어 구매와 예약 요청을 조용히 저장만 합니다. 설정에서 다시 켤 수 있습니다."}
         </p>
       </section>
     );

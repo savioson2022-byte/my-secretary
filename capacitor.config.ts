@@ -1,0 +1,16 @@
+import type { CapacitorConfig } from "@capacitor/cli";
+
+const config: CapacitorConfig = {
+  appId: "app.mysecretary.mobile",
+  appName: "나의 비서",
+  webDir: "public",
+  server: {
+    url: "https://my-secretary-remote.vercel.app",
+    cleartext: false,
+  },
+  ios: {
+    scheme: "MySecretary",
+  },
+};
+
+export default config;

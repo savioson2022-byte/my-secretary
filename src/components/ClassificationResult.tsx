@@ -42,12 +42,8 @@ const ACTION_TYPE_OPTIONS: ActionType[] = [
 
 const PROCESS_TYPE_OPTIONS: ProcessType[] = [
   "즉시처리",
-  "에이전트위임",
-  "시간작업",
   "단기일정",
-  "정기시간표",
   "메모",
-  "아이디어",
 ];
 
 const PRIORITY_OPTIONS: Priority[] = ["낮음", "보통", "높음"];
@@ -56,7 +52,7 @@ const REPEAT_TYPE_OPTIONS: RepeatType[] = ["일회성", "주기성"];
 
 function getProcessDescription(processType: ProcessType) {
   if (processType === "즉시처리") {
-    return "5분 안에 끝낼 수 있는 일입니다. 빠르게 처리할 수 있습니다.";
+    return "바로 처리하거나 에이전트에게 넘길 수 있는 일입니다. 구매, 예약, 연락 같은 요청이 여기에 들어갑니다.";
   }
 
   if (processType === "에이전트위임") {
@@ -76,7 +72,7 @@ function getProcessDescription(processType: ProcessType) {
   }
 
   if (processType === "메모") {
-    return "행동보다는 기억해둘 정보입니다.";
+    return "행동보다는 기억해둘 정보입니다. 아이디어도 먼저 메모로 모아둡니다.";
   }
 
   if (processType === "아이디어") {
@@ -253,12 +249,19 @@ export default function ClassificationResult({
             }
             className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none focus:border-blue-400"
           >
-            {PROCESS_TYPE_OPTIONS.map((processType) => (
+          {PROCESS_TYPE_OPTIONS.map((processType) => (
               <option key={processType} value={processType}>
                 {processType}
               </option>
             ))}
+            {!PROCESS_TYPE_OPTIONS.includes(result.processType) && (
+              <option value={result.processType}>{result.processType}</option>
+            )}
           </select>
+          <p className="mt-2 text-xs font-semibold leading-5 text-slate-400">
+            앱 사용성을 위해 분류는 단기일정, 메모, 즉시처리로 단순화했습니다.
+            정기일정은 일정관리에서 직접 관리합니다.
+          </p>
         </div>
 
         {result.processType === "에이전트위임" &&

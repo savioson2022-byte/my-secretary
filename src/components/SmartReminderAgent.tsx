@@ -4,11 +4,15 @@ import { useEffect, useMemo, useState } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { getRoutineSchedules } from "@/lib/routineStorage";
 import { getSingleSchedules } from "@/lib/singleScheduleStorage";
+import { getItems } from "@/lib/storage";
+import { getUserProfile } from "@/lib/userProfileStorage";
 import { DayOfWeek, RoutineSchedule } from "@/types/routine";
 
 const REMINDER_OFFSETS = [10, 0];
 const NOTIFIED_KEY = "my-assistant-notified-reminders";
+const DIGEST_NOTIFIED_KEY = "my-assistant-notified-unresolved-digests";
 const PUSH_SYNC_DAYS = 14;
+const UNRESOLVED_DIGEST_HOURS = [8, 20];
 
 type PushScheduleEntry = {
   sourceType: "single" | "routine";
@@ -66,6 +70,21 @@ function getNotifiedIds() {
 function saveNotifiedIds(ids: Set<string>) {
   const recentIds = Array.from(ids).slice(-200);
   localStorage.setItem(NOTIFIED_KEY, JSON.stringify(recentIds));
+}
+
+function getDigestNotifiedIds() {
+  try {
+    return new Set<string>(
+      JSON.parse(localStorage.getItem(DIGEST_NOTIFIED_KEY) ?? "[]")
+    );
+  } catch {
+    return new Set<string>();
+  }
+}
+
+function saveDigestNotifiedIds(ids: Set<string>) {
+  const recentIds = Array.from(ids).slice(-100);
+  localStorage.setItem(DIGEST_NOTIFIED_KEY, JSON.stringify(recentIds));
 }
 
 function showReminder(title: string, body: string) {
@@ -207,6 +226,60 @@ function checkDueReminders() {
   saveNotifiedIds(notifiedIds);
 }
 
+function getUnresolvedActionItems() {
+  return getItems().filter((item) => {
+    if (item.status !== "미완료") return false;
+
+    const isIncompleteSingleSchedule =
+      item.processType === "단기일정" &&
+      (!item.dueDate || !item.scheduleStartTime);
+    const isInstantAction =
+      item.processType === "즉시처리" ||
+      item.actionType === "구매" ||
+      item.actionType === "예약" ||
+      item.actionType === "연락";
+
+    return isIncompleteSingleSchedule || isInstantAction;
+  });
+}
+
+function checkUnresolvedDigest() {
+  const profile = getUserProfile();
+
+  if (profile?.unresolvedDigestEnabled === false) return;
+
+  if (
+    profile?.unresolvedDigestSnoozedUntil &&
+    new Date(profile.unresolvedDigestSnoozedUntil).getTime() > Date.now()
+  ) {
+    return;
+  }
+
+  const now = new Date();
+  const currentHour = now.getHours();
+  const currentMinute = now.getMinutes();
+
+  if (!UNRESOLVED_DIGEST_HOURS.includes(currentHour) || currentMinute > 10) {
+    return;
+  }
+
+  const unresolvedItems = getUnresolvedActionItems();
+
+  if (unresolvedItems.length === 0) return;
+
+  const digestIds = getDigestNotifiedIds();
+  const digestId = `${toDateText(now)}-${currentHour}`;
+
+  if (digestIds.has(digestId)) return;
+
+  digestIds.add(digestId);
+  showReminder(
+    "확정 안 된 일이 있어요",
+    `${unresolvedItems.length}개의 단기일정/즉시처리를 오늘 정리하면 좋아요.`
+  );
+  saveDigestNotifiedIds(digestIds);
+}
+
 export default function SmartReminderAgent() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [isMounted, setIsMounted] = useState(false);
@@ -234,8 +307,12 @@ export default function SmartReminderAgent() {
 
     setPermission(Notification.permission);
     checkDueReminders();
+    checkUnresolvedDigest();
 
-    const timer = window.setInterval(checkDueReminders, 30 * 1000);
+    const timer = window.setInterval(() => {
+      checkDueReminders();
+      checkUnresolvedDigest();
+    }, 30 * 1000);
 
     return () => window.clearInterval(timer);
   }, [canUseNotification]);
