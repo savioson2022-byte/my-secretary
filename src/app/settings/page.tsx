@@ -5,6 +5,7 @@ import LocalDataTransfer from "@/components/LocalDataTransfer";
 import MobileInstallGuide from "@/components/MobileInstallGuide";
 import SavedPlaceManager from "@/components/SavedPlaceManager";
 import UserStatusBadge from "@/components/UserStatusBadge";
+import Link from "next/link";
 
 export default function SettingsPage() {
   return (
@@ -25,6 +26,26 @@ export default function SettingsPage() {
       <div className="space-y-5">
         <AccountManager />
         <CloudSyncStatusCard />
+
+        <section className="app-card p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-black text-slate-900">
+                구매 자동화
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-slate-500">
+                이미 산 적 있는 쿠팡 상품만 재구매 후보로 관리합니다.
+                결제수단과 비밀번호는 앱에 저장하지 않습니다.
+              </p>
+            </div>
+            <Link
+              href="/purchase"
+              className="shrink-0 rounded-full bg-blue-600 px-4 py-2 text-xs font-black text-white"
+            >
+              열기
+            </Link>
+          </div>
+        </section>
 
         <section className="app-card p-5">
           <h2 className="text-lg font-black text-slate-900">기본값</h2>

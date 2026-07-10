@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { getLocalDataUpdatedEventName } from "@/lib/localStorageRepository";
 import {
   createId,
@@ -309,6 +310,12 @@ export default function AgentActionSuggestionView({
           >
             구매 완료
           </button>
+          <Link
+            href="/purchase"
+            className="rounded-full bg-white px-3 py-1.5 text-xs font-black text-slate-600 ring-1 ring-slate-100"
+          >
+            자동화 설정
+          </Link>
         </div>
       </div>
     );
