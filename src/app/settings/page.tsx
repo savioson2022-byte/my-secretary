@@ -31,6 +31,26 @@ export default function SettingsPage() {
           <div className="flex items-start justify-between gap-4">
             <div>
               <h2 className="text-lg font-black text-slate-900">
+                앱 설치와 빠른 실행
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-slate-500">
+                iPhone에서 앱처럼 열기, TestFlight 준비, 음성 기록 단축어를
+                한곳에서 확인합니다.
+              </p>
+            </div>
+            <Link
+              href="/app"
+              className="shrink-0 rounded-full bg-slate-950 px-4 py-2 text-xs font-black text-white"
+            >
+              열기
+            </Link>
+          </div>
+        </section>
+
+        <section className="app-card p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-black text-slate-900">
                 구매 자동화
               </h2>
               <p className="mt-2 text-sm leading-6 text-slate-500">

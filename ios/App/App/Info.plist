@@ -20,6 +20,18 @@
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
 	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>app.mysecretary.mobile</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>mysecretary</string>
+				<string>my-secretary</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
@@ -47,5 +59,38 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>UIApplicationShortcutItems</key>
+	<array>
+		<dict>
+			<key>UIApplicationShortcutItemIconType</key>
+			<string>UIApplicationShortcutIconTypeCompose</string>
+			<key>UIApplicationShortcutItemSubtitle</key>
+			<string>바로 말하고 기록하기</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>음성 기록</string>
+			<key>UIApplicationShortcutItemType</key>
+			<string>app.mysecretary.shortcut.voice</string>
+		</dict>
+		<dict>
+			<key>UIApplicationShortcutItemIconType</key>
+			<string>UIApplicationShortcutIconTypeDate</string>
+			<key>UIApplicationShortcutItemSubtitle</key>
+			<string>오늘 해야 할 일 보기</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>오늘 일정</string>
+			<key>UIApplicationShortcutItemType</key>
+			<string>app.mysecretary.shortcut.today</string>
+		</dict>
+		<dict>
+			<key>UIApplicationShortcutItemIconType</key>
+			<string>UIApplicationShortcutIconTypeTask</string>
+			<key>UIApplicationShortcutItemSubtitle</key>
+			<string>알림과 앱 사용 방식</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>설정</string>
+			<key>UIApplicationShortcutItemType</key>
+			<string>app.mysecretary.shortcut.settings</string>
+		</dict>
+	</array>
 </dict>
 </plist>

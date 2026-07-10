@@ -53,3 +53,31 @@ iOS 앱은 전원 버튼 두 번, 볼륨 버튼 세 번 같은 물리 버튼 조
 5. Siri Shortcuts/App Intents 추가
 6. 잠금화면/홈화면 위젯 추가
 7. Apple Watch는 우선 iPhone 알림 미러링으로 검증
+
+## 현재 반영된 내용
+
+- Capacitor 기반 iOS 프로젝트를 생성했다.
+- 앱 이름은 `나의 비서`, 번들 식별자는 `app.mysecretary.mobile`로 준비했다.
+- 앱 URL 스킴은 `mysecretary://`, `my-secretary://`를 등록했다.
+- iOS 홈 화면 아이콘 길게 누르기용 빠른 동작을 추가했다.
+  - 음성 기록
+  - 오늘 일정
+  - 설정
+- 웹앱 안에 `/app` 페이지를 추가해 TestFlight, App Store Connect, 음성 기록 단축어 설정 흐름을 안내한다.
+
+## App Store 또는 TestFlight 배포 순서
+
+1. Mac에서 `npm run ios:open`으로 Xcode 프로젝트를 연다.
+2. Xcode의 Signing & Capabilities에서 Apple Developer Team을 선택한다.
+3. Bundle Identifier가 Apple Developer 계정에서 사용 가능한지 확인한다.
+4. 실제 iPhone을 연결해 알림, 음성 기록, 로그인, 일정 동기화를 먼저 테스트한다.
+5. Xcode에서 Archive를 만든다.
+6. Distribute App으로 App Store Connect에 업로드한다.
+7. TestFlight에서 내부 테스트를 먼저 진행한다.
+8. 외부 사용자 테스트가 필요하면 Apple의 베타 앱 심사를 거쳐 공개 링크를 만든다.
+9. 일주일 실사용 후 App Store 심사용 스크린샷, 설명, 개인정보 처리 항목을 정리한다.
+
+## 외부 프로그램 다운로드 방식이 어려운 이유
+
+iPhone은 일반 웹사이트에서 내려받은 앱 파일을 바로 설치하는 사용 흐름이 안정적이지 않다.
+지인에게 테스트 앱을 배포하려면 TestFlight가 가장 현실적이고, 일반 사용자에게 배포하려면 App Store 심사가 필요하다.
