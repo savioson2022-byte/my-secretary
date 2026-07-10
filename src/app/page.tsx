@@ -211,7 +211,9 @@ export default function Home() {
     return items.filter((item) => {
       return (
         item.status === "미완료" &&
-        (item.actionType === "구매" || item.actionType === "예약")
+        (item.processType === "에이전트위임" ||
+          item.actionType === "구매" ||
+          item.actionType === "예약")
       );
     }).length;
   }, [items]);

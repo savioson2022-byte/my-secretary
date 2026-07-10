@@ -5,6 +5,7 @@ export type StorageDomain =
   | "routine-schedules"
   | "single-schedules"
   | "places"
+  | "purchase-history"
   | "suggestion-feedback"
   | "travel-time-rules"
   | "travel-time-estimates"
@@ -68,6 +69,15 @@ export const STORAGE_CATALOG: StorageCatalogItem[] = [
     priority: "middle",
     userScoped: true,
     note: "할 일, 일정, 아이디어, 기타 기록 원본이다.",
+  },
+  {
+    domain: "purchase-history",
+    label: "구매 이력과 재구매 자동화 설정",
+    localStorageKey: STORAGE_KEYS.purchaseHistory,
+    supabaseTable: STORAGE_TO_SUPABASE_TABLE[STORAGE_KEYS.purchaseHistory],
+    priority: "middle",
+    userScoped: true,
+    note: "이미 구매한 상품만 재구매 자동화 후보로 허용하기 위한 사용자별 안전 장치다.",
   },
   {
     domain: "suggestion-feedback",

@@ -8,6 +8,7 @@ import type {
   TravelTimeRule,
 } from "@/types/calendar";
 import type { SuggestionFeedback } from "@/types/suggestionFeedback";
+import type { PurchaseHistoryItem } from "@/types/purchaseHistory";
 import type { DayOfWeek, RoutineSchedule } from "@/types/routine";
 import {
   getCloudSyncStatus,
@@ -25,6 +26,7 @@ type SyncableItem = {
 type SyncDomain<TLocal extends SyncableItem, TRow extends { id: string }> = {
   key: string;
   table: string;
+  optionalTable?: boolean;
   optionalColumns?: string[];
   toRow: (
     item: TLocal,
@@ -177,7 +179,14 @@ const syncDomains: Array<SyncDomain<SyncableItem, { id: string }>> = [
   {
     key: STORAGE_KEYS.assistantItems,
     table: "assistant_items",
-    optionalColumns: ["color", "idea_group_id", "idea_group_title", "idea_subcategory"],
+    optionalColumns: [
+      "color",
+      "idea_group_id",
+      "idea_group_title",
+      "idea_subcategory",
+      "purchase_product_name",
+      "purchase_platform",
+    ],
     toRow(item, userId, availableColumns) {
       const assistantItem = item as AssistantItem;
 
@@ -225,6 +234,18 @@ const syncDomains: Array<SyncDomain<SyncableItem, { id: string }>> = [
         });
       }
 
+      if (availableColumns.has("purchase_product_name")) {
+        Object.assign(row, {
+          purchase_product_name: assistantItem.purchaseProductName ?? null,
+        });
+      }
+
+      if (availableColumns.has("purchase_platform")) {
+        Object.assign(row, {
+          purchase_platform: assistantItem.purchasePlatform ?? null,
+        });
+      }
+
       return row;
     },
     fromRow(row) {
@@ -251,6 +272,11 @@ const syncDomains: Array<SyncDomain<SyncableItem, { id: string }>> = [
         ideaGroupId: asNullableText(row.idea_group_id),
         ideaGroupTitle: asNullableText(row.idea_group_title),
         ideaSubcategory: asNullableText(row.idea_subcategory),
+        purchaseProductName: asNullableText(row.purchase_product_name),
+        purchasePlatform: asNullableText(row.purchase_platform) as
+          | "coupang"
+          | "other"
+          | null,
         createdAt: asText(row.created_at),
         updatedAt: asText(row.updated_at),
       } as AssistantItem;
@@ -523,6 +549,44 @@ const syncDomains: Array<SyncDomain<SyncableItem, { id: string }>> = [
     },
   },
   {
+    key: STORAGE_KEYS.purchaseHistory,
+    table: "purchase_history",
+    optionalTable: true,
+    toRow(item, userId) {
+      const history = item as PurchaseHistoryItem;
+
+      return {
+        id: history.id,
+        user_id: userId,
+        product_name: history.productName,
+        platform: history.platform,
+        product_url: history.productUrl ?? null,
+        default_quantity: history.defaultQuantity ?? null,
+        max_budget_krw: history.maxBudgetKrw ?? null,
+        auto_repurchase_enabled: history.autoRepurchaseEnabled,
+        last_purchased_at: history.lastPurchasedAt,
+        memo: history.memo,
+        created_at: history.createdAt,
+        updated_at: history.updatedAt,
+      };
+    },
+    fromRow(row) {
+      return {
+        id: asText(row.id),
+        productName: asText(row.product_name),
+        platform: asText(row.platform, "coupang") as PurchaseHistoryItem["platform"],
+        productUrl: asNullableText(row.product_url),
+        defaultQuantity: asNullableNumber(row.default_quantity),
+        maxBudgetKrw: asNullableNumber(row.max_budget_krw),
+        autoRepurchaseEnabled: asBoolean(row.auto_repurchase_enabled, false),
+        lastPurchasedAt: asText(row.last_purchased_at),
+        memo: asText(row.memo),
+        createdAt: asText(row.created_at),
+        updatedAt: asText(row.updated_at),
+      } as PurchaseHistoryItem;
+    },
+  },
+  {
     key: STORAGE_KEYS.suggestionFeedback,
     table: "suggestion_feedback",
     toRow(item, userId) {
@@ -632,6 +696,14 @@ async function syncDomainWithCloud({
       .in("id", remoteDeletedIds);
 
     if (deleteError) {
+      if (
+        domain.optionalTable &&
+        (deleteError.code === "42P01" ||
+          deleteError.message.includes("does not exist"))
+      ) {
+        return;
+      }
+
       throw deleteError;
     }
   }
@@ -642,6 +714,13 @@ async function syncDomainWithCloud({
     .eq("user_id", userId);
 
   if (error) {
+    if (
+      domain.optionalTable &&
+      (error.code === "42P01" || error.message.includes("does not exist"))
+    ) {
+      return;
+    }
+
     throw error;
   }
 

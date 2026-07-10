@@ -6,6 +6,7 @@ export const STORAGE_KEYS = {
   travelTimeRules: "my-assistant-travel-time-rules",
   travelTimeEstimates: "my-assistant-travel-time-estimates",
   suggestionFeedback: "my-assistant-suggestion-feedback",
+  purchaseHistory: "my-assistant-purchase-history",
   userProfile: "my-assistant-user-profile",
   voiceControlMode: "my-assistant-voice-control-mode",
 } as const;
@@ -26,6 +27,7 @@ export const STORAGE_TO_SUPABASE_TABLE = {
   [STORAGE_KEYS.travelTimeRules]: "travel_time_rules",
   [STORAGE_KEYS.travelTimeEstimates]: "travel_time_estimates",
   [STORAGE_KEYS.suggestionFeedback]: "suggestion_feedback",
+  [STORAGE_KEYS.purchaseHistory]: "purchase_history",
   [STORAGE_KEYS.userProfile]: "profiles",
 } as const;
 
@@ -37,5 +39,6 @@ export const USER_SCOPED_STORAGE_KEYS = [
   STORAGE_KEYS.travelTimeRules,
   STORAGE_KEYS.travelTimeEstimates,
   STORAGE_KEYS.suggestionFeedback,
+  STORAGE_KEYS.purchaseHistory,
   STORAGE_KEYS.userProfile,
 ] as const;

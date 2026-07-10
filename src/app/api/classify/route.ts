@@ -44,6 +44,7 @@ const CLASSIFICATION_SCHEMA = {
       type: "string",
       enum: [
         "즉시처리",
+        "에이전트위임",
         "시간작업",
         "단기일정",
         "정기시간표",
@@ -82,6 +83,15 @@ const CLASSIFICATION_SCHEMA = {
       type: ["string", "null"],
       description: "단기일정 종료 시간. HH:mm 형식 또는 null",
     },
+    purchaseProductName: {
+      type: ["string", "null"],
+      description: "구매 위임일 때 상품명. 예: 물티슈, 충전기",
+    },
+    purchasePlatform: {
+      type: ["string", "null"],
+      enum: ["coupang", "other", null],
+      description: "구매 위임 플랫폼. 쿠팡 요청이면 coupang",
+    },
   },
   required: [
     "originalText",
@@ -97,6 +107,8 @@ const CLASSIFICATION_SCHEMA = {
     "reminderDate",
     "scheduleStartTime",
     "scheduleEndTime",
+    "purchaseProductName",
+    "purchasePlatform",
   ],
 };
 
@@ -167,6 +179,10 @@ function normalizeResult(
     reminderDate: result.reminderDate || null,
     scheduleStartTime,
     scheduleEndTime,
+    purchaseProductName:
+      result.actionType === "구매" ? result.purchaseProductName ?? null : null,
+    purchasePlatform:
+      result.actionType === "구매" ? result.purchasePlatform ?? "coupang" : null,
   };
 }
 
@@ -217,10 +233,19 @@ ${userContext ? `\n사용자별 분류 기준:\n${userContext}\n` : ""}
 
 1. 즉시처리
 - 5~10분 안에 끝낼 수 있는 행동
-- 예: 쿠팡에서 염색약 주문하기, 엄마한테 연락하기, 병원 예약하기
+- 예: 엄마한테 연락하기, 간단한 확인하기
 - estimatedMinutes는 보통 5 또는 10
 
-2. 시간작업
+2. 에이전트위임
+- 외부 서비스에서 사용자를 대신해 준비하거나 실행해야 하는 요청
+- 특히 "쿠팡에서 물티슈 사줘", "충전기 주문해줘", "로켓배송으로 시켜줘" 같은 구매 요청은 에이전트위임으로 분류해라.
+- actionType은 "구매", category는 "생활/구매"로 둬라.
+- purchaseProductName에는 실제 상품명을 짧게 넣어라. 예: "물티슈", "충전기", "고양이 사료"
+- purchasePlatform은 쿠팡 요청이면 "coupang"으로 둬라.
+- 단, 실제 결제는 사용자의 최종 확인이 필요하다.
+- estimatedMinutes는 보통 5 또는 10
+
+3. 시간작업
 - 시간이 필요하지만 아직 시간이 확정된 일정은 아닌 작업
 - 캘린더의 빈 시간에 배치 추천할 대상
 - 예: 기하 문제 풀기, 미적분 수업 준비하기, 보고서 쓰기, 데이트 장소 찾아보기, 방 청소하기
@@ -229,7 +254,7 @@ ${userContext ? `\n사용자별 분류 기준:\n${userContext}\n` : ""}
 - estimatedMinutes는 보통 30, 40, 45, 60 중 적절히 추정
 - scheduleStartTime과 scheduleEndTime은 null
 
-3. 단기일정
+4. 단기일정
 - 특정 날짜나 시간이 있는 한 번짜리 확정 일정
 - 예: 내일 3시 병원, 금요일 6시 친구 약속, 6월 25일 지구과학 시험
 - 날짜를 알 수 있으면 dueDate에 YYYY-MM-DD로 넣기
@@ -239,18 +264,18 @@ ${userContext ? `\n사용자별 분류 기준:\n${userContext}\n` : ""}
 - 오전/오후를 문맥상 판단해라. "저녁 6시"는 18:00, "오후 3시"는 15:00, "아침 8시"는 08:00이다.
 - "3시 병원"처럼 오전/오후가 없고 병원/약속/학원 문맥이면 보통 오후로 추정해도 된다.
 
-4. 정기시간표
+5. 정기시간표
 - 반복되는 고정 일정
 - 예: 매주 월수금 영어학원, 매주 토요일 기하학원, 평일 학교
 - repeatType은 주기성
 - 일정 시간이 있으면 scheduleStartTime과 scheduleEndTime을 채워도 된다.
 
-5. 메모
+6. 메모
 - 행동보다는 기억할 정보
 - 예: 시험범위는 52쪽부터 65쪽
 - scheduleStartTime과 scheduleEndTime은 null
 
-6. 아이디어
+7. 아이디어
 - 나중에 발전시킬 생각
 - 예: 나의 비서에 애플워치 입력 기능 넣기
 - scheduleStartTime과 scheduleEndTime은 null

@@ -111,6 +111,13 @@ function detectProcessType(
   text: string,
   actionType: AssistantItemWithoutId["actionType"]
 ): AssistantItemWithoutId["processType"] {
+  if (
+    actionType === "구매" &&
+    /(쿠팡|주문|구매|결제|사줘|시켜줘|시켜|사야|장보기)/.test(text)
+  ) {
+    return "에이전트위임";
+  }
+
   // 반복되는 고정 일정
   if (
     /(매일|매주|매달|월마다|주마다|반복|꾸준히|정기적으로|월요일마다|화요일마다|수요일마다|목요일마다|금요일마다|토요일마다|일요일마다)/.test(
@@ -161,6 +168,15 @@ function detectProcessType(
   return "메모";
 }
 
+function detectPurchaseProductName(text: string) {
+  const cleanedText = text
+    .replace(/쿠팡에서|쿠팡|로켓배송|주문해줘|주문|구매해줘|구매|결제|사줘|사야|시켜줘|시켜|좀|해줘|필요해|떨어졌어|다 떨어졌어/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return cleanedText || null;
+}
+
 function detectEstimatedMinutes(
   actionType: AssistantItemWithoutId["actionType"]
 ): number | null {
@@ -186,6 +202,8 @@ export function classifyInput(originalText: string): AssistantItemWithoutId {
   const detectedDate = detectDate(text);
   const processType = detectProcessType(text, actionType);
   const estimatedMinutes = detectEstimatedMinutes(actionType);
+  const purchaseProductName =
+    actionType === "구매" ? detectPurchaseProductName(text) : null;
 
   const title = text.length > 22 ? `${text.slice(0, 22)}...` : text;
 
@@ -201,5 +219,7 @@ export function classifyInput(originalText: string): AssistantItemWithoutId {
     status: "미완료",
     processType,
     estimatedMinutes,
+    purchaseProductName,
+    purchasePlatform: actionType === "구매" ? "coupang" : null,
   };
 }

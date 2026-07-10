@@ -21,6 +21,7 @@ export type ActionType =
 
 export type ProcessType =
   | "즉시처리"
+  | "에이전트위임"
   | "시간작업"
   | "단기일정"
   | "정기시간표"
@@ -80,6 +81,8 @@ export type AssistantItemWithoutId = {
   ideaGroupId?: string | null;
   ideaGroupTitle?: string | null;
   ideaSubcategory?: string | null;
+  purchaseProductName?: string | null;
+  purchasePlatform?: "coupang" | "other" | null;
 };
 
 export type AssistantItem = AssistantItemWithoutId & {

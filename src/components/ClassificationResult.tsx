@@ -42,6 +42,7 @@ const ACTION_TYPE_OPTIONS: ActionType[] = [
 
 const PROCESS_TYPE_OPTIONS: ProcessType[] = [
   "즉시처리",
+  "에이전트위임",
   "시간작업",
   "단기일정",
   "정기시간표",
@@ -56,6 +57,10 @@ const REPEAT_TYPE_OPTIONS: RepeatType[] = ["일회성", "주기성"];
 function getProcessDescription(processType: ProcessType) {
   if (processType === "즉시처리") {
     return "5분 안에 끝낼 수 있는 일입니다. 빠르게 처리할 수 있습니다.";
+  }
+
+  if (processType === "에이전트위임") {
+    return "외부 서비스에서 대신 준비할 일입니다. 구매는 사용자의 최종 확인 후 진행합니다.";
   }
 
   if (processType === "시간작업") {
@@ -255,6 +260,51 @@ export default function ClassificationResult({
             ))}
           </select>
         </div>
+
+        {result.processType === "에이전트위임" &&
+          result.actionType === "구매" && (
+            <div className="rounded-[24px] bg-violet-50 p-4 ring-1 ring-violet-100">
+              <p className="text-sm font-black text-violet-700">
+                구매 위임 정보
+              </p>
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                <div>
+                  <FieldLabel>상품명</FieldLabel>
+                  <input
+                    value={result.purchaseProductName ?? ""}
+                    onChange={(event) =>
+                      updateResult({
+                        purchaseProductName: event.target.value,
+                      })
+                    }
+                    placeholder="예: 물티슈"
+                    className="mt-2 w-full rounded-2xl border border-violet-100 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-violet-400"
+                  />
+                </div>
+                <div>
+                  <FieldLabel>구매처</FieldLabel>
+                  <select
+                    value={result.purchasePlatform ?? "coupang"}
+                    onChange={(event) =>
+                      updateResult({
+                        purchasePlatform: event.target.value as
+                          | "coupang"
+                          | "other",
+                      })
+                    }
+                    className="mt-2 w-full rounded-2xl border border-violet-100 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-violet-400"
+                  >
+                    <option value="coupang">쿠팡</option>
+                    <option value="other">기타</option>
+                  </select>
+                </div>
+              </div>
+              <p className="mt-3 text-xs font-bold leading-5 text-violet-600">
+                이미 구매한 적 있는 상품만 재구매 자동화 후보로 표시됩니다.
+                처음 사는 상품은 쿠팡 검색까지만 도와줍니다.
+              </p>
+            </div>
+          )}
 
         {result.processType === "단기일정" && (
           <ScheduleColorPicker

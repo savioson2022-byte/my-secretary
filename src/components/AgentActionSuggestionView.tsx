@@ -1,8 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { getLocalDataUpdatedEventName } from "@/lib/localStorageRepository";
+import {
+  createId,
+  findMatchingPurchaseHistory,
+  getPurchaseHistories,
+  savePurchaseHistory,
+  updatePurchaseHistory,
+} from "@/lib/purchaseHistoryStorage";
 import { updateItem } from "@/lib/storage";
 import type { AssistantItem } from "@/types/assistant";
+import type { PurchaseHistoryItem } from "@/types/purchaseHistory";
 
 type AgentActionSuggestionViewProps = {
   items: AssistantItem[];
@@ -11,6 +20,10 @@ type AgentActionSuggestionViewProps = {
 };
 
 function getActionLabel(item: AssistantItem) {
+  if (item.processType === "에이전트위임" && item.actionType === "구매") {
+    return "구매 위임";
+  }
+
   if (item.actionType === "구매") return "구매 준비";
   if (item.actionType === "예약") return "예약 준비";
   return "처리 준비";
@@ -28,6 +41,25 @@ function getActionGuide(item: AssistantItem) {
   return "외부 서비스 연결 전까지는 사용자가 확인할 수 있는 준비 항목으로 관리합니다.";
 }
 
+function extractPurchaseProductName(item: AssistantItem) {
+  if (item.purchaseProductName?.trim()) {
+    return item.purchaseProductName.trim();
+  }
+
+  const cleanedText = item.originalText
+    .replace(/쿠팡에서|쿠팡|로켓배송|주문해줘|주문|구매해줘|구매|결제|사줘|사야|시켜줘|시켜|좀|해줘|필요해|떨어졌어|다 떨어졌어/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return cleanedText || item.title;
+}
+
+function createCoupangSearchUrl(productName: string) {
+  return `https://www.coupang.com/np/search?q=${encodeURIComponent(
+    productName
+  )}`;
+}
+
 export default function AgentActionSuggestionView({
   items,
   compact = false,
@@ -41,14 +73,38 @@ export default function AgentActionSuggestionView({
     estimatedMinutes: "",
   });
   const [message, setMessage] = useState<string | null>(null);
+  const [purchaseHistories, setPurchaseHistories] = useState<
+    PurchaseHistoryItem[]
+  >([]);
   const agentItems = items.filter((item) => {
     return (
       item.status === "미완료" &&
-      (item.actionType === "구매" || item.actionType === "예약")
+      (item.processType === "에이전트위임" ||
+        item.actionType === "구매" ||
+        item.actionType === "예약")
     );
   });
   const visibleItems =
     typeof maxItems === "number" ? agentItems.slice(0, maxItems) : agentItems;
+
+  useEffect(() => {
+    function refreshPurchaseHistories() {
+      setPurchaseHistories(getPurchaseHistories());
+    }
+
+    refreshPurchaseHistories();
+    window.addEventListener(
+      getLocalDataUpdatedEventName(),
+      refreshPurchaseHistories
+    );
+
+    return () => {
+      window.removeEventListener(
+        getLocalDataUpdatedEventName(),
+        refreshPurchaseHistories
+      );
+    };
+  }, []);
 
   function startEdit(item: AssistantItem) {
     setEditingItemId(item.id);
@@ -102,6 +158,160 @@ export default function AgentActionSuggestionView({
       updatedAt: new Date().toISOString(),
     });
     setMessage("에이전트 준비 항목을 보류해뒀어.");
+  }
+
+  function upsertPurchaseHistory({
+    item,
+    enableAutomation,
+    matchedHistory,
+  }: {
+    item: AssistantItem;
+    enableAutomation: boolean;
+    matchedHistory: PurchaseHistoryItem | null;
+  }) {
+    const now = new Date().toISOString();
+    const productName = extractPurchaseProductName(item);
+
+    if (matchedHistory) {
+      updatePurchaseHistory({
+        ...matchedHistory,
+        productName,
+        platform: "coupang",
+        autoRepurchaseEnabled:
+          matchedHistory.autoRepurchaseEnabled || enableAutomation,
+        lastPurchasedAt: now,
+        updatedAt: now,
+      });
+    } else {
+      savePurchaseHistory({
+        id: createId(),
+        productName,
+        platform: "coupang",
+        productUrl: createCoupangSearchUrl(productName),
+        defaultQuantity: null,
+        maxBudgetKrw: null,
+        autoRepurchaseEnabled: enableAutomation,
+        lastPurchasedAt: now,
+        memo: "나의 비서 구매 위임에서 등록됨",
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+
+    setPurchaseHistories(getPurchaseHistories());
+  }
+
+  function markPurchaseComplete(
+    item: AssistantItem,
+    matchedHistory: PurchaseHistoryItem | null
+  ) {
+    upsertPurchaseHistory({
+      item,
+      enableAutomation: true,
+      matchedHistory,
+    });
+    quickConfirm(item);
+    setMessage("구매 완료로 기록했고, 다음부터 재구매 자동화 후보로 사용할게.");
+  }
+
+  function enableRepurchaseAutomation(
+    item: AssistantItem,
+    matchedHistory: PurchaseHistoryItem | null
+  ) {
+    upsertPurchaseHistory({
+      item,
+      enableAutomation: true,
+      matchedHistory,
+    });
+    setMessage("이 상품은 다음부터 재구매 자동화 후보로 표시할게.");
+  }
+
+  function PurchaseDelegationPanel({ item }: { item: AssistantItem }) {
+    if (item.actionType !== "구매") return null;
+
+    const productName = extractPurchaseProductName(item);
+    const matchedHistory = findMatchingPurchaseHistory(
+      productName,
+      purchaseHistories
+    );
+    const canAutomate = Boolean(
+      matchedHistory?.autoRepurchaseEnabled &&
+        matchedHistory.platform === "coupang"
+    );
+    const searchUrl =
+      matchedHistory?.productUrl || createCoupangSearchUrl(productName);
+
+    return (
+      <div className="mt-3 rounded-2xl bg-white p-3 ring-1 ring-violet-100">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs font-black text-violet-600">쿠팡 구매 위임</p>
+            <p className="mt-1 truncate text-sm font-black text-slate-900">
+              {productName}
+            </p>
+          </div>
+          <span
+            className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-black ${
+              canAutomate
+                ? "bg-emerald-50 text-emerald-600"
+                : matchedHistory
+                  ? "bg-amber-50 text-amber-600"
+                  : "bg-slate-100 text-slate-500"
+            }`}
+          >
+            {canAutomate
+              ? "재구매 가능"
+              : matchedHistory
+                ? "이력 있음"
+                : "첫 구매"}
+          </span>
+        </div>
+        <p className="mt-2 text-xs font-semibold leading-5 text-slate-500">
+          {canAutomate
+            ? "이미 구매한 상품이라 재구매 후보로 열 수 있어요. 결제는 쿠팡에서 최종 확인해 주세요."
+            : matchedHistory
+              ? "구매 이력은 있지만 자동화 허용이 꺼져 있어요."
+              : "처음 사는 상품은 자동화하지 않고 쿠팡 검색까지만 도와줘요."}
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <a
+            href={searchUrl}
+            target="_blank"
+            rel="noreferrer"
+            className={`rounded-full px-3 py-1.5 text-xs font-black text-white ${
+              canAutomate ? "bg-emerald-600" : "bg-violet-600"
+            }`}
+          >
+            {canAutomate ? "재구매 열기" : "쿠팡에서 찾기"}
+          </a>
+          {matchedHistory && !canAutomate && (
+            <button
+              type="button"
+              onClick={() => enableRepurchaseAutomation(item, matchedHistory)}
+              className="rounded-full bg-white px-3 py-1.5 text-xs font-black text-violet-600 ring-1 ring-violet-100"
+            >
+              재구매 허용
+            </button>
+          )}
+          {!matchedHistory && (
+            <button
+              type="button"
+              onClick={() => enableRepurchaseAutomation(item, null)}
+              className="rounded-full bg-white px-3 py-1.5 text-xs font-black text-slate-600 ring-1 ring-slate-100"
+            >
+              이미 산 적 있음
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => markPurchaseComplete(item, matchedHistory)}
+            className="rounded-full bg-white px-3 py-1.5 text-xs font-black text-slate-600 ring-1 ring-slate-100"
+          >
+            구매 완료
+          </button>
+        </div>
+      </div>
+    );
   }
 
   if (agentItems.length === 0) {
@@ -163,6 +373,7 @@ export default function AgentActionSuggestionView({
                 {getActionGuide(item)}
               </p>
             )}
+            <PurchaseDelegationPanel item={item} />
             {editingItemId === item.id && (
               <div className="mt-3 grid gap-2 rounded-2xl bg-white p-3 ring-1 ring-slate-100 sm:grid-cols-2">
                 <input
