@@ -5,9 +5,14 @@ import Capacitor
 class AppDelegate: UIResponder, UIApplicationDelegate {
 
     var window: UIWindow?
+    private let appBaseURL = "https://my-secretary-remote.vercel.app"
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        if let shortcutItem = launchOptions?[.shortcutItem] as? UIApplicationShortcutItem {
+            openShortcut(shortcutItem)
+            return false
+        }
+
         return true
     }
 
@@ -34,9 +39,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
-        // Called when the app was launched with a url. Feel free to add additional processing here,
-        // but if you want the App API to support tracking app url opens, make sure to keep this call
-        return ApplicationDelegateProxy.shared.application(app, open: url, options: options)
+        let proxyHandled = ApplicationDelegateProxy.shared.application(app, open: url, options: options)
+        let routeHandled = openDeepLink(url)
+        return proxyHandled || routeHandled
     }
 
     func application(_ application: UIApplication, continue userActivity: NSUserActivity, restorationHandler: @escaping ([UIUserActivityRestoring]?) -> Void) -> Bool {
@@ -46,4 +51,97 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         return ApplicationDelegateProxy.shared.application(application, continue: userActivity, restorationHandler: restorationHandler)
     }
 
+    func application(_ application: UIApplication, performActionFor shortcutItem: UIApplicationShortcutItem, completionHandler: @escaping (Bool) -> Void) {
+        completionHandler(openShortcut(shortcutItem))
+    }
+
+    @discardableResult
+    private func openShortcut(_ shortcutItem: UIApplicationShortcutItem) -> Bool {
+        guard let path = path(forShortcutType: shortcutItem.type) else {
+            return false
+        }
+
+        openWebPath(path)
+        return true
+    }
+
+    @discardableResult
+    private func openDeepLink(_ url: URL) -> Bool {
+        guard url.scheme == "mysecretary" || url.scheme == "my-secretary" else {
+            return false
+        }
+
+        let target = [url.host, url.path]
+            .compactMap { $0 }
+            .joined(separator: "/")
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+
+        switch target {
+        case "voice", "record", "memo":
+            openWebPath("/?voice=1")
+        case "today", "":
+            openWebPath("/")
+        case "settings":
+            openWebPath("/settings")
+        case "app":
+            openWebPath("/app")
+        default:
+            return false
+        }
+
+        return true
+    }
+
+    private func path(forShortcutType type: String) -> String? {
+        switch type {
+        case "app.mysecretary.shortcut.voice":
+            return "/?voice=1"
+        case "app.mysecretary.shortcut.today":
+            return "/"
+        case "app.mysecretary.shortcut.settings":
+            return "/settings"
+        default:
+            return nil
+        }
+    }
+
+    private func openWebPath(_ path: String) {
+        guard let url = URL(string: "\(appBaseURL)\(path)") else {
+            return
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
+            guard let bridgeViewController = self?.bridgeViewController(from: self?.window?.rootViewController) else {
+                return
+            }
+
+            bridgeViewController.webView?.load(URLRequest(url: url))
+        }
+    }
+
+    private func bridgeViewController(from viewController: UIViewController?) -> CAPBridgeViewController? {
+        if let bridgeViewController = viewController as? CAPBridgeViewController {
+            return bridgeViewController
+        }
+
+        if let navigationController = viewController as? UINavigationController {
+            return bridgeViewController(from: navigationController.visibleViewController)
+        }
+
+        if let tabBarController = viewController as? UITabBarController {
+            return bridgeViewController(from: tabBarController.selectedViewController)
+        }
+
+        if let presentedViewController = viewController?.presentedViewController {
+            return bridgeViewController(from: presentedViewController)
+        }
+
+        for childViewController in viewController?.children ?? [] {
+            if let bridgeViewController = bridgeViewController(from: childViewController) {
+                return bridgeViewController
+            }
+        }
+
+        return nil
+    }
 }

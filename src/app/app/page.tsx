@@ -134,6 +134,9 @@ export default function AppInstallPage() {
               <code className="mt-3 block break-all rounded-2xl bg-white p-3 text-[11px] font-bold text-slate-600 ring-1 ring-slate-100">
                 https://my-secretary-remote.vercel.app/?voice=1
               </code>
+              <code className="mt-2 block break-all rounded-2xl bg-white p-3 text-[11px] font-bold text-slate-600 ring-1 ring-slate-100">
+                mysecretary://voice
+              </code>
             </div>
 
             <div className="rounded-3xl bg-slate-50 p-4 ring-1 ring-slate-100">
@@ -142,8 +145,8 @@ export default function AppInstallPage() {
               </p>
               <p className="mt-2 text-xs leading-5 text-slate-500">
                 iOS 앱 프로젝트에는 홈 화면 아이콘 길게 누르기용 빠른 동작이
-                들어갔습니다. 실제 기기 빌드 후 음성 기록, 오늘 일정, 설정을
-                빠르게 열 수 있게 확장합니다.
+                들어갔습니다. 실제 기기 빌드 후 음성 기록, 오늘 일정, 설정으로
+                바로 이동합니다.
               </p>
             </div>
           </div>

@@ -63,6 +63,10 @@ iOS 앱은 전원 버튼 두 번, 볼륨 버튼 세 번 같은 물리 버튼 조
   - 음성 기록
   - 오늘 일정
   - 설정
+- 빠른 동작과 URL 스킴이 실제 웹뷰 경로로 이동하도록 AppDelegate에 연결했다.
+  - `mysecretary://voice` -> `/?voice=1`
+  - `mysecretary://today` -> `/`
+  - `mysecretary://settings` -> `/settings`
 - 웹앱 안에 `/app` 페이지를 추가해 TestFlight, App Store Connect, 음성 기록 단축어 설정 흐름을 안내한다.
 
 ## App Store 또는 TestFlight 배포 순서
