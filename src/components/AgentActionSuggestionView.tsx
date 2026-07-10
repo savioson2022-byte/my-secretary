@@ -588,6 +588,11 @@ export default function AgentActionSuggestionView({
                       ? ` · ${product.lowestPriceKrw.toLocaleString("ko-KR")}원`
                       : ""}
                   </p>
+                  {product.matchLabel && (
+                    <p className="mt-1 text-[11px] font-black text-emerald-600">
+                      {product.matchLabel}
+                    </p>
+                  )}
                   <button
                     type="button"
                     onClick={() =>

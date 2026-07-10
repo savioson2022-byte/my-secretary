@@ -11,4 +11,5 @@ export type ProductSearchResult = {
   lowestPriceKrw: number | null;
   category: string;
   provider: "naver-shopping" | "fallback";
+  matchLabel?: string;
 };
