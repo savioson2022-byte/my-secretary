@@ -13,12 +13,35 @@ import {
 import { updateItem } from "@/lib/storage";
 import type { AssistantItem } from "@/types/assistant";
 import type { PurchaseHistoryItem } from "@/types/purchaseHistory";
+import type {
+  ProductSearchPreference,
+  ProductSearchResult,
+} from "@/types/productSearch";
 
 type AgentActionSuggestionViewProps = {
   items: AssistantItem[];
   compact?: boolean;
   maxItems?: number;
 };
+
+type PurchaseAssistantDraft = {
+  color: string;
+  preference: ProductSearchPreference | "";
+  budget: string;
+  products: ProductSearchResult[];
+  isSearching: boolean;
+  searched: boolean;
+  error: string | null;
+};
+
+const PURCHASE_PREFERENCE_OPTIONS: Array<{
+  value: ProductSearchPreference;
+  label: string;
+}> = [
+  { value: "quality", label: "성분/품질" },
+  { value: "lowest-price", label: "최저가" },
+  { value: "bulk", label: "대용량" },
+];
 
 function getActionLabel(item: AssistantItem) {
   if (item.processType === "에이전트위임" && item.actionType === "구매") {
@@ -61,6 +84,26 @@ function createCoupangSearchUrl(productName: string) {
   )}`;
 }
 
+function isHairDyeProduct(productName: string) {
+  return /(염색약|염모제|헤어컬러|헤어 컬러|새치염색|새치 염색)/.test(
+    productName
+  );
+}
+
+function createPurchaseAssistantDraft(
+  history: PurchaseHistoryItem | null
+): PurchaseAssistantDraft {
+  return {
+    color: "",
+    preference: history?.autoRepurchaseEnabled ? "quality" : "",
+    budget: history?.maxBudgetKrw ? String(history.maxBudgetKrw) : "",
+    products: [],
+    isSearching: false,
+    searched: false,
+    error: null,
+  };
+}
+
 export default function AgentActionSuggestionView({
   items,
   compact = false,
@@ -77,6 +120,9 @@ export default function AgentActionSuggestionView({
   const [purchaseHistories, setPurchaseHistories] = useState<
     PurchaseHistoryItem[]
   >([]);
+  const [purchaseAssistantDrafts, setPurchaseAssistantDrafts] = useState<
+    Record<string, PurchaseAssistantDraft>
+  >({});
   const agentItems = items.filter((item) => {
     return (
       item.status === "미완료" &&
@@ -165,19 +211,26 @@ export default function AgentActionSuggestionView({
     item,
     enableAutomation,
     matchedHistory,
+    selectedProduct,
   }: {
     item: AssistantItem;
     enableAutomation: boolean;
     matchedHistory: PurchaseHistoryItem | null;
+    selectedProduct?: ProductSearchResult;
   }) {
     const now = new Date().toISOString();
     const productName = extractPurchaseProductName(item);
+    const nextProductName = selectedProduct?.title ?? productName;
+    const nextProductUrl =
+      selectedProduct?.link ?? matchedHistory?.productUrl ?? createCoupangSearchUrl(productName);
 
     if (matchedHistory) {
       updatePurchaseHistory({
         ...matchedHistory,
-        productName,
+        productName: nextProductName,
         platform: "coupang",
+        productUrl: nextProductUrl,
+        maxBudgetKrw: matchedHistory.maxBudgetKrw,
         autoRepurchaseEnabled:
           matchedHistory.autoRepurchaseEnabled || enableAutomation,
         lastPurchasedAt: now,
@@ -186,9 +239,9 @@ export default function AgentActionSuggestionView({
     } else {
       savePurchaseHistory({
         id: createId(),
-        productName,
+        productName: nextProductName,
         platform: "coupang",
-        productUrl: createCoupangSearchUrl(productName),
+        productUrl: nextProductUrl,
         defaultQuantity: null,
         maxBudgetKrw: null,
         autoRepurchaseEnabled: enableAutomation,
@@ -200,6 +253,119 @@ export default function AgentActionSuggestionView({
     }
 
     setPurchaseHistories(getPurchaseHistories());
+  }
+
+  function getAssistantDraft(
+    itemId: string,
+    matchedHistory: PurchaseHistoryItem | null
+  ) {
+    return (
+      purchaseAssistantDrafts[itemId] ??
+      createPurchaseAssistantDraft(matchedHistory)
+    );
+  }
+
+  function updateAssistantDraft(
+    itemId: string,
+    nextPartialDraft: Partial<PurchaseAssistantDraft>
+  ) {
+    setPurchaseAssistantDrafts((current) => ({
+      ...current,
+      [itemId]: {
+        ...(current[itemId] ?? createPurchaseAssistantDraft(null)),
+        ...nextPartialDraft,
+      },
+    }));
+  }
+
+  async function searchPurchaseProducts({
+    item,
+    productName,
+    matchedHistory,
+  }: {
+    item: AssistantItem;
+    productName: string;
+    matchedHistory: PurchaseHistoryItem | null;
+  }) {
+    const draft = getAssistantDraft(item.id, matchedHistory);
+
+    if (isHairDyeProduct(productName) && !draft.color.trim()) {
+      updateAssistantDraft(item.id, {
+        error: "염색약은 색상을 먼저 골라야 정확히 찾을 수 있어요.",
+      });
+      return;
+    }
+
+    updateAssistantDraft(item.id, {
+      isSearching: true,
+      error: null,
+    });
+
+    try {
+      const params = new URLSearchParams({
+        product: productName,
+      });
+
+      if (draft.color.trim()) {
+        params.set("color", draft.color.trim());
+      }
+
+      if (draft.preference) {
+        params.set("preference", draft.preference);
+      }
+
+      if (draft.budget.trim()) {
+        params.set("budget", draft.budget.trim());
+      }
+
+      const response = await fetch(`/api/products/search?${params.toString()}`);
+
+      if (!response.ok) {
+        throw new Error("상품 검색에 실패했어요.");
+      }
+
+      const data = (await response.json()) as {
+        products?: ProductSearchResult[];
+        message?: string;
+      };
+
+      updateAssistantDraft(item.id, {
+        products: data.products ?? [],
+        isSearching: false,
+        searched: true,
+        error: data.message ?? null,
+      });
+    } catch (error) {
+      updateAssistantDraft(item.id, {
+        products: [],
+        isSearching: false,
+        searched: true,
+        error:
+          error instanceof Error
+            ? error.message
+            : "상품 검색 중 오류가 생겼어요.",
+      });
+    }
+  }
+
+  function confirmProductCandidate({
+    item,
+    matchedHistory,
+    selectedProduct,
+  }: {
+    item: AssistantItem;
+    matchedHistory: PurchaseHistoryItem | null;
+    selectedProduct: ProductSearchResult;
+  }) {
+    upsertPurchaseHistory({
+      item,
+      enableAutomation: true,
+      matchedHistory,
+      selectedProduct,
+    });
+    setMessage(
+      `"${selectedProduct.title}"을 구매 후보로 저장했어. 구매 자동화 페이지에서 실행할 수 있어.`
+    );
   }
 
   function markPurchaseComplete(
@@ -241,6 +407,8 @@ export default function AgentActionSuggestionView({
     );
     const searchUrl =
       matchedHistory?.productUrl || createCoupangSearchUrl(productName);
+    const assistantDraft = getAssistantDraft(item.id, matchedHistory);
+    const needsColor = isHairDyeProduct(productName);
 
     return (
       <div className="mt-3 rounded-2xl bg-white p-3 ring-1 ring-violet-100">
@@ -274,6 +442,171 @@ export default function AgentActionSuggestionView({
               ? "구매 이력은 있지만 자동화 허용이 꺼져 있어요."
               : "처음 사는 상품은 자동화하지 않고 쿠팡 검색까지만 도와줘요."}
         </p>
+
+        <div className="mt-3 rounded-2xl bg-violet-50 p-3 ring-1 ring-violet-100">
+          <p className="text-xs font-black text-violet-700">
+            구매 조건 확인
+          </p>
+          {needsColor && (
+            <div className="mt-3">
+              <label className="text-[11px] font-black text-violet-600">
+                무슨 색으로 살까요?
+              </label>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {["블랙", "다크브라운", "초코브라운", "애쉬브라운"].map(
+                  (color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      onClick={() =>
+                        updateAssistantDraft(item.id, {
+                          color,
+                          error: null,
+                        })
+                      }
+                      className={`rounded-full px-3 py-1.5 text-[11px] font-black ${
+                        assistantDraft.color === color
+                          ? "bg-violet-600 text-white"
+                          : "bg-white text-violet-600 ring-1 ring-violet-100"
+                      }`}
+                    >
+                      {color}
+                    </button>
+                  )
+                )}
+              </div>
+              <input
+                value={assistantDraft.color}
+                onChange={(event) =>
+                  updateAssistantDraft(item.id, {
+                    color: event.target.value,
+                    error: null,
+                  })
+                }
+                placeholder="직접 입력"
+                className="mt-2 w-full rounded-xl border border-violet-100 bg-white px-3 py-2 text-xs font-bold outline-none focus:border-violet-400"
+              />
+            </div>
+          )}
+
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <div>
+              <label className="text-[11px] font-black text-violet-600">
+                어떤 기준이 중요해요?
+              </label>
+              <select
+                value={assistantDraft.preference}
+                onChange={(event) =>
+                  updateAssistantDraft(item.id, {
+                    preference: event.target.value as
+                      | ProductSearchPreference
+                      | "",
+                    error: null,
+                  })
+                }
+                className="mt-1 w-full rounded-xl border border-violet-100 bg-white px-3 py-2 text-xs font-bold outline-none focus:border-violet-400"
+              >
+                <option value="">추천 기준 선택</option>
+                {PURCHASE_PREFERENCE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-[11px] font-black text-violet-600">
+                최대 가격
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={assistantDraft.budget}
+                onChange={(event) =>
+                  updateAssistantDraft(item.id, {
+                    budget: event.target.value,
+                    error: null,
+                  })
+                }
+                placeholder="원"
+                className="mt-1 w-full rounded-xl border border-violet-100 bg-white px-3 py-2 text-xs font-bold outline-none focus:border-violet-400"
+              />
+            </div>
+          </div>
+
+          {assistantDraft.error && (
+            <p className="mt-2 rounded-xl bg-white px-3 py-2 text-xs font-bold text-violet-700 ring-1 ring-violet-100">
+              {assistantDraft.error}
+            </p>
+          )}
+
+          <button
+            type="button"
+            onClick={() =>
+              searchPurchaseProducts({
+                item,
+                productName,
+                matchedHistory,
+              })
+            }
+            disabled={assistantDraft.isSearching}
+            className="mt-3 w-full rounded-xl bg-violet-600 px-3 py-2 text-xs font-black text-white disabled:bg-slate-300"
+          >
+            {assistantDraft.isSearching ? "상품 찾는 중" : "조건에 맞는 상품 찾기"}
+          </button>
+        </div>
+
+        {assistantDraft.products.length > 0 && (
+          <div className="mt-3 space-y-2">
+            <p className="text-xs font-black text-slate-700">
+              이 물건을 구매할까요?
+            </p>
+            {assistantDraft.products.map((product) => (
+              <article
+                key={product.id}
+                className="flex gap-3 rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-100"
+              >
+                {product.image ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={product.image}
+                    alt=""
+                    className="h-16 w-16 shrink-0 rounded-xl object-cover"
+                  />
+                ) : (
+                  <div className="grid h-16 w-16 shrink-0 place-items-center rounded-xl bg-white text-[11px] font-black text-slate-400 ring-1 ring-slate-100">
+                    검색
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="line-clamp-2 text-xs font-black leading-5 text-slate-900">
+                    {product.title}
+                  </p>
+                  <p className="mt-1 text-[11px] font-bold text-slate-400">
+                    {product.mallName}
+                    {product.lowestPriceKrw
+                      ? ` · ${product.lowestPriceKrw.toLocaleString("ko-KR")}원`
+                      : ""}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      confirmProductCandidate({
+                        item,
+                        matchedHistory,
+                        selectedProduct: product,
+                      })
+                    }
+                    className="mt-2 rounded-full bg-emerald-600 px-3 py-1.5 text-[11px] font-black text-white"
+                  >
+                    이 물건으로 구매 준비
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+
         <div className="mt-3 flex flex-wrap gap-2">
           <a
             href={searchUrl}
