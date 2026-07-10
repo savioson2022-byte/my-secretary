@@ -69,6 +69,14 @@ iOS 앱은 전원 버튼 두 번, 볼륨 버튼 세 번 같은 물리 버튼 조
   - `mysecretary://settings` -> `/settings`
 - 웹앱 안에 `/app` 페이지를 추가해 TestFlight, App Store Connect, 음성 기록 단축어 설정 흐름을 안내한다.
 
+## 2026-07-11 검증 기록
+
+- Xcode 설치 후 iOS 26.5 시뮬레이터 런타임을 설치했다.
+- `iPhone 17` 시뮬레이터 대상으로 Debug 빌드를 성공했다.
+- 시뮬레이터에 `나의 비서` 앱을 설치하고 실행했다.
+- `mysecretary://voice` URL 스킴이 iOS에서 앱 열기 확인창을 띄우는 것을 확인했다.
+- Swift Package 의존성은 `Package.resolved`에 고정했다.
+
 ## App Store 또는 TestFlight 배포 순서
 
 1. Mac에서 `npm run ios:open`으로 Xcode 프로젝트를 연다.
