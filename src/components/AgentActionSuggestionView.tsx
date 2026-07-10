@@ -95,6 +95,15 @@ export default function AgentActionSuggestionView({
     setMessage("에이전트 준비 항목을 확정했어.");
   }
 
+  function quickHold(item: AssistantItem) {
+    updateItem({
+      ...item,
+      status: "보류",
+      updatedAt: new Date().toISOString(),
+    });
+    setMessage("에이전트 준비 항목을 보류해뒀어.");
+  }
+
   if (agentItems.length === 0) {
     if (compact) return null;
 
@@ -229,11 +238,7 @@ export default function AgentActionSuggestionView({
                 onClick={() =>
                   editingItemId === item.id
                     ? saveDraft(item, "보류")
-                    : updateItem({
-                        ...item,
-                        status: "보류",
-                        updatedAt: new Date().toISOString(),
-                      })
+                    : quickHold(item)
                 }
                 className="rounded-full bg-white px-3 py-1.5 text-xs font-black text-slate-400 ring-1 ring-slate-100"
               >

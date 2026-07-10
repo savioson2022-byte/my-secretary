@@ -27,8 +27,17 @@ function formatDate(date: string) {
   }).format(new Date(date));
 }
 
+function getScheduleText(item: AssistantItem) {
+  if (!item.scheduleStartTime && !item.scheduleEndTime) return null;
+
+  return [item.scheduleStartTime, item.scheduleEndTime]
+    .filter(Boolean)
+    .join(" - ");
+}
+
 export default function ItemCard({ item, onComplete, onDelete }: ItemCardProps) {
   const isDone = item.status === "완료";
+  const scheduleText = getScheduleText(item);
 
   return (
     <article
@@ -64,6 +73,9 @@ export default function ItemCard({ item, onComplete, onDelete }: ItemCardProps) 
         <Badge>{item.repeatType}</Badge>
         <Badge>{item.actionType}</Badge>
         <Badge>중요도 {item.priority}</Badge>
+        {item.ideaGroupTitle && <Badge>묶음 {item.ideaGroupTitle}</Badge>}
+        {item.ideaSubcategory && <Badge>{item.ideaSubcategory}</Badge>}
+        {scheduleText && <Badge>시간 {scheduleText}</Badge>}
         {item.dueDate && <Badge>마감 {item.dueDate}</Badge>}
         {item.reminderDate && <Badge>알림 {item.reminderDate}</Badge>}
       </div>

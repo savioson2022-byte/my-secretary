@@ -79,6 +79,18 @@ function getTodayText() {
   return `${year}-${month}-${date}`;
 }
 
+function getCurrentMinutes() {
+  const now = new Date();
+
+  return now.getHours() * 60 + now.getMinutes();
+}
+
+function getTimeMinutes(timeText: string) {
+  const [hour = "0", minute = "0"] = timeText.split(":");
+
+  return Number(hour) * 60 + Number(minute);
+}
+
 function getDayOfWeekFromDateText(dateText: string): DayOfWeek {
   const dayIndex = new Date(`${dateText}T00:00:00`).getDay();
   const daysByDateIndex: DayOfWeek[] = ["일", "월", "화", "수", "목", "금", "토"];
@@ -94,27 +106,6 @@ function isRoutineActiveOnDate(routine: RoutineSchedule, dateText: string) {
 
   return true;
 }
-
-const previewSchedules = [
-  {
-    time: "10:00",
-    title: "영어 학원",
-    detail: "10:00 - 12:00 · 강남 영어학원",
-    tag: "정기",
-  },
-  {
-    time: "14:30",
-    title: "치과 예약",
-    detail: "14:30 - 15:30 · 인쇄치과",
-    tag: "단기",
-  },
-  {
-    time: "19:00",
-    title: "운동",
-    detail: "19:00 - 20:30 · 헬스장",
-    tag: "정기",
-  },
-];
 
 export default function Home() {
   const [inputText, setInputText] = useState("");
@@ -196,6 +187,46 @@ export default function Home() {
       return a.time.localeCompare(b.time);
     });
   }, [routines, singleSchedules]);
+
+  const nextTodaySchedule = useMemo(() => {
+    const currentMinutes = getCurrentMinutes();
+
+    return (
+      todayScheduleItems.find((schedule) => {
+        return getTimeMinutes(schedule.time) >= currentMinutes;
+      }) ?? todayScheduleItems[0]
+    );
+  }, [todayScheduleItems]);
+
+  const pendingTimeTaskCount = useMemo(() => {
+    return items.filter((item) => {
+      return (
+        item.status === "미완료" &&
+        (item.processType === "시간작업" || item.actionType === "예약")
+      );
+    }).length;
+  }, [items]);
+
+  const pendingAgentCount = useMemo(() => {
+    return items.filter((item) => {
+      return (
+        item.status === "미완료" &&
+        (item.actionType === "구매" || item.actionType === "예약")
+      );
+    }).length;
+  }, [items]);
+
+  const inboxItemCount = useMemo(() => {
+    return items.filter((item) => {
+      return (
+        item.status === "미완료" &&
+        !item.dueDate &&
+        !item.reminderDate &&
+        !item.scheduleStartTime &&
+        item.processType !== "아이디어"
+      );
+    }).length;
+  }, [items]);
 
   const filteredItems = useMemo(() => {
     return items.filter((item) => matchesFilter(item, selectedFilter));
@@ -358,6 +389,66 @@ export default function Home() {
         </header>
 
         <div className="mt-6 space-y-4">
+          <section className="app-card p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-black text-blue-600">오늘 액션</p>
+                <h3 className="mt-1 text-lg font-black text-slate-950">
+                  {nextTodaySchedule
+                    ? `${nextTodaySchedule.time} ${nextTodaySchedule.title}`
+                    : todayItems.length > 0
+                    ? "먼저 확인할 기록이 있어요"
+                    : "바로 기록해도 좋아요"}
+                </h3>
+                <p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-slate-500">
+                  {nextTodaySchedule
+                    ? nextTodaySchedule.detail
+                    : todayItems.length > 0
+                    ? `${todayItems.length}개의 중요한 기록을 오늘 처리하면 좋아요.`
+                    : "생각나는 일을 말하거나 적으면 일정, 할 일, 아이디어로 정리해둘게요."}
+                </p>
+              </div>
+              <Link
+                href="/schedule/manage"
+                className="shrink-0 rounded-full bg-blue-600 px-3 py-2 text-xs font-black text-white shadow-[0_10px_24px_rgba(49,130,246,0.22)]"
+              >
+                일정관리
+              </Link>
+            </div>
+
+            <div className="mt-4 grid grid-cols-4 gap-2">
+              {[
+                ["일정", todayScheduleItems.length, "/calendar/monthly"],
+                ["중요", todayItems.length, "/records"],
+                ["추천", pendingTimeTaskCount, "/calendar/weekly"],
+                ["준비", pendingAgentCount, "/records"],
+              ].map(([label, count, href]) => (
+                <Link
+                  key={label}
+                  href={String(href)}
+                  className="rounded-2xl bg-slate-50 px-2 py-3 text-center ring-1 ring-slate-100"
+                >
+                  <p className="text-base font-black text-slate-950">
+                    {count}
+                  </p>
+                  <p className="mt-0.5 text-[11px] font-black text-slate-400">
+                    {label}
+                  </p>
+                </Link>
+              ))}
+            </div>
+
+            {inboxItemCount > 0 && (
+              <Link
+                href="/records"
+                className="mt-3 flex items-center justify-between rounded-2xl bg-amber-50 px-3 py-2 text-xs font-black text-amber-700 ring-1 ring-amber-100"
+              >
+                <span>분류만 되고 날짜가 없는 기록 {inboxItemCount}개</span>
+                <span>정리하기</span>
+              </Link>
+            )}
+          </section>
+
           <InputBox
             value={inputText}
             onChange={setInputText}
@@ -399,32 +490,37 @@ export default function Home() {
               </div>
 
               <div className="space-y-2">
-                {(todayScheduleItems.length > 0
-                  ? todayScheduleItems.slice(0, 3)
-                  : todayItems.length > 0
-                  ? todayItems.slice(0, 3).map((item) => ({
+                {todayScheduleItems.length === 0 && todayItems.length === 0 ? (
+                  <div className="rounded-2xl bg-slate-50 p-4 text-sm font-semibold leading-6 text-slate-500">
+                    오늘 확정된 일정은 아직 없어요. 떠오른 일을 바로 입력하거나
+                    일정관리에서 시간을 잡아둘 수 있어요.
+                  </div>
+                ) : (
+                  (todayScheduleItems.length > 0
+                    ? todayScheduleItems.slice(0, 3)
+                    : todayItems.slice(0, 3).map((item) => ({
                       time: item.scheduleStartTime ?? item.dueDate ?? "오늘",
                       title: item.title,
                       detail: item.originalText,
                       tag: item.processType,
                     }))
-                  : previewSchedules
-                ).map((schedule) => (
-                  <div key={`${schedule.time}-${schedule.title}`} className="flex items-center gap-3 rounded-2xl bg-white px-3 py-3 ring-1 ring-slate-100">
-                    <span className="w-12 text-sm font-black text-slate-900">{schedule.time}</span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-black text-slate-900">{schedule.title}</p>
-                      <p className="mt-0.5 truncate text-xs font-semibold text-slate-400">{schedule.detail}</p>
+                  ).map((schedule) => (
+                    <div key={`${schedule.time}-${schedule.title}`} className="flex items-center gap-3 rounded-2xl bg-white px-3 py-3 ring-1 ring-slate-100">
+                      <span className="w-12 text-sm font-black text-slate-900">{schedule.time}</span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-black text-slate-900">{schedule.title}</p>
+                        <p className="mt-0.5 truncate text-xs font-semibold text-slate-400">{schedule.detail}</p>
+                      </div>
+                      <span className={`rounded-full px-2 py-1 text-[11px] font-black ${
+                        schedule.tag === "단기" || schedule.tag === "단기일정"
+                          ? "bg-blue-50 text-blue-600"
+                          : "bg-emerald-50 text-emerald-600"
+                      }`}>
+                        {schedule.tag}
+                      </span>
                     </div>
-                    <span className={`rounded-full px-2 py-1 text-[11px] font-black ${
-                      schedule.tag === "단기" || schedule.tag === "단기일정"
-                        ? "bg-blue-50 text-blue-600"
-                        : "bg-emerald-50 text-emerald-600"
-                    }`}>
-                      {schedule.tag}
-                    </span>
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </section>
           )}

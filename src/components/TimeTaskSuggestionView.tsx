@@ -5,7 +5,11 @@ import { suggestTimeTaskSchedules } from "@/lib/taskScheduleSuggestion";
 import { getCloudDataSyncedEventName } from "@/lib/dataSyncEvents";
 import { getLocalDataUpdatedEventName } from "@/lib/localStorageRepository";
 import { getSavedPlaces } from "@/lib/placeStorage";
-import { saveSingleSchedule } from "@/lib/singleScheduleStorage";
+import {
+  getSingleSchedules,
+  saveSingleSchedule,
+  updateSingleSchedule,
+} from "@/lib/singleScheduleStorage";
 import {
   getSuggestionFeedbacks,
   saveSuggestionFeedbackForSuggestion,
@@ -159,7 +163,7 @@ export default function TimeTaskSuggestionView({
 
     const now = new Date().toISOString();
 
-    saveSingleSchedule({
+    const nextSchedule: SingleSchedule = {
       id: createId(),
       title,
       date,
@@ -171,7 +175,20 @@ export default function TimeTaskSuggestionView({
       sourceItemId: suggestion.itemId,
       createdAt: now,
       updatedAt: now,
+    };
+    const existingSchedule = getSingleSchedules().find((schedule) => {
+      return schedule.sourceItemId === suggestion.itemId;
     });
+
+    if (existingSchedule) {
+      updateSingleSchedule({
+        ...nextSchedule,
+        id: existingSchedule.id,
+        createdAt: existingSchedule.createdAt,
+      });
+    } else {
+      saveSingleSchedule(nextSchedule);
+    }
 
     if (sourceItem) {
       updateItem({
@@ -186,7 +203,11 @@ export default function TimeTaskSuggestionView({
     }
 
     setEditingSuggestionId(null);
-    setFeedbackMessage("추천을 확정해서 단기 일정에 저장했어.");
+    setFeedbackMessage(
+      existingSchedule
+        ? "기존 단기 일정을 추천한 시간으로 수정했어."
+        : "추천을 확정해서 단기 일정에 저장했어."
+    );
   }
 
   function getCurrentFeedback(suggestion: (typeof suggestions)[number]) {
