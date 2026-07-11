@@ -76,6 +76,14 @@ iOS 앱은 전원 버튼 두 번, 볼륨 버튼 세 번 같은 물리 버튼 조
 - 시뮬레이터에 `나의 비서` 앱을 설치하고 실행했다.
 - `mysecretary://voice` URL 스킴이 iOS에서 앱 열기 확인창을 띄우는 것을 확인했다.
 - Swift Package 의존성은 `Package.resolved`에 고정했다.
+- 실제 iOS 기기용 SDK 컴파일을 확인했다.
+  - `CODE_SIGNING_ALLOWED=NO` 상태의 generic iOS Debug 빌드 성공
+  - `CODE_SIGNING_ALLOWED=NO` 상태의 Release Archive 성공
+- 서명 포함 빌드는 Development Team이 없어 실패했다.
+  - Xcode 오류: `Signing for "App" requires a development team.`
+  - 키체인 확인 결과 Apple 개발 서명 인증서 0개
+  - 로컬 프로비저닝 프로파일 없음
+- 따라서 현재 남은 작업은 코드 수정이 아니라 Apple Developer Team 연결이다.
 
 ## App Store 또는 TestFlight 배포 순서
 
