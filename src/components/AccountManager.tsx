@@ -437,41 +437,51 @@ export default function AccountManager() {
   async function handlePasswordLogin() {
     if (!supabase) return;
 
-    const nextLoginId = normalizeLoginId(loginId);
+    const loginIdentifier = loginId.trim();
+    const nextLoginId = normalizeLoginId(loginIdentifier);
+    const fallbackEmail = signupEmail.trim().toLowerCase();
 
-    if (!nextLoginId || !password) {
-      setMessage("아이디와 비밀번호를 입력해주세요.");
+    if (!loginIdentifier || !password) {
+      setMessage("아이디 또는 이메일과 비밀번호를 입력해주세요.");
       return;
     }
 
     setIsSaving(true);
     setMessage(null);
 
-    const { data: emailData, error: lookupError } = await supabase.rpc(
-      "resolve_app_login_email",
-      {
-        login_id_input: nextLoginId,
-      }
-    );
+    let loginEmail = loginIdentifier.includes("@")
+      ? loginIdentifier.toLowerCase()
+      : "";
 
-    if (lookupError) {
-      setIsSaving(false);
-      setMessage(
-        "통합계정 DB 적용이 필요합니다. Supabase SQL Editor에 새 마이그레이션을 먼저 실행해주세요."
+    if (!loginEmail) {
+      const { data: emailData, error: lookupError } = await supabase.rpc(
+        "resolve_app_login_email",
+        {
+          login_id_input: nextLoginId,
+        }
       );
-      return;
-    }
 
-    const loginEmail =
-      typeof emailData === "string" && emailData.trim()
-        ? emailData.trim()
-        : nextLoginId.includes("@")
-          ? nextLoginId
-          : "";
+      if (lookupError) {
+        setIsSaving(false);
+        setMessage(
+          "통합계정 DB 적용이 필요합니다. Supabase SQL Editor에 새 마이그레이션을 먼저 실행해주세요."
+        );
+        return;
+      }
+
+      loginEmail =
+        typeof emailData === "string" && emailData.trim()
+          ? emailData.trim()
+          : fallbackEmail.includes("@")
+            ? fallbackEmail
+            : "";
+    }
 
     if (!loginEmail) {
       setIsSaving(false);
-      setMessage("해당 아이디를 찾지 못했습니다. 이메일 인증을 먼저 완료했는지 확인해주세요.");
+      setMessage(
+        "아이디 연결을 아직 찾지 못했습니다. 처음 한 번은 아이디 칸에 가입 이메일을 넣고 로그인해주세요."
+      );
       return;
     }
 
@@ -491,10 +501,13 @@ export default function AccountManager() {
     setUser(nextUser);
 
     if (nextUser) {
-      await ensureProfileAndDevice(nextUser, nextLoginId.includes("@") ? undefined : nextLoginId);
+      await ensureProfileAndDevice(
+        nextUser,
+        loginIdentifier.includes("@") ? getLoginIdFromUser(nextUser) ?? undefined : nextLoginId
+      );
     }
 
-    setMessage("로그인했습니다.");
+    setMessage("로그인했습니다. 이 기기와 통합계정 연결도 확인했습니다.");
   }
 
   async function handleSignOut() {
@@ -658,8 +671,8 @@ export default function AccountManager() {
             {authMode === "signup" ? "통합계정 만들기" : "아이디로 로그인"}
           </h2>
           <p className="mt-2 text-sm leading-6 text-slate-300">
-            앱 안에서는 아이디와 비밀번호로 로그인합니다. 인증 이메일은 처음
-            계정을 만들 때만 사용합니다.
+            앱 안에서는 아이디와 비밀번호로 로그인합니다. 아이디 연결 전에는
+            가입 이메일로도 로그인할 수 있습니다.
           </p>
         </div>
 
@@ -683,13 +696,19 @@ export default function AccountManager() {
 
           <div className="mt-5 space-y-3">
             <label className="block">
-              <span className="text-xs font-black text-slate-500">아이디</span>
+              <span className="text-xs font-black text-slate-500">
+                {authMode === "signup" ? "아이디" : "아이디 또는 이메일"}
+              </span>
               <input
                 value={loginId}
                 onChange={(event) => setLoginId(event.target.value)}
                 autoCapitalize="none"
                 autoComplete="username"
-                placeholder="예: mysecretary"
+                placeholder={
+                  authMode === "signup"
+                    ? "예: mysecretary"
+                    : "아이디 또는 가입 이메일"
+                }
                 className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold outline-none focus:border-blue-400"
               />
             </label>
