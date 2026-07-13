@@ -1,12 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Capacitor } from "@capacitor/core";
 import type { User } from "@supabase/supabase-js";
 import DeviceProfileCard from "@/components/DeviceProfileCard";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import {
-  getSupabaseBrowserConfig,
   isSupabaseConfigured,
 } from "@/lib/supabase/config";
 import { ensureUnifiedAccount } from "@/lib/unifiedAccount";
@@ -15,8 +13,6 @@ import { RegisteredDevice, UserProfileRecord } from "@/types/device";
 import { UserProfile } from "@/types/userProfile";
 import { TravelMode } from "@/types/calendar";
 import type { UnifiedAccountState } from "@/types/unifiedAccount";
-
-type OAuthProvider = "google" | "apple" | "kakao";
 
 const TRAVEL_MODE_OPTIONS: Array<{ value: TravelMode; label: string }> = [
   { value: "walk", label: "도보" },
@@ -31,46 +27,6 @@ const ENERGY_PATTERN_OPTIONS: Array<{
   { value: "morning", label: "오전형" },
   { value: "balanced", label: "균형형" },
   { value: "night", label: "저녁형" },
-];
-
-const OAUTH_PROVIDERS: Array<{
-  provider: OAuthProvider | "naver";
-  label: string;
-  setupLabel?: string;
-  bgClassName: string;
-  textClassName: string;
-  enabled: boolean;
-}> = [
-  {
-    provider: "kakao",
-    label: "카카오로 계속하기",
-    bgClassName: "bg-[#FEE500]",
-    textClassName: "text-[#191919]",
-    enabled: true,
-  },
-  {
-    provider: "google",
-    label: "Google로 계속하기",
-    setupLabel: "Google 설정 필요",
-    bgClassName: "bg-white ring-1 ring-slate-200",
-    textClassName: "text-slate-800",
-    enabled: true,
-  },
-  {
-    provider: "apple",
-    label: "Apple로 계속하기",
-    setupLabel: "Apple 설정 필요",
-    bgClassName: "bg-slate-950",
-    textClassName: "text-white",
-    enabled: true,
-  },
-  {
-    provider: "naver",
-    label: "네이버는 설정 준비 중",
-    bgClassName: "bg-[#03C75A]",
-    textClassName: "text-white",
-    enabled: false,
-  },
 ];
 
 function detectDeviceType() {
@@ -117,22 +73,29 @@ function getInitial(name: string) {
   return name.trim().slice(0, 1).toUpperCase() || "나";
 }
 
-function getAuthRedirectUrl() {
+function getEmailConfirmationUrl() {
   const callbackUrl = new URL("/auth/callback", window.location.origin);
   callbackUrl.searchParams.set("next", window.location.pathname || "/account");
 
   return callbackUrl.toString();
 }
 
-function getKakaoAuthStartUrl() {
-  const startUrl = new URL("/api/auth/kakao/start", window.location.origin);
-  startUrl.searchParams.set("next", window.location.pathname || "/account");
+function normalizeLoginId(loginId: string) {
+  return loginId.trim().toLowerCase();
+}
 
-  if (Capacitor.isNativePlatform()) {
-    startUrl.searchParams.set("native", "1");
+function isValidLoginId(loginId: string) {
+  return /^[a-z0-9_]{4,24}$/.test(normalizeLoginId(loginId));
+}
+
+function getLoginIdFromUser(user: User) {
+  const loginId = user.user_metadata?.login_id;
+
+  if (typeof loginId === "string" && loginId.trim()) {
+    return normalizeLoginId(loginId);
   }
 
-  return startUrl.toString();
+  return null;
 }
 
 export default function AccountManager() {
@@ -140,16 +103,15 @@ export default function AccountManager() {
   const configured = isSupabaseConfigured();
 
   const [user, setUser] = useState<User | null>(null);
-  const [email, setEmail] = useState("");
-  const [otpCode, setOtpCode] = useState("");
   const [authMode, setAuthMode] = useState<"signup" | "login">("signup");
-  const [otpSent, setOtpSent] = useState(false);
+  const [loginId, setLoginId] = useState("");
+  const [signupEmail, setSignupEmail] = useState("");
+  const [signupName, setSignupName] = useState("");
+  const [password, setPassword] = useState("");
+  const [passwordConfirm, setPasswordConfirm] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [oauthProviderStatus, setOauthProviderStatus] = useState<
-    Partial<Record<OAuthProvider, boolean>>
-  >({});
 
   const [displayName, setDisplayName] = useState("");
   const [classificationPreference, setClassificationPreference] = useState("");
@@ -227,31 +189,6 @@ export default function AccountManager() {
     }
 
     const client = supabase;
-    const config = getSupabaseBrowserConfig();
-
-    async function loadOAuthProviderStatus() {
-      if (!config) return;
-
-      try {
-        const response = await fetch(`${config.url}/auth/v1/settings`, {
-          headers: {
-            apikey: config.publishableKey,
-          },
-        });
-        const data = (await response.json()) as {
-          external?: Partial<Record<OAuthProvider, boolean>>;
-        };
-
-        setOauthProviderStatus({
-          apple: data.external?.apple,
-          google: data.external?.google,
-          kakao: data.external?.kakao,
-        });
-      } catch {
-        setOauthProviderStatus({});
-      }
-    }
-
     async function loadAuthState() {
       const { data: sessionData } = await client.auth.getSession();
       const sessionUser = sessionData.session?.user ?? null;
@@ -274,7 +211,6 @@ export default function AccountManager() {
     }
 
     loadAuthState();
-    loadOAuthProviderStatus();
 
     const { data: listener } = client.auth.onAuthStateChange(
       async (_event, session) => {
@@ -321,16 +257,18 @@ export default function AccountManager() {
     setDevices((nextDevices as RegisteredDevice[] | null) ?? []);
   }
 
-  async function ensureProfileAndDevice(nextUser: User) {
+  async function ensureProfileAndDevice(nextUser: User, nextLoginId?: string) {
     if (!supabase) return;
 
     const defaultName = getUserDisplayName(nextUser, "");
     const now = new Date().toISOString();
+    const accountLoginId = nextLoginId ?? getLoginIdFromUser(nextUser) ?? undefined;
 
     try {
       const nextUnifiedAccount = await ensureUnifiedAccount({
         supabase,
         user: nextUser,
+        loginId: accountLoginId,
       });
       setUnifiedAccount(nextUnifiedAccount);
       setUnifiedAccountMessage(null);
@@ -400,45 +338,46 @@ export default function AccountManager() {
     await loadProfileAndDevices(nextUser.id);
   }
 
-  async function handleSendLoginLink() {
-    if (!supabase || !email.trim()) return;
+  async function handlePasswordSignup() {
+    if (!supabase) return;
 
-    setIsSaving(true);
-    setMessage(null);
+    const nextLoginId = normalizeLoginId(loginId);
+    const nextEmail = signupEmail.trim().toLowerCase();
+    const nextName = signupName.trim();
 
-    const { error } = await supabase.auth.signInWithOtp({
-      email: email.trim(),
-      options: {
-        shouldCreateUser: authMode === "signup",
-        emailRedirectTo: getAuthRedirectUrl(),
-      },
-    });
-
-    setIsSaving(false);
-
-    if (error) {
-      setMessage(error.message);
+    if (!isValidLoginId(nextLoginId)) {
+      setMessage("아이디는 영문 소문자, 숫자, 밑줄로 4-24자까지 사용할 수 있습니다.");
       return;
     }
 
-    setOtpSent(true);
-    setMessage(
-      authMode === "signup"
-        ? "회원가입 확인 메일을 보냈습니다. 이메일의 링크를 열거나 6자리 코드를 입력해주세요."
-        : "로그인 메일을 보냈습니다. 이메일의 링크를 열거나 6자리 코드를 입력해주세요."
-    );
-  }
+    if (!nextEmail || !nextEmail.includes("@")) {
+      setMessage("인증 이메일을 정확히 입력해주세요.");
+      return;
+    }
 
-  async function handleVerifyOtpCode() {
-    if (!supabase || !email.trim() || !otpCode.trim()) return;
+    if (password.length < 8) {
+      setMessage("비밀번호는 8자 이상으로 만들어주세요.");
+      return;
+    }
+
+    if (password !== passwordConfirm) {
+      setMessage("비밀번호 확인이 서로 다릅니다.");
+      return;
+    }
 
     setIsSaving(true);
     setMessage(null);
 
-    const { data, error } = await supabase.auth.verifyOtp({
-      email: email.trim(),
-      token: otpCode.trim().replace(/\s/g, ""),
-      type: "email",
+    const { data, error } = await supabase.auth.signUp({
+      email: nextEmail,
+      password,
+      options: {
+        emailRedirectTo: getEmailConfirmationUrl(),
+        data: {
+          login_id: nextLoginId,
+          display_name: nextName || nextLoginId,
+        },
+      },
     });
 
     setIsSaving(false);
@@ -452,37 +391,77 @@ export default function AccountManager() {
     setUser(nextUser);
 
     if (nextUser) {
-      await ensureProfileAndDevice(nextUser);
+      await ensureProfileAndDevice(nextUser, nextLoginId);
     }
 
-    setOtpCode("");
-    setOtpSent(false);
-    setMessage("로그인했습니다.");
+    setMessage(
+      data.session
+        ? "회원가입과 로그인이 완료됐습니다."
+        : "인증 메일을 보냈습니다. 메일 확인 후 이 아이디와 비밀번호로 로그인하세요."
+    );
   }
 
-  async function handleOAuthLogin(provider: OAuthProvider) {
+  async function handlePasswordLogin() {
     if (!supabase) return;
+
+    const nextLoginId = normalizeLoginId(loginId);
+
+    if (!nextLoginId || !password) {
+      setMessage("아이디와 비밀번호를 입력해주세요.");
+      return;
+    }
 
     setIsSaving(true);
     setMessage(null);
 
-    if (provider === "kakao") {
-      window.location.href = getKakaoAuthStartUrl();
+    const { data: emailData, error: lookupError } = await supabase.rpc(
+      "resolve_app_login_email",
+      {
+        login_id_input: nextLoginId,
+      }
+    );
+
+    if (lookupError) {
+      setIsSaving(false);
+      setMessage(
+        "통합계정 DB 적용이 필요합니다. Supabase SQL Editor에 새 마이그레이션을 먼저 실행해주세요."
+      );
       return;
     }
 
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider,
-      options: {
-        redirectTo: getAuthRedirectUrl(),
-      },
+    const loginEmail =
+      typeof emailData === "string" && emailData.trim()
+        ? emailData.trim()
+        : nextLoginId.includes("@")
+          ? nextLoginId
+          : "";
+
+    if (!loginEmail) {
+      setIsSaving(false);
+      setMessage("해당 아이디를 찾지 못했습니다. 이메일 인증을 먼저 완료했는지 확인해주세요.");
+      return;
+    }
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: loginEmail,
+      password,
     });
 
     setIsSaving(false);
 
     if (error) {
       setMessage(error.message);
+      return;
     }
+
+    const nextUser = data.user ?? data.session?.user ?? null;
+    setUser(nextUser);
+
+    if (nextUser) {
+      await ensureProfileAndDevice(nextUser, nextLoginId.includes("@") ? undefined : nextLoginId);
+    }
+
+    setMessage("로그인했습니다.");
   }
 
   async function handleSignOut() {
@@ -643,10 +622,11 @@ export default function AccountManager() {
         <div className="bg-gradient-to-br from-slate-950 to-slate-800 p-5 text-white">
           <p className="text-sm font-black text-blue-200">나의 비서 계정</p>
           <h2 className="mt-2 text-2xl font-black tracking-tight">
-            {authMode === "signup" ? "회원가입" : "로그인"}
+            {authMode === "signup" ? "통합계정 만들기" : "아이디로 로그인"}
           </h2>
           <p className="mt-2 text-sm leading-6 text-slate-300">
-            한 번 로그인하면 같은 계정의 기기들이 같은 사용자로 연결됩니다.
+            앱 안에서는 아이디와 비밀번호로 로그인합니다. 인증 이메일은 처음
+            계정을 만들 때만 사용합니다.
           </p>
         </div>
 
@@ -668,88 +648,121 @@ export default function AccountManager() {
             ))}
           </div>
 
-          <div className="mt-4 space-y-2">
-            {OAUTH_PROVIDERS.map((item) => {
-              const providerStatus =
-                item.provider === "naver"
-                  ? false
-                  : oauthProviderStatus[item.provider];
-              const isProviderEnabled =
-                item.enabled && providerStatus !== false;
+          <div className="mt-5 space-y-3">
+            <label className="block">
+              <span className="text-xs font-black text-slate-500">아이디</span>
+              <input
+                value={loginId}
+                onChange={(event) => setLoginId(event.target.value)}
+                autoCapitalize="none"
+                autoComplete="username"
+                placeholder="예: mysecretary"
+                className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold outline-none focus:border-blue-400"
+              />
+            </label>
 
-              return (
-                <button
-                  key={item.provider}
-                  type="button"
-                  onClick={() => {
-                    if (isProviderEnabled) {
-                      handleOAuthLogin(item.provider as OAuthProvider);
-                    }
-                  }}
-                  disabled={!isProviderEnabled || isSaving}
-                  className={`flex w-full items-center justify-center rounded-2xl px-4 py-3 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-55 ${item.bgClassName} ${item.textClassName}`}
-                >
-                  {isProviderEnabled
-                    ? item.label
-                    : item.setupLabel ?? item.label}
-                </button>
-              );
-            })}
-          </div>
+            {authMode === "signup" && (
+              <>
+                <label className="block">
+                  <span className="text-xs font-black text-slate-500">
+                    인증 이메일
+                  </span>
+                  <input
+                    value={signupEmail}
+                    onChange={(event) => setSignupEmail(event.target.value)}
+                    autoCapitalize="none"
+                    autoComplete="email"
+                    placeholder="이메일 확인용"
+                    className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold outline-none focus:border-blue-400"
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-xs font-black text-slate-500">
+                    이름 또는 별명
+                  </span>
+                  <input
+                    value={signupName}
+                    onChange={(event) => setSignupName(event.target.value)}
+                    autoComplete="name"
+                    placeholder="프로필에 표시할 이름"
+                    className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold outline-none focus:border-blue-400"
+                  />
+                </label>
+              </>
+            )}
 
-          <div className="my-5 flex items-center gap-3">
-            <span className="h-px flex-1 bg-slate-100" />
-            <span className="text-xs font-black text-slate-300">또는</span>
-            <span className="h-px flex-1 bg-slate-100" />
-          </div>
+            <label className="block">
+              <span className="text-xs font-black text-slate-500">
+                비밀번호
+              </span>
+              <input
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                type="password"
+                autoComplete={
+                  authMode === "signup" ? "new-password" : "current-password"
+                }
+                placeholder="8자 이상"
+                className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold outline-none focus:border-blue-400"
+              />
+            </label>
 
-          <div className="space-y-3">
-            <input
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="이메일"
-              className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold outline-none focus:border-blue-400"
-            />
+            {authMode === "signup" && (
+              <label className="block">
+                <span className="text-xs font-black text-slate-500">
+                  비밀번호 확인
+                </span>
+                <input
+                  value={passwordConfirm}
+                  onChange={(event) => setPasswordConfirm(event.target.value)}
+                  type="password"
+                  autoComplete="new-password"
+                  placeholder="한 번 더 입력"
+                  className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold outline-none focus:border-blue-400"
+                />
+              </label>
+            )}
+
             <button
               type="button"
-              onClick={handleSendLoginLink}
-              disabled={isSaving || !email.trim()}
+              onClick={
+                authMode === "signup"
+                  ? handlePasswordSignup
+                  : handlePasswordLogin
+              }
+              disabled={
+                isSaving ||
+                !loginId.trim() ||
+                !password.trim() ||
+                (authMode === "signup" &&
+                  (!signupEmail.trim() || !passwordConfirm.trim()))
+              }
               className="w-full rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white transition hover:bg-blue-500 disabled:bg-slate-300"
             >
-              {authMode === "signup"
-                ? "이메일로 회원가입"
-                : "로그인 메일 받기"}
+              {authMode === "signup" ? "통합계정 만들기" : "로그인"}
             </button>
+          </div>
 
-            {otpSent && (
-              <div className="rounded-3xl bg-slate-50 p-3 ring-1 ring-slate-100">
-                <label className="text-xs font-black text-slate-500">
-                  이메일 6자리 코드
-                </label>
-                <div className="mt-2 flex gap-2">
-                  <input
-                    value={otpCode}
-                    onChange={(event) => setOtpCode(event.target.value)}
-                    inputMode="numeric"
-                    autoComplete="one-time-code"
-                    placeholder="123456"
-                    className="min-w-0 flex-1 rounded-2xl border border-slate-200 px-4 py-3 text-center text-lg font-black tracking-[0.25em] outline-none focus:border-blue-400"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleVerifyOtpCode}
-                    disabled={isSaving || !otpCode.trim()}
-                    className="shrink-0 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white transition hover:bg-slate-700 disabled:bg-slate-300"
-                  >
-                    확인
-                  </button>
-                </div>
-                <p className="mt-2 text-xs font-semibold leading-5 text-slate-500">
-                  앱에서는 이메일 링크 대신 코드를 입력하는 방식이 가장
-                  안정적입니다.
-                </p>
-              </div>
-            )}
+          <div className="mt-4 rounded-3xl bg-slate-50 p-4 ring-1 ring-slate-100">
+            <p className="text-xs font-black text-slate-500">
+              카카오, 네이버, Google로 시작하기
+            </p>
+            <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
+              다음 단계에서 이 버튼들은 이메일 인증을 줄이는 용도로만 다시
+              연결합니다. 최종 로그인 기준은 지금 만든 앱 아이디입니다.
+            </p>
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              {["카카오", "네이버", "Google"].map((label) => (
+                <button
+                  key={label}
+                  type="button"
+                  disabled
+                  className="rounded-2xl bg-white px-3 py-3 text-xs font-black text-slate-400 ring-1 ring-slate-100"
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {message && (

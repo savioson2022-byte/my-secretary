@@ -1,6 +1,7 @@
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import type {
   AccountIdentity,
+  AppLoginCredential,
   AppAccount,
   UnifiedAccountState,
 } from "@/types/unifiedAccount";
@@ -42,15 +43,43 @@ function getProviderSubject(user: User, provider: string) {
 export async function ensureUnifiedAccount({
   supabase,
   user,
+  loginId,
 }: {
   supabase: SupabaseClient;
   user: User;
+  loginId?: string;
 }): Promise<UnifiedAccountState | null> {
   const provider = getProvider(user);
   const providerSubject = getProviderSubject(user, provider);
   const displayName = getUserDisplayName(user);
   const email = user.email ?? "";
   const now = new Date().toISOString();
+  const normalizedLoginId = loginId?.trim() || null;
+
+  async function upsertLoginCredential(account: AppAccount) {
+    if (!normalizedLoginId || !email) return;
+
+    const { error } = await supabase
+      .from("app_login_credentials")
+      .upsert(
+        {
+          app_account_id: account.id,
+          auth_user_id: user.id,
+          login_id: normalizedLoginId,
+          email,
+          updated_at: now,
+        },
+        {
+          onConflict: "auth_user_id",
+        }
+      )
+      .select()
+      .single<AppLoginCredential>();
+
+    if (error) {
+      throw error;
+    }
+  }
 
   const { data: existingIdentity, error: identityError } = await supabase
     .from("account_identities")
@@ -91,6 +120,29 @@ export async function ensureUnifiedAccount({
       throw updateError;
     }
 
+    if (account && normalizedLoginId && account.login_id !== normalizedLoginId) {
+      const { data: updatedAccount, error: accountUpdateError } = await supabase
+        .from("app_accounts")
+        .update({
+          login_id: normalizedLoginId,
+          updated_at: now,
+        })
+        .eq("id", account.id)
+        .select()
+        .single<AppAccount>();
+
+      if (accountUpdateError) {
+        throw accountUpdateError;
+      }
+
+      await upsertLoginCredential(updatedAccount);
+      return identity ? { account: updatedAccount, identity } : null;
+    }
+
+    if (account) {
+      await upsertLoginCredential(account);
+    }
+
     return account && identity ? { account, identity } : null;
   }
 
@@ -98,6 +150,7 @@ export async function ensureUnifiedAccount({
     .from("app_accounts")
     .insert({
       primary_auth_user_id: user.id,
+      login_id: normalizedLoginId,
       display_name: displayName,
       primary_email: email,
       status: "active",
@@ -128,6 +181,8 @@ export async function ensureUnifiedAccount({
   if (identityInsertError) {
     throw identityInsertError;
   }
+
+  await upsertLoginCredential(account);
 
   return { account, identity };
 }
