@@ -118,15 +118,8 @@ function getInitial(name: string) {
 }
 
 function getAuthRedirectUrl() {
-  if (Capacitor.isNativePlatform()) {
-    const callbackUrl = new URL("/auth/callback", window.location.origin);
-    callbackUrl.searchParams.set("next", "/auth/native-handoff");
-
-    return callbackUrl.toString();
-  }
-
   const callbackUrl = new URL("/auth/callback", window.location.origin);
-  callbackUrl.searchParams.set("next", window.location.pathname || "/settings");
+  callbackUrl.searchParams.set("next", window.location.pathname || "/account");
 
   return callbackUrl.toString();
 }
@@ -148,7 +141,9 @@ export default function AccountManager() {
 
   const [user, setUser] = useState<User | null>(null);
   const [email, setEmail] = useState("");
+  const [otpCode, setOtpCode] = useState("");
   const [authMode, setAuthMode] = useState<"signup" | "login">("signup");
+  const [otpSent, setOtpSent] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -426,11 +421,43 @@ export default function AccountManager() {
       return;
     }
 
+    setOtpSent(true);
     setMessage(
       authMode === "signup"
-        ? "회원가입 확인 링크를 이메일로 보냈습니다. 같은 기기에서 링크를 열어주세요."
-        : "로그인 링크를 이메일로 보냈습니다. 같은 기기에서 링크를 열어주세요."
+        ? "회원가입 확인 메일을 보냈습니다. 이메일의 링크를 열거나 6자리 코드를 입력해주세요."
+        : "로그인 메일을 보냈습니다. 이메일의 링크를 열거나 6자리 코드를 입력해주세요."
     );
+  }
+
+  async function handleVerifyOtpCode() {
+    if (!supabase || !email.trim() || !otpCode.trim()) return;
+
+    setIsSaving(true);
+    setMessage(null);
+
+    const { data, error } = await supabase.auth.verifyOtp({
+      email: email.trim(),
+      token: otpCode.trim().replace(/\s/g, ""),
+      type: "email",
+    });
+
+    setIsSaving(false);
+
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+
+    const nextUser = data.user ?? data.session?.user ?? null;
+    setUser(nextUser);
+
+    if (nextUser) {
+      await ensureProfileAndDevice(nextUser);
+    }
+
+    setOtpCode("");
+    setOtpSent(false);
+    setMessage("로그인했습니다.");
   }
 
   async function handleOAuthLogin(provider: OAuthProvider) {
@@ -689,8 +716,40 @@ export default function AccountManager() {
               disabled={isSaving || !email.trim()}
               className="w-full rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white transition hover:bg-blue-500 disabled:bg-slate-300"
             >
-              {authMode === "signup" ? "이메일로 회원가입" : "로그인 링크 받기"}
+              {authMode === "signup"
+                ? "이메일로 회원가입"
+                : "로그인 메일 받기"}
             </button>
+
+            {otpSent && (
+              <div className="rounded-3xl bg-slate-50 p-3 ring-1 ring-slate-100">
+                <label className="text-xs font-black text-slate-500">
+                  이메일 6자리 코드
+                </label>
+                <div className="mt-2 flex gap-2">
+                  <input
+                    value={otpCode}
+                    onChange={(event) => setOtpCode(event.target.value)}
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    placeholder="123456"
+                    className="min-w-0 flex-1 rounded-2xl border border-slate-200 px-4 py-3 text-center text-lg font-black tracking-[0.25em] outline-none focus:border-blue-400"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleVerifyOtpCode}
+                    disabled={isSaving || !otpCode.trim()}
+                    className="shrink-0 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white transition hover:bg-slate-700 disabled:bg-slate-300"
+                  >
+                    확인
+                  </button>
+                </div>
+                <p className="mt-2 text-xs font-semibold leading-5 text-slate-500">
+                  앱에서는 이메일 링크 대신 코드를 입력하는 방식이 가장
+                  안정적입니다.
+                </p>
+              </div>
+            )}
           </div>
 
           {message && (
