@@ -26,7 +26,7 @@ export default function WeeklyCalendarPage() {
   }, []);
 
   return (
-    <main className="mx-auto min-h-screen max-w-5xl px-4 py-8">
+    <main className="app-page mx-auto max-w-5xl px-4">
       <div className="phone-shell overflow-hidden p-4 md:p-6">
         <div className="flex items-center justify-between px-1 pb-5 pt-1 text-xs font-black text-slate-900">
           <span>9:41</span>

@@ -47,7 +47,7 @@ export default function MonthlyCalendarPage() {
   }, []);
 
   return (
-    <main className="mx-auto min-h-screen max-w-[720px] bg-white px-3 py-4 sm:bg-transparent sm:px-4 sm:py-8">
+    <main className="app-page mx-auto max-w-[720px] bg-white px-3 sm:bg-transparent sm:px-4">
       <div className="min-h-screen bg-white pb-2 sm:phone-shell sm:min-h-0 sm:overflow-hidden sm:p-4">
         <div className="flex items-center justify-between px-1 pb-5 pt-1 text-xs font-black text-slate-900">
           <span>9:41</span>

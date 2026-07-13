@@ -78,7 +78,7 @@ export default function BottomNavigation() {
       </nav>
       <div
         aria-hidden="true"
-        className="h-[calc(5.5rem+env(safe-area-inset-bottom))]"
+        className="h-[var(--app-bottom-nav-height)]"
       />
     </>
   );

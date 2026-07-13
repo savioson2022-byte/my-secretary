@@ -30,6 +30,7 @@ const ENERGY_PATTERN_OPTIONS: Array<{
 ];
 
 const LOCAL_APP_SESSION_KEY = "my-secretary-local-app-session";
+const LOCAL_APP_SESSION_CHANGED_EVENT = "my-secretary-local-app-session-changed";
 
 type LocalAppSession = {
   id: string;
@@ -152,11 +153,13 @@ function getStoredLocalSession() {
 
 function saveLocalSession(session: LocalAppSession) {
   window.localStorage.setItem(LOCAL_APP_SESSION_KEY, JSON.stringify(session));
+  window.dispatchEvent(new Event(LOCAL_APP_SESSION_CHANGED_EVENT));
 }
 
 function clearLocalSession() {
   if (typeof window !== "undefined") {
     window.localStorage.removeItem(LOCAL_APP_SESSION_KEY);
+    window.dispatchEvent(new Event(LOCAL_APP_SESSION_CHANGED_EVENT));
   }
 }
 
