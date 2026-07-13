@@ -77,6 +77,18 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
 
         switch target {
+        case "auth/callback":
+            var path = "/auth/callback"
+            if let query = url.query, !query.isEmpty {
+                path += "?\(query)"
+            }
+            openWebPath(path)
+        case "auth/session":
+            var path = "/auth/native-callback"
+            if let fragment = url.fragment, !fragment.isEmpty {
+                path += "#\(fragment)"
+            }
+            openWebPath(path)
         case "voice", "record", "memo":
             openWebPath("/?voice=1")
         case "today", "":

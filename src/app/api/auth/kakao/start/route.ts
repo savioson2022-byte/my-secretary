@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 const KAKAO_AUTHORIZE_URL = "https://kauth.kakao.com/oauth/authorize";
 const STATE_COOKIE = "kakao_oauth_state";
 const NEXT_COOKIE = "kakao_oauth_next";
+const NATIVE_COOKIE = "kakao_oauth_native";
 
 function getSafeNextPath(value: string | null) {
   if (!value || !value.startsWith("/") || value.startsWith("//")) {
@@ -22,6 +23,7 @@ function isHttps(request: NextRequest) {
 export async function GET(request: NextRequest) {
   const kakaoRestApiKey = process.env.KAKAO_REST_API_KEY;
   const nextPath = getSafeNextPath(request.nextUrl.searchParams.get("next"));
+  const isNative = request.nextUrl.searchParams.get("native") === "1";
 
   if (!kakaoRestApiKey) {
     const redirectUrl = new URL("/account", request.url);
@@ -53,6 +55,13 @@ export async function GET(request: NextRequest) {
     secure,
   });
   response.cookies.set(NEXT_COOKIE, nextPath, {
+    httpOnly: true,
+    maxAge: 600,
+    path: "/",
+    sameSite: "lax",
+    secure,
+  });
+  response.cookies.set(NATIVE_COOKIE, isNative ? "1" : "0", {
     httpOnly: true,
     maxAge: 600,
     path: "/",

@@ -5,6 +5,7 @@ import { getSupabaseBrowserConfig } from "@/lib/supabase/config";
 const KAKAO_TOKEN_URL = "https://kauth.kakao.com/oauth/token";
 const STATE_COOKIE = "kakao_oauth_state";
 const NEXT_COOKIE = "kakao_oauth_next";
+const NATIVE_COOKIE = "kakao_oauth_native";
 
 function getSafeNextPath(value: string | undefined) {
   if (!value || !value.startsWith("/") || value.startsWith("//")) {
@@ -32,6 +33,7 @@ export async function GET(request: NextRequest) {
   const state = request.nextUrl.searchParams.get("state");
   const storedState = request.cookies.get(STATE_COOKIE)?.value;
   const nextPath = getSafeNextPath(request.cookies.get(NEXT_COOKIE)?.value);
+  const isNative = request.cookies.get(NATIVE_COOKIE)?.value === "1";
 
   if (!config) {
     return redirectWithError(
@@ -110,7 +112,7 @@ export async function GET(request: NextRequest) {
     },
   });
 
-  const { error } = await supabase.auth.signInWithIdToken({
+  const { data, error } = await supabase.auth.signInWithIdToken({
     provider: "kakao",
     token: tokenData.id_token,
   });
@@ -125,8 +127,20 @@ export async function GET(request: NextRequest) {
     response = redirectWithError(request, error.message);
   }
 
+  if (!error && isNative && data.session) {
+    const nativeRedirectUrl = new URL("mysecretary://auth/session");
+    const hashParams = new URLSearchParams({
+      access_token: data.session.access_token,
+      refresh_token: data.session.refresh_token,
+      next: nextPath,
+    });
+    nativeRedirectUrl.hash = hashParams.toString();
+    response = NextResponse.redirect(nativeRedirectUrl);
+  }
+
   response.cookies.delete(STATE_COOKIE);
   response.cookies.delete(NEXT_COOKIE);
+  response.cookies.delete(NATIVE_COOKIE);
 
   return response;
 }

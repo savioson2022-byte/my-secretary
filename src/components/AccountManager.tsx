@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Capacitor } from "@capacitor/core";
 import type { User } from "@supabase/supabase-js";
 import DeviceProfileCard from "@/components/DeviceProfileCard";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -115,6 +116,16 @@ function getInitial(name: string) {
 }
 
 function getAuthRedirectUrl() {
+  if (Capacitor.isNativePlatform()) {
+    const callbackUrl = new URL("mysecretary://auth/callback");
+    callbackUrl.searchParams.set(
+      "next",
+      window.location.pathname || "/settings"
+    );
+
+    return callbackUrl.toString();
+  }
+
   const callbackUrl = new URL("/auth/callback", window.location.origin);
   callbackUrl.searchParams.set("next", window.location.pathname || "/settings");
 
@@ -124,6 +135,10 @@ function getAuthRedirectUrl() {
 function getKakaoAuthStartUrl() {
   const startUrl = new URL("/api/auth/kakao/start", window.location.origin);
   startUrl.searchParams.set("next", window.location.pathname || "/account");
+
+  if (Capacitor.isNativePlatform()) {
+    startUrl.searchParams.set("native", "1");
+  }
 
   return startUrl.toString();
 }
