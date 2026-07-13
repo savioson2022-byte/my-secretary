@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import CloudDataSyncBridge from "@/components/CloudDataSyncBridge";
+import PurchaseMailAutoSyncBridge from "@/components/PurchaseMailAutoSyncBridge";
 import SmartReminderAgent from "@/components/SmartReminderAgent";
 import "./globals.css";
 
@@ -59,6 +60,7 @@ export default function RootLayout({
       <body>
         {children}
         <CloudDataSyncBridge />
+        <PurchaseMailAutoSyncBridge />
         <SmartReminderAgent />
       </body>
     </html>
