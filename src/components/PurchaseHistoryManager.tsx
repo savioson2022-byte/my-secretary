@@ -247,6 +247,26 @@ export default function PurchaseHistoryManager() {
     setMessage("구매 이력을 삭제했어.");
   }
 
+  function handleDeleteAllHistories() {
+    const shouldDelete = window.confirm(
+      "저장된 구매템을 모두 삭제할까요? 이 작업은 되돌릴 수 없습니다."
+    );
+
+    if (!shouldDelete) return;
+
+    histories.forEach((history) => deletePurchaseHistory(history.id));
+    setHistories(getPurchaseHistories());
+    resetDraft();
+    setMessage("저장된 구매템을 모두 삭제했어.");
+  }
+
+  function handleClearImportData() {
+    setMailText("");
+    setMailCandidates([]);
+    setSelectedCandidate(null);
+    setMessage("붙여넣은 주문 정보와 후보를 지웠어.");
+  }
+
   async function copyCommand(history: PurchaseHistoryItem) {
     const command = getAutomationCommand(history);
 
@@ -368,6 +388,15 @@ export default function PurchaseHistoryManager() {
           >
             {isImportingMail ? "AI가 확인 중" : "AI로 상품 후보 찾기"}
           </button>
+          {(mailText || mailCandidates.length > 0 || selectedCandidate) && (
+            <button
+              type="button"
+              onClick={handleClearImportData}
+              className="rounded-2xl bg-white px-4 py-3 text-sm font-black text-rose-500 ring-1 ring-rose-100"
+            >
+              붙여넣은 정보 지우기
+            </button>
+          )}
         </div>
 
         {mailCandidates.length > 0 && (
@@ -421,6 +450,16 @@ export default function PurchaseHistoryManager() {
             </span>
           </div>
         </div>
+
+        {histories.length > 0 && (
+          <button
+            type="button"
+            onClick={handleDeleteAllHistories}
+            className="mt-4 w-full rounded-2xl bg-rose-50 px-4 py-3 text-sm font-black text-rose-600 ring-1 ring-rose-100"
+          >
+            저장된 구매템 전체 삭제
+          </button>
+        )}
 
         {message && (
           <p className="mt-4 rounded-2xl bg-blue-50 px-4 py-3 text-sm font-bold text-blue-700 ring-1 ring-blue-100">
