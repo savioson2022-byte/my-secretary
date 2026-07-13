@@ -18,6 +18,14 @@ import {
   shouldAttachToIdeaRecord,
 } from "@/lib/ideaGrouping";
 import { getLocalDataUpdatedEventName } from "@/lib/localStorageRepository";
+import {
+  getDueRepurchaseHistories,
+  getNextPurchaseDateFromToday,
+} from "@/lib/purchaseAutomation";
+import {
+  getPurchaseHistories,
+  updatePurchaseHistory,
+} from "@/lib/purchaseHistoryStorage";
 import { getRoutineSchedules } from "@/lib/routineStorage";
 import { createSingleScheduleFromItem } from "@/lib/singleScheduleFromItem";
 import {
@@ -34,6 +42,7 @@ import {
 import { SingleSchedule } from "@/types/calendar";
 import { DayOfWeek, RoutineSchedule } from "@/types/routine";
 import { UserProfile } from "@/types/userProfile";
+import { PurchaseHistoryItem } from "@/types/purchaseHistory";
 
 function createId() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -117,6 +126,9 @@ export default function Home() {
   const [items, setItems] = useState<AssistantItem[]>([]);
   const [routines, setRoutines] = useState<RoutineSchedule[]>([]);
   const [singleSchedules, setSingleSchedules] = useState<SingleSchedule[]>([]);
+  const [purchaseHistories, setPurchaseHistories] = useState<
+    PurchaseHistoryItem[]
+  >([]);
   const [selectedFilter, setSelectedFilter] = useState<FilterType>("전체");
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
@@ -131,6 +143,7 @@ export default function Home() {
       setItems(getItems());
       setRoutines(getRoutineSchedules());
       setSingleSchedules(getSingleSchedules());
+      setPurchaseHistories(getPurchaseHistories());
       setUserProfile(getUserProfile());
     }
 
@@ -222,6 +235,10 @@ export default function Home() {
       );
     }).length;
   }, [items, userProfile]);
+
+  const dueRepurchaseItems = useMemo(() => {
+    return getDueRepurchaseHistories(purchaseHistories, 2);
+  }, [purchaseHistories]);
 
   const inboxItemCount = useMemo(() => {
     return items.filter((item) => {
@@ -332,6 +349,18 @@ export default function Home() {
   function handleDelete(id: string) {
     deleteItem(id);
     setItems(getItems());
+  }
+
+  function postponeRepurchase(history: PurchaseHistoryItem) {
+    const nextPurchaseCheckDate =
+      getNextPurchaseDateFromToday(history) ?? history.nextPurchaseCheckDate;
+
+    updatePurchaseHistory({
+      ...history,
+      nextPurchaseCheckDate,
+      updatedAt: new Date().toISOString(),
+    });
+    setPurchaseHistories(getPurchaseHistories());
   }
 
   return (
@@ -464,6 +493,69 @@ export default function Home() {
                 <span>분류만 되고 날짜가 없는 기록 {inboxItemCount}개</span>
                 <span>정리하기</span>
               </Link>
+            )}
+
+            {dueRepurchaseItems.length > 0 && (
+              <div className="mt-3 rounded-2xl bg-emerald-50 p-3 ring-1 ring-emerald-100">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-black text-emerald-700">
+                      재구매 추천
+                    </p>
+                    <p className="mt-0.5 text-[11px] font-bold text-emerald-600">
+                      메일에서 확인한 주기를 기준으로 알려드려요.
+                    </p>
+                  </div>
+                  <Link
+                    href="/purchase"
+                    className="shrink-0 rounded-full bg-white px-3 py-1.5 text-[11px] font-black text-emerald-700 ring-1 ring-emerald-100"
+                  >
+                    관리
+                  </Link>
+                </div>
+                <div className="mt-3 grid gap-2">
+                  {dueRepurchaseItems.map((history) => (
+                    <div
+                      key={history.id}
+                      className="rounded-2xl bg-white p-3 ring-1 ring-emerald-100"
+                    >
+                      <p className="truncate text-sm font-black text-slate-900">
+                        {history.productName}
+                      </p>
+                      <p className="mt-1 text-[11px] font-bold text-slate-400">
+                        {history.repeatCycleDays
+                          ? `${history.repeatCycleDays}일 주기`
+                          : "구매 주기 확인 필요"}
+                        {history.maxBudgetKrw
+                          ? ` · ${history.maxBudgetKrw.toLocaleString()}원`
+                          : ""}
+                      </p>
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        <a
+                          href={
+                            history.productUrl ||
+                            `https://www.coupang.com/np/search?q=${encodeURIComponent(
+                              history.productName
+                            )}`
+                          }
+                          target="_blank"
+                          rel="noreferrer"
+                          className="rounded-full bg-emerald-600 px-3 py-2 text-center text-xs font-black text-white"
+                        >
+                          쿠팡 열기
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => postponeRepurchase(history)}
+                          className="rounded-full bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-700 ring-1 ring-emerald-100"
+                        >
+                          다음에
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
           </section>
 

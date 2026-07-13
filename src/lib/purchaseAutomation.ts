@@ -25,6 +25,10 @@ function addDays(date: Date, days: number) {
   return nextDate;
 }
 
+function getDateOnly(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
 function getCandidateKey(productName: string) {
   return normalizePurchaseName(productName).slice(0, 24);
 }
@@ -128,4 +132,38 @@ export function createPurchaseHistoryFromCandidate({
     createdAt: now,
     updatedAt: now,
   };
+}
+
+export function getNextPurchaseDateFromToday(history: PurchaseHistoryItem) {
+  if (!history.repeatCycleDays || history.repeatCycleDays <= 0) return null;
+
+  return toDateInputValue(addDays(new Date(), history.repeatCycleDays));
+}
+
+export function isRepurchaseDue(history: PurchaseHistoryItem, now = new Date()) {
+  if (!history.autoRepurchaseEnabled || !history.nextPurchaseCheckDate) {
+    return false;
+  }
+
+  const targetDate = new Date(`${history.nextPurchaseCheckDate}T00:00:00`);
+
+  if (Number.isNaN(targetDate.getTime())) {
+    return false;
+  }
+
+  return targetDate.getTime() <= getDateOnly(now).getTime();
+}
+
+export function getDueRepurchaseHistories(
+  histories: PurchaseHistoryItem[],
+  limit = 3
+) {
+  return histories
+    .filter((history) => isRepurchaseDue(history))
+    .sort((left, right) => {
+      return String(left.nextPurchaseCheckDate).localeCompare(
+        String(right.nextPurchaseCheckDate)
+      );
+    })
+    .slice(0, limit);
 }

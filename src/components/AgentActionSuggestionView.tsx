@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { getLocalDataUpdatedEventName } from "@/lib/localStorageRepository";
+import { getNextPurchaseDateFromToday } from "@/lib/purchaseAutomation";
 import {
   createId,
   findMatchingPurchaseHistory,
@@ -232,12 +233,17 @@ export default function AgentActionSuggestionView({
       selectedProduct?.link ?? matchedHistory?.productUrl ?? createCoupangSearchUrl(productName);
 
     if (matchedHistory) {
+      const nextPurchaseCheckDate =
+        matchedHistory.nextPurchaseCheckDate ??
+        getNextPurchaseDateFromToday(matchedHistory);
+
       updatePurchaseHistory({
         ...matchedHistory,
         productName: nextProductName,
         platform: "coupang",
         productUrl: nextProductUrl,
         maxBudgetKrw: matchedHistory.maxBudgetKrw,
+        nextPurchaseCheckDate,
         autoRepurchaseEnabled:
           matchedHistory.autoRepurchaseEnabled || enableAutomation,
         lastPurchasedAt: now,
@@ -251,6 +257,11 @@ export default function AgentActionSuggestionView({
         productUrl: nextProductUrl,
         defaultQuantity: null,
         maxBudgetKrw: null,
+        repeatCycleDays: null,
+        nextPurchaseCheckDate: null,
+        source: "agent",
+        sourceMessageId: null,
+        importedAt: null,
         autoRepurchaseEnabled: enableAutomation,
         lastPurchasedAt: now,
         memo: "나의 비서 구매 위임에서 등록됨",
