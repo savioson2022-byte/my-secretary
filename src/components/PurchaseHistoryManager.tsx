@@ -483,6 +483,48 @@ export default function PurchaseHistoryManager() {
     setMailAutomationMessage("메일 자동 수집 연결을 삭제했어.");
   }
 
+  async function forgetMailImportDetails({
+    shouldConfirm = true,
+  }: {
+    shouldConfirm?: boolean;
+  } = {}) {
+    if (shouldConfirm) {
+      const shouldForget = window.confirm(
+        "메일 수집 기록에서 상품명과 제목을 비울까요? 같은 메일이 다시 수집되지 않도록 메일 식별값만 남겨둡니다."
+      );
+
+      if (!shouldForget) return false;
+    }
+
+    const accessToken = await getSupabaseAccessToken();
+
+    if (!accessToken) {
+      setMailAutomationMessage("먼저 앱 계정으로 로그인해야 수집 기록을 비울 수 있어.");
+      return false;
+    }
+
+    const response = await fetch("/api/purchase/mail/imports", {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      const data = (await response.json().catch(() => ({}))) as {
+        error?: string;
+      };
+
+      setMailAutomationMessage(
+        data.error ?? "메일 수집 기록을 비우지 못했어."
+      );
+      return false;
+    }
+
+    setMailAutomationMessage("메일 수집 기록의 상품명과 제목을 비웠어.");
+    return true;
+  }
+
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -547,6 +589,7 @@ export default function PurchaseHistoryManager() {
     setMessage("저장된 구매템을 모두 삭제했어.");
 
     await deleteRemotePurchaseHistories(historyIds);
+    await forgetMailImportDetails({ shouldConfirm: false });
   }
 
   function handleClearImportData() {
@@ -972,15 +1015,26 @@ export default function PurchaseHistoryManager() {
           </div>
         </div>
 
-        {histories.length > 0 && (
+        <div className="mt-4 grid gap-2 sm:grid-cols-2">
+          {histories.length > 0 && (
+            <button
+              type="button"
+              onClick={handleDeleteAllHistories}
+              className="rounded-2xl bg-rose-50 px-4 py-3 text-sm font-black text-rose-600 ring-1 ring-rose-100"
+            >
+              저장된 구매템 전체 삭제
+            </button>
+          )}
           <button
             type="button"
-            onClick={handleDeleteAllHistories}
-            className="mt-4 w-full rounded-2xl bg-rose-50 px-4 py-3 text-sm font-black text-rose-600 ring-1 ring-rose-100"
+            onClick={() => {
+              void forgetMailImportDetails();
+            }}
+            className="rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-600 ring-1 ring-slate-200"
           >
-            저장된 구매템 전체 삭제
+            메일 수집 기록 비우기
           </button>
-        )}
+        </div>
 
         {message && (
           <p className="mt-4 rounded-2xl bg-blue-50 px-4 py-3 text-sm font-bold text-blue-700 ring-1 ring-blue-100">

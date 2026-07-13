@@ -101,3 +101,11 @@ create policy "Users can insert own purchase mail imports"
   for insert
   to authenticated
   with check ((select auth.uid()) = user_id);
+
+drop policy if exists "Users can update own purchase mail imports" on public.purchase_mail_imports;
+create policy "Users can update own purchase mail imports"
+  on public.purchase_mail_imports
+  for update
+  to authenticated
+  using ((select auth.uid()) = user_id)
+  with check ((select auth.uid()) = user_id);
