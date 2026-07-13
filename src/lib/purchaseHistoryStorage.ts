@@ -2,6 +2,7 @@ import {
   createLocalStorageRepository,
   isBrowser,
 } from "@/lib/localStorageRepository";
+import { normalizePurchaseName } from "@/lib/purchaseName";
 import { STORAGE_KEYS } from "@/lib/storageKeys";
 import type { PurchaseHistoryItem } from "@/types/purchaseHistory";
 
@@ -24,12 +25,7 @@ export function deletePurchaseHistory(id: string) {
   purchaseHistoryRepository.delete(id);
 }
 
-export function normalizePurchaseName(value: string) {
-  return value
-    .toLowerCase()
-    .replace(/\s+/g, "")
-    .replace(/[^\p{L}\p{N}]/gu, "");
-}
+export { normalizePurchaseName };
 
 export function findMatchingPurchaseHistory(
   productName: string,

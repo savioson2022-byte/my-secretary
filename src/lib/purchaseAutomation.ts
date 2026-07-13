@@ -1,5 +1,5 @@
 import type { MailImportCandidate } from "@/lib/purchaseMailImport";
-import { normalizePurchaseName } from "@/lib/purchaseHistoryStorage";
+import { normalizePurchaseName } from "./purchaseName";
 import type { PurchaseHistoryItem } from "@/types/purchaseHistory";
 
 export const PURCHASE_AUTOMATION_START_DATE = "2026-07-14";

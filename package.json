@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "check:supabase": "node --env-file=.env.local scripts/check-supabase-connection.mjs",
+    "check:purchase": "node scripts/verify-purchase-automation.mjs",
     "purchase:coupang": "node scripts/coupang-repurchase-assistant.mjs",
     "ios:sync": "cap sync ios",
     "ios:open": "cap open ios"
