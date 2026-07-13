@@ -45,6 +45,8 @@ type MailAutomationConfig = {
   hasSupabaseAdmin: boolean;
   hasOpenAi: boolean;
   hasCronSecret: boolean;
+  canCheckSchema: boolean;
+  hasPurchaseMailSchema: boolean;
   cronSchedule: string;
   automationStartDate: string;
 };
@@ -295,7 +297,14 @@ export default function PurchaseHistoryManager() {
   }
 
   async function refreshMailAutomationConfig() {
-    const response = await fetch("/api/purchase/mail/config");
+    const accessToken = await getSupabaseAccessToken();
+    const response = await fetch("/api/purchase/mail/config", {
+      headers: accessToken
+        ? {
+            Authorization: `Bearer ${accessToken}`,
+          }
+        : {},
+    });
 
     if (!response.ok) return;
 
@@ -629,6 +638,20 @@ export default function PurchaseHistoryManager() {
               </span>
               <span
                 className={`rounded-2xl px-3 py-2 text-center ${
+                  mailAutomationConfig.hasPurchaseMailSchema
+                    ? "bg-emerald-50 text-emerald-600"
+                    : "bg-rose-50 text-rose-600"
+                }`}
+              >
+                DB{" "}
+                {mailAutomationConfig.canCheckSchema
+                  ? mailAutomationConfig.hasPurchaseMailSchema
+                    ? "준비"
+                    : "필요"
+                  : "확인전"}
+              </span>
+              <span
+                className={`rounded-2xl px-3 py-2 text-center ${
                   mailAutomationConfig.hasGoogleOAuth
                     ? "bg-emerald-50 text-emerald-600"
                     : "bg-slate-100 text-slate-500"
@@ -641,6 +664,16 @@ export default function PurchaseHistoryManager() {
               </span>
             </div>
           )}
+
+          {mailAutomationConfig?.canCheckSchema &&
+            !mailAutomationConfig.hasPurchaseMailSchema && (
+              <p className="rounded-2xl bg-rose-50 p-4 text-xs font-bold leading-5 text-rose-600 ring-1 ring-rose-100">
+                Supabase에 쿠팡 자동화 테이블이 아직 없습니다.
+                supabase/migrations/20260714010000_create_purchase_mail_automation.sql
+                파일을 SQL Editor에서 실행해야 메일 연결과 자동 수집이
+                저장됩니다.
+              </p>
+            )}
 
           {mailConnections.length === 0 ? (
             <p className="rounded-2xl bg-slate-50 p-4 text-xs font-bold leading-5 text-slate-500 ring-1 ring-slate-100">

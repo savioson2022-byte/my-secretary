@@ -50,7 +50,8 @@ export async function POST(request: Request) {
   if (error) {
     return NextResponse.json(
       {
-        error: "네이버 메일 연결 저장에 실패했습니다.",
+        error:
+          "네이버 메일 연결 저장에 실패했습니다. Supabase SQL 마이그레이션이 먼저 적용되어야 합니다.",
       },
       {
         status: 500,

@@ -25,7 +25,8 @@ export async function GET(request: Request) {
       {
         connections: [],
         isAuthenticated: true,
-        message: "메일 연결 상태를 불러오지 못했습니다.",
+        message:
+          "쿠팡 자동화 DB 테이블이 아직 없거나 접근할 수 없습니다. Supabase SQL 마이그레이션을 먼저 실행해야 합니다.",
       },
       {
         status: 500,
