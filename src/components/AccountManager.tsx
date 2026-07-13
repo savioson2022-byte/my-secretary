@@ -117,11 +117,8 @@ function getInitial(name: string) {
 
 function getAuthRedirectUrl() {
   if (Capacitor.isNativePlatform()) {
-    const callbackUrl = new URL("mysecretary://auth/callback");
-    callbackUrl.searchParams.set(
-      "next",
-      window.location.pathname || "/settings"
-    );
+    const callbackUrl = new URL("/auth/callback", window.location.origin);
+    callbackUrl.searchParams.set("next", "/auth/native-handoff");
 
     return callbackUrl.toString();
   }

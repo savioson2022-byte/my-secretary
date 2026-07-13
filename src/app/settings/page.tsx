@@ -1,4 +1,5 @@
 import AccountManager from "@/components/AccountManager";
+import AppRuntimeControls from "@/components/AppRuntimeControls";
 import BottomNavigation from "@/components/BottomNavigation";
 import CloudSyncStatusCard from "@/components/CloudSyncStatusCard";
 import LocalDataTransfer from "@/components/LocalDataTransfer";
@@ -24,6 +25,7 @@ export default function SettingsPage() {
       </header>
 
       <div className="space-y-5">
+        <AppRuntimeControls />
         <AccountManager />
         <CloudSyncStatusCard />
 

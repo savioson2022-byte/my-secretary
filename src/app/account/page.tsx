@@ -1,4 +1,5 @@
 import AccountManager from "@/components/AccountManager";
+import AppRuntimeControls from "@/components/AppRuntimeControls";
 import BottomNavigation from "@/components/BottomNavigation";
 import LocalDataTransfer from "@/components/LocalDataTransfer";
 import MobileInstallGuide from "@/components/MobileInstallGuide";
@@ -22,6 +23,7 @@ export default function AccountPage() {
       </header>
 
       <div className="space-y-5">
+        <AppRuntimeControls />
         <AccountManager />
         <SavedPlaceManager />
         <MobileInstallGuide />
