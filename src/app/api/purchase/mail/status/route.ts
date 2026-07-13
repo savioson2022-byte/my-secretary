@@ -1,12 +1,10 @@
 import { NextResponse } from "next/server";
-import { getUserFromAuthorization } from "@/lib/apiAuth";
-import { createSupabaseAdminClient } from "@/lib/supabase/server";
+import { getAuthedSupabaseForRequest } from "@/lib/apiAuth";
 
 export async function GET(request: Request) {
-  const auth = await getUserFromAuthorization(request);
-  const supabase = createSupabaseAdminClient();
+  const context = await getAuthedSupabaseForRequest(request);
 
-  if (!auth || !supabase) {
+  if (!context?.supabase) {
     return NextResponse.json({
       connections: [],
       isAuthenticated: false,
@@ -14,12 +12,12 @@ export async function GET(request: Request) {
     });
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await context.supabase
     .from("purchase_mail_connections")
     .select(
       "id, provider, email, sync_after, last_sync_at, status, last_error, updated_at"
     )
-    .eq("user_id", auth.user.id)
+    .eq("user_id", context.auth.user.id)
     .order("updated_at", { ascending: false });
 
   if (error) {

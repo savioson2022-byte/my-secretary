@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import { getUserFromAuthorization } from "@/lib/apiAuth";
+import { getAuthedSupabaseForRequest } from "@/lib/apiAuth";
 import { syncGmailPurchaseMails } from "@/lib/gmailPurchaseSync";
 import { syncNaverPurchaseMails } from "@/lib/naverPurchaseSync";
-import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import type { PurchaseHistoryItem } from "@/types/purchaseHistory";
 
 type PurchaseHistoryRow = {
@@ -46,10 +45,9 @@ function rowToHistory(row: PurchaseHistoryRow): PurchaseHistoryItem {
 }
 
 export async function POST(request: Request) {
-  const auth = await getUserFromAuthorization(request);
-  const supabase = createSupabaseAdminClient();
+  const context = await getAuthedSupabaseForRequest(request);
 
-  if (!auth || !supabase) {
+  if (!context?.supabase) {
     return NextResponse.json(
       {
         error: "로그인이 필요합니다.",
@@ -60,10 +58,10 @@ export async function POST(request: Request) {
     );
   }
 
-  const { data: connections, error: connectionError } = await supabase
+  const { data: connections, error: connectionError } = await context.supabase
     .from("purchase_mail_connections")
     .select("*")
-    .eq("user_id", auth.user.id)
+    .eq("user_id", context.auth.user.id)
     .eq("status", "active");
 
   if (connectionError) {
@@ -84,10 +82,10 @@ export async function POST(request: Request) {
     });
   }
 
-  const { data: historyRows } = await supabase
+  const { data: historyRows } = await context.supabase
     .from("purchase_history")
     .select("*")
-    .eq("user_id", auth.user.id);
+    .eq("user_id", context.auth.user.id);
   const existingHistories = ((historyRows ?? []) as PurchaseHistoryRow[]).map(
     rowToHistory
   );
@@ -104,12 +102,12 @@ export async function POST(request: Request) {
       } =
         connection.provider === "gmail"
           ? await syncGmailPurchaseMails({
-              supabase,
+              supabase: context.supabase,
               connection,
               existingHistories,
             })
           : await syncNaverPurchaseMails({
-              supabase,
+              supabase: context.supabase,
               connection,
               existingHistories,
             });
@@ -120,7 +118,7 @@ export async function POST(request: Request) {
     } catch (error) {
       console.error("Gmail 구매 메일 동기화 실패:", error);
 
-      await supabase
+      await context.supabase
         .from("purchase_mail_connections")
         .update({
           status: "error",

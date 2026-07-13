@@ -34,6 +34,28 @@ create policy "Users can read own purchase mail connection status"
   to authenticated
   using ((select auth.uid()) = user_id);
 
+drop policy if exists "Users can insert own purchase mail connections" on public.purchase_mail_connections;
+create policy "Users can insert own purchase mail connections"
+  on public.purchase_mail_connections
+  for insert
+  to authenticated
+  with check ((select auth.uid()) = user_id);
+
+drop policy if exists "Users can update own purchase mail connections" on public.purchase_mail_connections;
+create policy "Users can update own purchase mail connections"
+  on public.purchase_mail_connections
+  for update
+  to authenticated
+  using ((select auth.uid()) = user_id)
+  with check ((select auth.uid()) = user_id);
+
+drop policy if exists "Users can delete own purchase mail connections" on public.purchase_mail_connections;
+create policy "Users can delete own purchase mail connections"
+  on public.purchase_mail_connections
+  for delete
+  to authenticated
+  using ((select auth.uid()) = user_id);
+
 create table if not exists public.purchase_mail_oauth_states (
   state text primary key,
   user_id uuid not null references auth.users(id) on delete cascade,
@@ -72,3 +94,10 @@ create policy "Users can read own purchase mail imports"
   for select
   to authenticated
   using ((select auth.uid()) = user_id);
+
+drop policy if exists "Users can insert own purchase mail imports" on public.purchase_mail_imports;
+create policy "Users can insert own purchase mail imports"
+  on public.purchase_mail_imports
+  for insert
+  to authenticated
+  with check ((select auth.uid()) = user_id);

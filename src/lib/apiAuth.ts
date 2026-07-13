@@ -1,5 +1,8 @@
 import type { User } from "@supabase/supabase-js";
-import { createSupabaseUserServerClient } from "@/lib/supabase/server";
+import {
+  createSupabaseAdminClient,
+  createSupabaseUserServerClient,
+} from "@/lib/supabase/server";
 
 export async function getUserFromAuthorization(request: Request): Promise<{
   accessToken: string;
@@ -21,5 +24,18 @@ export async function getUserFromAuthorization(request: Request): Promise<{
   return {
     accessToken,
     user: data.user,
+  };
+}
+
+export async function getAuthedSupabaseForRequest(request: Request) {
+  const auth = await getUserFromAuthorization(request);
+
+  if (!auth) return null;
+
+  return {
+    auth,
+    supabase:
+      createSupabaseAdminClient() ??
+      createSupabaseUserServerClient(auth.accessToken),
   };
 }

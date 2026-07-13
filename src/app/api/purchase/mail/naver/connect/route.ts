@@ -1,15 +1,13 @@
 import { NextResponse } from "next/server";
-import { getUserFromAuthorization } from "@/lib/apiAuth";
-import { createSupabaseAdminClient } from "@/lib/supabase/server";
+import { getAuthedSupabaseForRequest } from "@/lib/apiAuth";
 
 export async function POST(request: Request) {
-  const auth = await getUserFromAuthorization(request);
-  const supabase = createSupabaseAdminClient();
+  const context = await getAuthedSupabaseForRequest(request);
   const body = await request.json();
   const email = String(body.email ?? "").trim();
   const appPassword = String(body.appPassword ?? "").trim();
 
-  if (!auth || !supabase) {
+  if (!context?.supabase) {
     return NextResponse.json(
       {
         error: "로그인이 필요합니다.",
@@ -31,9 +29,9 @@ export async function POST(request: Request) {
     );
   }
 
-  const { error } = await supabase.from("purchase_mail_connections").upsert(
+  const { error } = await context.supabase.from("purchase_mail_connections").upsert(
     {
-      user_id: auth.user.id,
+      user_id: context.auth.user.id,
       provider: "naver",
       email,
       refresh_token: appPassword,

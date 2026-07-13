@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { getUserFromAuthorization } from "@/lib/apiAuth";
-import { createSupabaseAdminClient } from "@/lib/supabase/server";
+import { getAuthedSupabaseForRequest } from "@/lib/apiAuth";
 
 export async function DELETE(
   request: Request,
@@ -10,10 +9,9 @@ export async function DELETE(
     };
   }
 ) {
-  const auth = await getUserFromAuthorization(request);
-  const supabase = createSupabaseAdminClient();
+  const requestContext = await getAuthedSupabaseForRequest(request);
 
-  if (!auth || !supabase) {
+  if (!requestContext?.supabase) {
     return NextResponse.json(
       {
         error: "로그인이 필요합니다.",
@@ -24,11 +22,11 @@ export async function DELETE(
     );
   }
 
-  const { error } = await supabase
+  const { error } = await requestContext.supabase
     .from("purchase_mail_connections")
     .delete()
     .eq("id", context.params.id)
-    .eq("user_id", auth.user.id);
+    .eq("user_id", requestContext.auth.user.id);
 
   if (error) {
     return NextResponse.json(
