@@ -55,6 +55,11 @@ const purchaseAutomation = runCommonJs(
   "purchaseAutomation.ts"
 );
 
+const purchaseMailSyncWindow = runCommonJs(
+  readSource("src/lib/purchaseMailSyncWindow.ts"),
+  "purchaseMailSyncWindow.ts"
+);
+
 const purchaseMailImport = runCommonJs(
   readSource("src/lib/purchaseMailImport.ts"),
   "purchaseMailImport.ts"
@@ -182,5 +187,12 @@ assert.equal(parsedCandidates[0].productName, "탐사수 생수 2L 12개");
 assert.equal(parsedCandidates[0].priceText, "12,900원");
 assert.equal(parsedCandidates[0].quantityText, "12개");
 assert.equal(parsedCandidates[0].productUrl, "https://www.coupang.com/vp/products/1");
+
+assert.equal(
+  purchaseMailSyncWindow.getNextPurchaseMailSyncAfter(
+    new Date("2026-07-14T12:00:00.000Z")
+  ),
+  "2026-07-13T12:00:00.000Z"
+);
 
 console.log("purchase automation verification passed");

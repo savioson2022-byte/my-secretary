@@ -2,6 +2,7 @@ import { ImapFlow } from "imapflow";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createPurchaseHistoryFromCandidate } from "@/lib/purchaseAutomation";
 import { importPurchaseMailText } from "@/lib/purchaseMailAi";
+import { getNextPurchaseMailSyncAfter } from "@/lib/purchaseMailSyncWindow";
 import type { PurchaseHistoryItem } from "@/types/purchaseHistory";
 
 type NaverMailConnectionRow = {
@@ -49,6 +50,7 @@ export async function syncNaverPurchaseMails({
     logger: false,
   });
   const importedHistories: PurchaseHistoryItem[] = [];
+  let messageCount = 0;
 
   await client.connect();
 
@@ -61,6 +63,7 @@ export async function syncNaverPurchaseMails({
       const uidList = Array.isArray(uids)
         ? uids.slice(-MAX_NAVER_MESSAGES_PER_SYNC)
         : [];
+      messageCount = uidList.length;
 
       for await (const message of client.fetch(uidList, {
         envelope: true,
@@ -145,6 +148,7 @@ export async function syncNaverPurchaseMails({
     .from("purchase_mail_connections")
     .update({
       last_sync_at: new Date().toISOString(),
+      sync_after: getNextPurchaseMailSyncAfter(),
       status: "active",
       last_error: null,
       updated_at: new Date().toISOString(),
@@ -153,6 +157,7 @@ export async function syncNaverPurchaseMails({
 
   return {
     importedCount: importedHistories.length,
+    messageCount,
     importedHistories,
   };
 }

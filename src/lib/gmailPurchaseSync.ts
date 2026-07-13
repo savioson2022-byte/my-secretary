@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createPurchaseHistoryFromCandidate } from "@/lib/purchaseAutomation";
 import { importPurchaseMailText } from "@/lib/purchaseMailAi";
+import { getNextPurchaseMailSyncAfter } from "@/lib/purchaseMailSyncWindow";
 import type { PurchaseHistoryItem } from "@/types/purchaseHistory";
 
 type GmailTokenResponse = {
@@ -363,6 +364,7 @@ export async function syncGmailPurchaseMails({
     .from("purchase_mail_connections")
     .update({
       last_sync_at: new Date().toISOString(),
+      sync_after: getNextPurchaseMailSyncAfter(),
       status: "active",
       last_error: null,
       updated_at: new Date().toISOString(),
