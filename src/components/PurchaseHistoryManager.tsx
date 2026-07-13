@@ -506,23 +506,47 @@ export default function PurchaseHistoryManager() {
     resetDraft();
   }
 
-  function handleDelete(id: string) {
+  async function deleteRemotePurchaseHistories(ids: string[]) {
+    if (ids.length === 0) return;
+
+    const supabase = createSupabaseBrowserClient();
+
+    if (!supabase) return;
+
+    const { data } = await supabase.auth.getSession();
+
+    if (!data.session?.user) return;
+
+    await supabase
+      .from("purchase_history")
+      .delete()
+      .eq("user_id", data.session.user.id)
+      .in("id", ids);
+  }
+
+  async function handleDelete(id: string) {
     deletePurchaseHistory(id);
     setHistories(getPurchaseHistories());
     setMessage("구매 이력을 삭제했어.");
+
+    await deleteRemotePurchaseHistories([id]);
   }
 
-  function handleDeleteAllHistories() {
+  async function handleDeleteAllHistories() {
     const shouldDelete = window.confirm(
       "저장된 구매템을 모두 삭제할까요? 이 작업은 되돌릴 수 없습니다."
     );
 
     if (!shouldDelete) return;
 
+    const historyIds = histories.map((history) => history.id);
+
     histories.forEach((history) => deletePurchaseHistory(history.id));
     setHistories(getPurchaseHistories());
     resetDraft();
     setMessage("저장된 구매템을 모두 삭제했어.");
+
+    await deleteRemotePurchaseHistories(historyIds);
   }
 
   function handleClearImportData() {
