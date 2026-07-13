@@ -314,7 +314,7 @@ export default function PurchaseHistoryManager() {
       <section className="space-y-3">
         {histories.length === 0 ? (
           <div className="app-card p-5 text-sm font-semibold leading-6 text-slate-500">
-            아직 등록된 구매 이력이 없습니다. 에이전트 준비함에서 “이미 산 적
+            아직 등록된 구매 이력이 없습니다. 즉시처리 확인함에서 “이미 산 적
             있음”을 누르거나 이 페이지에서 직접 추가하세요.
           </div>
         ) : (

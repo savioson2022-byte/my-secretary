@@ -13,6 +13,10 @@ import { aiClassifyInput } from "@/lib/aiClassifyInput";
 import { classifyInput } from "@/lib/classifyInput";
 import { buildClassificationContext } from "@/lib/classificationContext";
 import { getCloudDataSyncedEventName } from "@/lib/dataSyncEvents";
+import {
+  groupIdeaWithAi,
+  shouldAttachToIdeaRecord,
+} from "@/lib/ideaGrouping";
 import { getLocalDataUpdatedEventName } from "@/lib/localStorageRepository";
 import { getRoutineSchedules } from "@/lib/routineStorage";
 import { createSingleScheduleFromItem } from "@/lib/singleScheduleFromItem";
@@ -276,13 +280,24 @@ export default function Home() {
     }
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!classificationResult) return;
 
     const now = new Date().toISOString();
+    const ideaGrouping = shouldAttachToIdeaRecord(classificationResult)
+      ? await groupIdeaWithAi({
+          text: classificationResult.originalText,
+          existingIdeas: items,
+        })
+      : null;
 
     const newItem: AssistantItem = {
       ...classificationResult,
+      ideaGroupId: ideaGrouping?.ideaGroupId ?? classificationResult.ideaGroupId,
+      ideaGroupTitle:
+        ideaGrouping?.ideaGroupTitle ?? classificationResult.ideaGroupTitle,
+      ideaSubcategory:
+        ideaGrouping?.ideaSubcategory ?? classificationResult.ideaSubcategory,
       id: createId(),
       createdAt: now,
       updatedAt: now,
@@ -412,10 +427,10 @@ export default function Home() {
                 </p>
               </div>
               <Link
-                href="/schedule/manage"
+                href="/calendar/weekly"
                 className="shrink-0 rounded-full bg-blue-600 px-3 py-2 text-xs font-black text-white shadow-[0_10px_24px_rgba(49,130,246,0.22)]"
               >
-                일정관리
+                캘린더
               </Link>
             </div>
 
@@ -486,44 +501,75 @@ export default function Home() {
           ) : (
             <section className="app-card p-4">
               <div className="mb-3 flex items-center justify-between">
-                <h3 className="font-black text-slate-900">오늘의 일정</h3>
-                <Link href="/calendar/monthly" className="text-xs font-black text-slate-400">
-                  전체 보기
+                <div>
+                  <h3 className="font-black text-slate-900">모바일 작업함</h3>
+                  <p className="mt-1 text-xs font-bold leading-5 text-slate-400">
+                    휴대폰에서는 보고, 말하고, 확정하는 일만 남깁니다.
+                  </p>
+                </div>
+                <Link href="/schedule/manage" className="text-xs font-black text-slate-400">
+                  자세히
                 </Link>
               </div>
 
-              <div className="space-y-2">
-                {todayScheduleItems.length === 0 && todayItems.length === 0 ? (
-                  <div className="rounded-2xl bg-slate-50 p-4 text-sm font-semibold leading-6 text-slate-500">
-                    오늘 확정된 일정은 아직 없어요. 떠오른 일을 바로 입력하거나
-                    일정관리에서 시간을 잡아둘 수 있어요.
-                  </div>
-                ) : (
-                  (todayScheduleItems.length > 0
-                    ? todayScheduleItems.slice(0, 3)
-                    : todayItems.slice(0, 3).map((item) => ({
-                      time: item.scheduleStartTime ?? item.dueDate ?? "오늘",
-                      title: item.title,
-                      detail: item.originalText,
-                      tag: item.processType,
-                    }))
-                  ).map((schedule) => (
-                    <div key={`${schedule.time}-${schedule.title}`} className="flex items-center gap-3 rounded-2xl bg-white px-3 py-3 ring-1 ring-slate-100">
-                      <span className="w-12 text-sm font-black text-slate-900">{schedule.time}</span>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-black text-slate-900">{schedule.title}</p>
-                        <p className="mt-0.5 truncate text-xs font-semibold text-slate-400">{schedule.detail}</p>
-                      </div>
-                      <span className={`rounded-full px-2 py-1 text-[11px] font-black ${
-                        schedule.tag === "단기" || schedule.tag === "단기일정"
-                          ? "bg-blue-50 text-blue-600"
-                          : "bg-emerald-50 text-emerald-600"
-                      }`}>
-                        {schedule.tag}
+              <div className="grid gap-2">
+                {[
+                  {
+                    title: "오늘 일정",
+                    count: todayScheduleItems.length,
+                    body: nextTodaySchedule
+                      ? `${nextTodaySchedule.time} ${nextTodaySchedule.title}`
+                      : "확정 일정 없음",
+                    href: "/calendar/weekly",
+                    tone: "blue",
+                  },
+                  {
+                    title: "정리할 기록",
+                    count: inboxItemCount,
+                    body:
+                      inboxItemCount > 0
+                        ? "날짜나 다음 행동이 아직 비어 있어요."
+                        : "지금은 비어 있어요.",
+                    href: "/records",
+                    tone: "amber",
+                  },
+                  {
+                    title: "즉시처리",
+                    count: pendingAgentCount,
+                    body:
+                      pendingAgentCount > 0
+                        ? "구매, 예약처럼 확인이 필요한 요청입니다."
+                        : "대기 중인 위임 요청 없음",
+                    href: "/records",
+                    tone: "violet",
+                  },
+                ].map((card) => (
+                  <Link
+                    key={card.title}
+                    href={card.href}
+                    className="flex items-center gap-3 rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-100"
+                  >
+                    <span
+                      className={`grid h-11 w-11 shrink-0 place-items-center rounded-2xl text-sm font-black ${
+                        card.tone === "blue"
+                          ? "bg-blue-100 text-blue-600"
+                          : card.tone === "amber"
+                          ? "bg-amber-100 text-amber-700"
+                          : "bg-violet-100 text-violet-600"
+                      }`}
+                    >
+                      {card.count}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-black text-slate-900">
+                        {card.title}
                       </span>
-                    </div>
-                  ))
-                )}
+                      <span className="mt-0.5 block truncate text-xs font-semibold text-slate-400">
+                        {card.body}
+                      </span>
+                    </span>
+                  </Link>
+                ))}
               </div>
             </section>
           )}

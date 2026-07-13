@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import BottomNavigation from "@/components/BottomNavigation";
 import ItemCard from "@/components/ItemCard";
 import UserStatusBadge from "@/components/UserStatusBadge";
-import { groupIdeaWithAi } from "@/lib/ideaGrouping";
+import { groupIdeaWithAi, isIdeaRecord } from "@/lib/ideaGrouping";
 import { deleteItem, getItems, saveItem, updateItem } from "@/lib/storage";
 import { AssistantItem } from "@/types/assistant";
 
@@ -38,7 +38,7 @@ export default function RecordsPage() {
 
   const ideaItems = useMemo(() => {
     return items
-      .filter((item) => item.processType === "아이디어")
+      .filter(isIdeaRecord)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }, [items]);
 
@@ -144,7 +144,8 @@ export default function RecordsPage() {
             아이디어 기록
           </h1>
           <p className="mt-2 text-sm leading-6 text-slate-500">
-            아직 일정이나 할 일로 정리하지 않을 생각을 빠르게 남깁니다.
+            아직 일정이나 할 일로 정리하지 않을 생각과 메모를 한곳에
+            이어서 남깁니다.
           </p>
         </div>
         <UserStatusBadge />

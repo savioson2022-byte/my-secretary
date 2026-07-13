@@ -21,13 +21,13 @@ const LINKS = [
   },
   {
     href: "/schedule/manage",
-    label: "일정관리",
+    label: "관리",
     icon: "M4 6h16M4 12h10M4 18h16M17 10l3 3-3 3",
   },
   {
-    href: "/places",
-    label: "장소",
-    icon: "M12 21s7-4.7 7-11a7 7 0 1 0-14 0c0 6.3 7 11 7 11ZM12 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z",
+    href: "/settings",
+    label: "설정",
+    icon: "M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7ZM19.4 15a1.7 1.7 0 0 0 .34 1.88l.04.04a2 2 0 0 1-2.83 2.83l-.04-.04A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6l-.03.04a2 2 0 0 1-3.94 0L10 20a1.7 1.7 0 0 0-1-.6 1.7 1.7 0 0 0-1.88.34l-.04.04a2 2 0 0 1-2.83-2.83l.04-.04A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1l-.04-.03a2 2 0 0 1 0-3.94L4 10a1.7 1.7 0 0 0 .6-1 1.7 1.7 0 0 0-.34-1.88l-.04-.04a2 2 0 0 1 2.83-2.83l.04.04A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6l.03-.04a2 2 0 0 1 3.94 0L14 4a1.7 1.7 0 0 0 1 .6 1.7 1.7 0 0 0 1.88-.34l.04-.04a2 2 0 0 1 2.83 2.83l-.04.04A1.7 1.7 0 0 0 19.4 9c.04.36.25.7.6 1l.04.03a2 2 0 0 1 0 3.94L20 14c-.35.3-.56.64-.6 1Z",
   },
 ];
 
@@ -44,7 +44,7 @@ export default function BottomNavigation() {
               pathname.startsWith("/calendar")) ||
             (link.href === "/schedule/manage" &&
               pathname.startsWith("/schedule")) ||
-            (link.href === "/places" && pathname.startsWith("/places"));
+            (link.href === "/settings" && pathname.startsWith("/settings"));
 
           return (
             <Link

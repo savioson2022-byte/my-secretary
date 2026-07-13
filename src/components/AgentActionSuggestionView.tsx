@@ -671,7 +671,7 @@ export default function AgentActionSuggestionView({
 
     return (
       <section className="app-card p-5">
-        <h2 className="text-lg font-black text-slate-900">에이전트 준비함</h2>
+        <h2 className="text-lg font-black text-slate-900">즉시처리 확인함</h2>
         <p className="mt-2 text-sm leading-6 text-slate-500">
           {instantActionEnabled
             ? "“쿠팡에서 시켜줘”, “네이버로 예약해줘” 같은 요청이 저장되면 이곳에서 필요한 확인사항을 모아볼 수 있습니다."
@@ -681,11 +681,78 @@ export default function AgentActionSuggestionView({
     );
   }
 
+  if (compact) {
+    return (
+      <section className="app-card p-4">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <h3 className="font-black text-slate-900">확인할 위임</h3>
+            <p className="mt-1 text-xs font-bold leading-5 text-slate-400">
+              홈에서는 확정/보류만 빠르게 처리합니다.
+            </p>
+          </div>
+          <Link
+            href="/records"
+            className="rounded-full bg-violet-50 px-3 py-1 text-xs font-black text-violet-600"
+          >
+            전체 {agentItems.length}
+          </Link>
+        </div>
+
+        {message && (
+          <p className="mb-3 rounded-2xl bg-violet-50 px-4 py-3 text-sm font-bold text-violet-700 ring-1 ring-violet-100">
+            {message}
+          </p>
+        )}
+
+        <div className="space-y-2">
+          {visibleItems.map((item) => (
+            <article
+              key={item.id}
+              className="rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-100"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-black text-slate-900">
+                    {item.title}
+                  </p>
+                  <p className="mt-1 text-xs font-black text-violet-600">
+                    {getActionLabel(item)}
+                  </p>
+                </div>
+                <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[11px] font-black text-slate-500 ring-1 ring-slate-100">
+                  확인 필요
+                </span>
+              </div>
+
+              <div className="mt-3 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => quickConfirm(item)}
+                  className="flex-1 rounded-full bg-violet-600 px-3 py-2 text-xs font-black text-white"
+                >
+                  확정
+                </button>
+                <button
+                  type="button"
+                  onClick={() => quickHold(item)}
+                  className="flex-1 rounded-full bg-white px-3 py-2 text-xs font-black text-slate-500 ring-1 ring-slate-100"
+                >
+                  나중에
+                </button>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className={compact ? "app-card p-4" : "app-card p-5"}>
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
-          <h2 className="font-black text-slate-900">에이전트 준비함</h2>
+          <h2 className="font-black text-slate-900">즉시처리 확인함</h2>
           {!compact && (
             <p className="mt-1 text-sm leading-6 text-slate-500">
               실제 구매와 예약은 사용자 확인 후 실행하도록 준비합니다.

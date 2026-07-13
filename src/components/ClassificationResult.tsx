@@ -260,7 +260,8 @@ export default function ClassificationResult({
           </select>
           <p className="mt-2 text-xs font-semibold leading-5 text-slate-400">
             앱 사용성을 위해 분류는 단기일정, 메모, 즉시처리로 단순화했습니다.
-            정기일정은 일정관리에서 직접 관리합니다.
+            메모는 아이디어 기록에도 자동으로 이어서 저장되고, 정기일정은
+            일정관리에서 직접 관리합니다.
           </p>
         </div>
 

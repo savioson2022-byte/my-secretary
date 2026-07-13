@@ -7,6 +7,17 @@ export type IdeaGroupingResult = {
   matchedExisting: boolean;
 };
 
+export function shouldAttachToIdeaRecord(item: Pick<AssistantItem, "processType">) {
+  return item.processType === "메모" || item.processType === "아이디어";
+}
+
+export function isIdeaRecord(item: AssistantItem) {
+  return (
+    item.processType === "아이디어" ||
+    (item.processType === "메모" && Boolean(item.ideaGroupId))
+  );
+}
+
 function normalizeText(text: string) {
   return text.trim().toLowerCase();
 }
@@ -44,7 +55,7 @@ export function fallbackGroupIdea({
 }): IdeaGroupingResult {
   const keywords = getKeywords(text);
   const candidates = existingIdeas
-    .filter((item) => item.processType === "아이디어")
+    .filter(isIdeaRecord)
     .map((item) => {
       const targetKeywords = getKeywords(
         `${item.title} ${item.originalText} ${item.ideaGroupTitle ?? ""}`
@@ -100,7 +111,7 @@ export async function groupIdeaWithAi({
       body: JSON.stringify({
         text,
         existingIdeas: existingIdeas
-          .filter((item) => item.processType === "아이디어")
+          .filter(isIdeaRecord)
           .slice(0, 40)
           .map((item) => ({
             id: item.id,

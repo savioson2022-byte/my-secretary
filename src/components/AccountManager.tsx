@@ -736,7 +736,7 @@ export default function AccountManager() {
                     즉시처리 자동 사용
                   </span>
                   <span className="mt-1 block text-xs font-semibold leading-5 text-slate-500">
-                    켜두면 구매, 예약, 연락 요청을 에이전트 준비함에서 바로
+                    켜두면 구매, 예약, 연락 요청을 즉시처리 확인함에서 바로
                     처리 후보로 보여줍니다.
                   </span>
                 </span>

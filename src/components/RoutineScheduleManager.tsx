@@ -1165,7 +1165,7 @@ function RoutineScheduleManager({
       date: summary.date,
     }))
   );
-  const showWeeklyCalendar = true;
+  const showWeeklyCalendar = variant !== "management";
   const canEditCalendar = variant !== "weekly";
   const showAvailabilityAndSuggestions = variant !== "management";
   const showScheduleManagement = variant !== "weekly";
@@ -1800,7 +1800,7 @@ function RoutineScheduleManager({
         <div>
           <h2 className="text-lg font-black text-slate-900">나의 일정 관리</h2>
           <p className="mt-1 text-sm text-slate-500">
-            반복 일정과 이동 준비를 한 곳에서 관리합니다.
+            정기 일정은 새로 입력하고, 단기 일정은 아래 목록에서 수정합니다.
           </p>
         </div>
 

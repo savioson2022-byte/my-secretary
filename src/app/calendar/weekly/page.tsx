@@ -38,7 +38,8 @@ export default function WeeklyCalendarPage() {
               주간 캘린더
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
-              이번 주의 정기 일정, 단기 일정, 빈 시간, 시간작업 추천을 확인합니다.
+              모바일에서는 이번 주 흐름, 하루 일정, 빈 시간, 추천 배치만
+              확인합니다. 자세한 입력과 편집은 관리 탭에서 합니다.
             </p>
           </div>
           <UserStatusBadge />
