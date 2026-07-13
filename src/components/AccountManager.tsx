@@ -29,6 +29,16 @@ const ENERGY_PATTERN_OPTIONS: Array<{
   { value: "night", label: "저녁형" },
 ];
 
+const LOCAL_APP_SESSION_KEY = "my-secretary-local-app-session";
+
+type LocalAppSession = {
+  id: string;
+  loginId: string;
+  email: string;
+  displayName: string;
+  createdAt: string;
+};
+
 function detectDeviceType() {
   if (typeof navigator === "undefined") return "unknown";
 
@@ -105,6 +115,51 @@ function getLoginIdFromUser(user: User) {
   return null;
 }
 
+function createLocalUser(session: LocalAppSession): User {
+  const now = session.createdAt;
+
+  return {
+    id: session.id,
+    app_metadata: {
+      provider: "local_app",
+      providers: ["local_app"],
+    },
+    user_metadata: {
+      login_id: session.loginId,
+      name: session.displayName,
+      full_name: session.displayName,
+    },
+    aud: "authenticated",
+    created_at: now,
+    email: session.email,
+    phone: "",
+    role: "authenticated",
+    updated_at: now,
+    identities: [],
+  } as User;
+}
+
+function getStoredLocalSession() {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const rawSession = window.localStorage.getItem(LOCAL_APP_SESSION_KEY);
+    return rawSession ? (JSON.parse(rawSession) as LocalAppSession) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveLocalSession(session: LocalAppSession) {
+  window.localStorage.setItem(LOCAL_APP_SESSION_KEY, JSON.stringify(session));
+}
+
+function clearLocalSession() {
+  if (typeof window !== "undefined") {
+    window.localStorage.removeItem(LOCAL_APP_SESSION_KEY);
+  }
+}
+
 export default function AccountManager() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const configured = isSupabaseConfigured();
@@ -122,6 +177,7 @@ export default function AccountManager() {
   const [message, setMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLocalSession, setIsLocalSession] = useState(false);
 
   const [displayName, setDisplayName] = useState("");
   const [classificationPreference, setClassificationPreference] = useState("");
@@ -198,7 +254,14 @@ export default function AccountManager() {
     );
     setDeviceName(getDefaultDeviceName());
 
+    const storedLocalSession = getStoredLocalSession();
+
     if (!supabase) {
+      if (storedLocalSession) {
+        setUser(createLocalUser(storedLocalSession));
+        setDisplayName(storedLocalSession.displayName);
+        setIsLocalSession(true);
+      }
       setIsLoading(false);
       return;
     }
@@ -210,16 +273,22 @@ export default function AccountManager() {
 
       if (sessionUser) {
         setUser(sessionUser);
+        setIsLocalSession(false);
         await ensureProfileAndDevice(sessionUser);
         setIsLoading(false);
         return;
       }
 
       const { data: userData } = await client.auth.getUser();
-      setUser(userData.user);
 
       if (userData.user) {
+        setUser(userData.user);
+        setIsLocalSession(false);
         await ensureProfileAndDevice(userData.user);
+      } else if (storedLocalSession) {
+        setUser(createLocalUser(storedLocalSession));
+        setDisplayName(storedLocalSession.displayName);
+        setIsLocalSession(true);
       }
 
       setIsLoading(false);
@@ -230,13 +299,24 @@ export default function AccountManager() {
     const { data: listener } = client.auth.onAuthStateChange(
       async (_event, session) => {
         const nextUser = session?.user ?? null;
-        setUser(nextUser);
 
         if (nextUser) {
+          setUser(nextUser);
+          setIsLocalSession(false);
           await ensureProfileAndDevice(nextUser);
         } else {
-          setDevices([]);
-          setUnifiedAccount(null);
+          const nextLocalSession = getStoredLocalSession();
+
+          if (nextLocalSession) {
+            setUser(createLocalUser(nextLocalSession));
+            setDisplayName(nextLocalSession.displayName);
+            setIsLocalSession(true);
+          } else {
+            setUser(null);
+            setDevices([]);
+            setUnifiedAccount(null);
+            setIsLocalSession(false);
+          }
         }
       }
     );
@@ -587,13 +667,60 @@ export default function AccountManager() {
     setMessage("새 비밀번호를 저장했습니다. 다음부터는 이 비밀번호로 로그인하세요.");
   }
 
+  function handleLocalAppLogin() {
+    const identifier = loginId.trim() || signupEmail.trim();
+
+    if (!identifier) {
+      setMessage("오늘 바로 시작하려면 아이디 또는 이메일을 입력해주세요.");
+      return;
+    }
+
+    const normalizedIdentifier = normalizeLoginId(identifier);
+    const fallbackName =
+      signupName.trim() ||
+      displayName.trim() ||
+      normalizedIdentifier.split("@")[0] ||
+      "사용자";
+    const now = new Date().toISOString();
+    const session: LocalAppSession = {
+      id:
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? `local-${crypto.randomUUID()}`
+          : `local-${Date.now()}`,
+      loginId: normalizedIdentifier,
+      email: identifier.includes("@")
+        ? identifier.toLowerCase()
+        : `${normalizedIdentifier}@local.my-secretary`,
+      displayName: fallbackName,
+      createdAt: now,
+    };
+
+    saveLocalSession(session);
+    setUser(createLocalUser(session));
+    setDisplayName(session.displayName);
+    setDevices([]);
+    setUnifiedAccount(null);
+    setIsLocalSession(true);
+    setMessage("오늘 바로 앱을 열었습니다. 정식 계정 연결은 이메일 한도 문제를 해결한 뒤 이어서 붙이면 됩니다.");
+  }
+
   async function handleSignOut() {
-    if (!supabase) return;
+    clearLocalSession();
+
+    if (!supabase || isLocalSession) {
+      setUser(null);
+      setDevices([]);
+      setUnifiedAccount(null);
+      setIsLocalSession(false);
+      setMessage("로그아웃했습니다.");
+      return;
+    }
 
     await supabase.auth.signOut();
     setUser(null);
     setDevices([]);
     setUnifiedAccount(null);
+    setIsLocalSession(false);
     setMessage("로그아웃했습니다.");
   }
 
@@ -892,6 +1019,19 @@ export default function AccountManager() {
                 비밀번호 재설정 메일 보내기
               </button>
             )}
+
+            <button
+              type="button"
+              onClick={handleLocalAppLogin}
+              disabled={isSaving || (!loginId.trim() && !signupEmail.trim())}
+              className="w-full rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white transition hover:bg-slate-800 disabled:bg-slate-300"
+            >
+              오늘 바로 앱 열기
+            </button>
+            <p className="text-xs font-semibold leading-5 text-slate-400">
+              이메일 발송 제한이 풀릴 때까지 이 기기에서 앱 화면과 기능을 먼저
+              확인하는 임시 로그인입니다.
+            </p>
           </div>
 
           <div className="mt-4 rounded-3xl bg-slate-50 p-4 ring-1 ring-slate-100">
@@ -952,7 +1092,11 @@ export default function AccountManager() {
                 {user.email}
               </p>
               <p className="mt-1 text-xs font-black text-emerald-600">
-                {currentDevice ? "현재 기기 연결됨" : "현재 기기 연결 확인 중"}
+                {isLocalSession
+                  ? "이 기기에서 바로 시작"
+                  : currentDevice
+                    ? "현재 기기 연결됨"
+                    : "현재 기기 연결 확인 중"}
               </p>
             </div>
           </div>
@@ -968,25 +1112,43 @@ export default function AccountManager() {
         <div className="mt-4 rounded-3xl bg-blue-50 p-4 ring-1 ring-blue-100">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-xs font-black text-blue-600">통합계정</p>
+              <p className="text-xs font-black text-blue-600">
+                {isLocalSession ? "오늘용 임시 로그인" : "통합계정"}
+              </p>
               <h3 className="mt-1 text-sm font-black text-slate-900">
-                {unifiedAccount
+                {isLocalSession
+                  ? "이 기기에서 앱 화면을 확인 중입니다."
+                  : unifiedAccount
                   ? "이 로그인은 통합계정에 연결됐습니다."
                   : "통합계정 연결 준비 중"}
               </h3>
               <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
-                카카오, Google, Apple, 이메일 로그인을 하나의 앱 계정으로
-                묶기 위한 기반입니다.
+                {isLocalSession
+                  ? "Supabase 이메일 제한이 풀리면 정식 계정으로 다시 연결하면 됩니다."
+                  : "카카오, Google, Apple, 이메일 로그인을 하나의 앱 계정으로 묶기 위한 기반입니다."}
               </p>
             </div>
-            {unifiedAccount?.identity.provider && (
+            {isLocalSession ? (
+              <span className="shrink-0 rounded-full bg-white px-3 py-1.5 text-xs font-black text-blue-700 ring-1 ring-blue-100">
+                local
+              </span>
+            ) : unifiedAccount?.identity.provider ? (
               <span className="shrink-0 rounded-full bg-white px-3 py-1.5 text-xs font-black text-blue-700 ring-1 ring-blue-100">
                 {unifiedAccount.identity.provider}
               </span>
-            )}
+            ) : null}
           </div>
 
-          {unifiedAccount ? (
+          {isLocalSession ? (
+            <div className="mt-3 grid gap-2 text-xs font-bold text-slate-500 sm:grid-cols-2">
+              <p className="rounded-2xl bg-white px-3 py-2 ring-1 ring-blue-100">
+                임시 계정 {getLoginIdFromUser(user) ?? "local"}
+              </p>
+              <p className="rounded-2xl bg-white px-3 py-2 ring-1 ring-blue-100">
+                저장 위치 현재 기기
+              </p>
+            </div>
+          ) : unifiedAccount ? (
             <div className="mt-3 grid gap-2 text-xs font-bold text-slate-500 sm:grid-cols-2">
               <p className="rounded-2xl bg-white px-3 py-2 ring-1 ring-blue-100">
                 계정 ID {unifiedAccount.account.id.slice(0, 8)}
