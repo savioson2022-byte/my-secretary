@@ -33,6 +33,9 @@ async function checkPurchaseMailSchema(request: Request) {
 }
 
 export async function GET(request: Request) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+  const supabaseProjectRef =
+    supabaseUrl.match(/^https:\/\/([^.]+)\.supabase\.co/)?.[1] ?? null;
   const hasGoogleOAuth =
     Boolean(process.env.GOOGLE_CLIENT_ID) &&
     Boolean(process.env.GOOGLE_CLIENT_SECRET);
@@ -48,6 +51,10 @@ export async function GET(request: Request) {
     hasOpenAi,
     hasCronSecret,
     ...schemaStatus,
+    supabaseProjectRef,
+    supabaseSqlEditorUrl: supabaseProjectRef
+      ? `https://supabase.com/dashboard/project/${supabaseProjectRef}/sql/new`
+      : null,
     cronSchedule: "하루 1회",
     automationStartDate: "2026-07-14",
   });

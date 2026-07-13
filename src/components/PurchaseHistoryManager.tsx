@@ -47,6 +47,8 @@ type MailAutomationConfig = {
   hasCronSecret: boolean;
   canCheckSchema: boolean;
   hasPurchaseMailSchema: boolean;
+  supabaseProjectRef: string | null;
+  supabaseSqlEditorUrl: string | null;
   cronSchedule: string;
   automationStartDate: string;
 };
@@ -309,6 +311,22 @@ export default function PurchaseHistoryManager() {
     if (!response.ok) return;
 
     setMailAutomationConfig((await response.json()) as MailAutomationConfig);
+  }
+
+  async function handleCopySetupSql() {
+    const response = await fetch("/api/purchase/mail/setup-sql");
+
+    if (!response.ok) {
+      setMailAutomationMessage("설정 SQL을 불러오지 못했어.");
+      return;
+    }
+
+    const sql = await response.text();
+
+    await navigator.clipboard.writeText(sql);
+    setMailAutomationMessage(
+      "Supabase SQL Editor에 붙여넣을 설정 SQL을 복사했어."
+    );
   }
 
   async function handleConnectGmail() {
@@ -667,12 +685,49 @@ export default function PurchaseHistoryManager() {
 
           {mailAutomationConfig?.canCheckSchema &&
             !mailAutomationConfig.hasPurchaseMailSchema && (
-              <p className="rounded-2xl bg-rose-50 p-4 text-xs font-bold leading-5 text-rose-600 ring-1 ring-rose-100">
-                Supabase에 쿠팡 자동화 테이블이 아직 없습니다.
-                supabase/migrations/20260714010000_create_purchase_mail_automation.sql
-                파일을 SQL Editor에서 실행해야 메일 연결과 자동 수집이
-                저장됩니다.
-              </p>
+              <div className="rounded-2xl bg-rose-50 p-4 ring-1 ring-rose-100">
+                <p className="text-xs font-bold leading-5 text-rose-600">
+                  Supabase에 쿠팡 자동화 테이블이 아직 없습니다. 설정 SQL을
+                  SQL Editor에서 실행해야 메일 연결과 자동 수집이 저장됩니다.
+                </p>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={handleCopySetupSql}
+                    className="rounded-2xl bg-white px-3 py-2 text-xs font-black text-rose-600 ring-1 ring-rose-100"
+                  >
+                    설정 SQL 복사
+                  </button>
+                  {mailAutomationConfig.supabaseSqlEditorUrl ? (
+                    <a
+                      href={mailAutomationConfig.supabaseSqlEditorUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="rounded-2xl bg-rose-600 px-3 py-2 text-center text-xs font-black text-white"
+                    >
+                      SQL Editor 열기
+                    </a>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled
+                      className="rounded-2xl bg-slate-200 px-3 py-2 text-xs font-black text-slate-400"
+                    >
+                      SQL Editor
+                    </button>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void refreshMailAutomationConfig();
+                    void refreshMailConnections();
+                  }}
+                  className="mt-2 w-full rounded-2xl bg-white px-3 py-2 text-xs font-black text-slate-600 ring-1 ring-slate-100"
+                >
+                  설정 후 다시 확인
+                </button>
+              </div>
             )}
 
           {mailConnections.length === 0 ? (
