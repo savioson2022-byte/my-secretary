@@ -22,6 +22,102 @@ function redirectWithError(request: NextRequest, message: string) {
   return NextResponse.redirect(redirectUrl);
 }
 
+function escapeHtml(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+function createNativeHandoffResponse(nativeUrl: URL) {
+  const href = escapeHtml(nativeUrl.toString());
+
+  return new NextResponse(
+    `<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>나의 비서 로그인 연결</title>
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: #f6f9ff;
+        color: #111827;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      main {
+        width: min(100% - 32px, 420px);
+        border-radius: 28px;
+        background: white;
+        padding: 28px;
+        box-shadow: 0 24px 70px rgba(15, 23, 42, 0.12);
+        text-align: center;
+      }
+      .mark {
+        width: 56px;
+        height: 56px;
+        margin: 0 auto 18px;
+        display: grid;
+        place-items: center;
+        border-radius: 20px;
+        background: #2563eb;
+        color: white;
+        font-weight: 900;
+        font-size: 24px;
+      }
+      h1 {
+        margin: 0;
+        font-size: 24px;
+        line-height: 1.25;
+      }
+      p {
+        margin: 12px 0 22px;
+        color: #64748b;
+        font-size: 15px;
+        line-height: 1.65;
+      }
+      a {
+        display: block;
+        border-radius: 18px;
+        background: #2563eb;
+        color: white;
+        padding: 16px 18px;
+        text-decoration: none;
+        font-weight: 900;
+      }
+      small {
+        display: block;
+        margin-top: 14px;
+        color: #94a3b8;
+        font-size: 12px;
+        line-height: 1.5;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="mark">나</div>
+      <h1>카카오 로그인이 완료됐어요</h1>
+      <p>아래 버튼을 눌러 나의 비서 앱으로 돌아가면 로그인 상태가 앱에 저장됩니다.</p>
+      <a href="${href}">나의 비서 앱으로 돌아가기</a>
+      <small>자동으로 앱이 열리지 않으면 이 버튼을 한 번 더 눌러주세요.</small>
+    </main>
+  </body>
+</html>`,
+    {
+      headers: {
+        "content-type": "text/html; charset=utf-8",
+        "cache-control": "no-store",
+      },
+    }
+  );
+}
+
 export async function GET(request: NextRequest) {
   const config = getSupabaseBrowserConfig();
   const kakaoRestApiKey = process.env.KAKAO_REST_API_KEY;
@@ -135,7 +231,7 @@ export async function GET(request: NextRequest) {
       next: nextPath,
     });
     nativeRedirectUrl.hash = hashParams.toString();
-    response = NextResponse.redirect(nativeRedirectUrl);
+    response = createNativeHandoffResponse(nativeRedirectUrl);
   }
 
   response.cookies.delete(STATE_COOKIE);
