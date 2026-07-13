@@ -552,10 +552,17 @@ const syncDomains: Array<SyncDomain<SyncableItem, { id: string }>> = [
     key: STORAGE_KEYS.purchaseHistory,
     table: "purchase_history",
     optionalTable: true,
-    toRow(item, userId) {
+    optionalColumns: [
+      "repeat_cycle_days",
+      "next_purchase_check_date",
+      "source",
+      "source_message_id",
+      "imported_at",
+    ],
+    toRow(item, userId, availableColumns) {
       const history = item as PurchaseHistoryItem;
 
-      return {
+      const row = {
         id: history.id,
         user_id: userId,
         product_name: history.productName,
@@ -569,6 +576,38 @@ const syncDomains: Array<SyncDomain<SyncableItem, { id: string }>> = [
         created_at: history.createdAt,
         updated_at: history.updatedAt,
       };
+
+      if (availableColumns.has("repeat_cycle_days")) {
+        Object.assign(row, {
+          repeat_cycle_days: history.repeatCycleDays ?? null,
+        });
+      }
+
+      if (availableColumns.has("next_purchase_check_date")) {
+        Object.assign(row, {
+          next_purchase_check_date: history.nextPurchaseCheckDate ?? null,
+        });
+      }
+
+      if (availableColumns.has("source")) {
+        Object.assign(row, {
+          source: history.source ?? "manual",
+        });
+      }
+
+      if (availableColumns.has("source_message_id")) {
+        Object.assign(row, {
+          source_message_id: history.sourceMessageId ?? null,
+        });
+      }
+
+      if (availableColumns.has("imported_at")) {
+        Object.assign(row, {
+          imported_at: history.importedAt ?? null,
+        });
+      }
+
+      return row;
     },
     fromRow(row) {
       return {
@@ -578,6 +617,11 @@ const syncDomains: Array<SyncDomain<SyncableItem, { id: string }>> = [
         productUrl: asNullableText(row.product_url),
         defaultQuantity: asNullableNumber(row.default_quantity),
         maxBudgetKrw: asNullableNumber(row.max_budget_krw),
+        repeatCycleDays: asNullableNumber(row.repeat_cycle_days),
+        nextPurchaseCheckDate: asNullableText(row.next_purchase_check_date),
+        source: asText(row.source, "manual") as PurchaseHistoryItem["source"],
+        sourceMessageId: asNullableText(row.source_message_id),
+        importedAt: asNullableText(row.imported_at),
         autoRepurchaseEnabled: asBoolean(row.auto_repurchase_enabled, false),
         lastPurchasedAt: asText(row.last_purchased_at),
         memo: asText(row.memo),

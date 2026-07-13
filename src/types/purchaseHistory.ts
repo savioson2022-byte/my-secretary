@@ -1,4 +1,5 @@
 export type PurchasePlatform = "coupang" | "other";
+export type PurchaseHistorySource = "manual" | "mail" | "agent";
 
 export type PurchaseHistoryItem = {
   id: string;
@@ -9,6 +10,9 @@ export type PurchaseHistoryItem = {
   maxBudgetKrw?: number | null;
   repeatCycleDays?: number | null;
   nextPurchaseCheckDate?: string | null;
+  source?: PurchaseHistorySource;
+  sourceMessageId?: string | null;
+  importedAt?: string | null;
   autoRepurchaseEnabled: boolean;
   lastPurchasedAt: string;
   memo: string;

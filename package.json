@@ -22,6 +22,7 @@
     "@types/react": "^18.2.67",
     "@types/react-dom": "^18.2.22",
     "autoprefixer": "^10.4.19",
+    "imapflow": "^1.4.7",
     "next": "^14.2.5",
     "openai": "^6.44.0",
     "postcss": "^8.4.38",

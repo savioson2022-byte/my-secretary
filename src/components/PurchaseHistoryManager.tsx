@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { getCloudDataSyncedEventName } from "@/lib/dataSyncEvents";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import {
   createId,
   deletePurchaseHistory,
@@ -26,6 +27,17 @@ type PurchaseDraft = {
   nextPurchaseCheckDate: string;
   autoRepurchaseEnabled: boolean;
   memo: string;
+};
+
+type MailConnectionStatus = {
+  id: string;
+  provider: "gmail" | "naver";
+  email: string | null;
+  sync_after: string;
+  last_sync_at: string | null;
+  status: "active" | "paused" | "error";
+  last_error: string | null;
+  updated_at: string;
 };
 
 function createEmptyDraft(): PurchaseDraft {
@@ -179,6 +191,17 @@ export default function PurchaseHistoryManager() {
   const [selectedCandidate, setSelectedCandidate] =
     useState<MailImportCandidate | null>(null);
   const [isImportingMail, setIsImportingMail] = useState(false);
+  const [mailConnections, setMailConnections] = useState<
+    MailConnectionStatus[]
+  >([]);
+  const [mailAutomationMessage, setMailAutomationMessage] = useState<
+    string | null
+  >(null);
+  const [isMailAutomationBusy, setIsMailAutomationBusy] = useState(false);
+  const [naverMailDraft, setNaverMailDraft] = useState({
+    email: "",
+    appPassword: "",
+  });
 
   useEffect(() => {
     function refreshHistories() {
@@ -194,6 +217,10 @@ export default function PurchaseHistoryManager() {
         refreshHistories
       );
     };
+  }, []);
+
+  useEffect(() => {
+    void refreshMailConnections();
   }, []);
 
   const enabledHistories = useMemo(() => {
@@ -216,6 +243,197 @@ export default function PurchaseHistoryManager() {
   function resetDraft() {
     setDraft(createEmptyDraft());
     setSelectedCandidate(null);
+  }
+
+  async function getSupabaseAccessToken() {
+    const supabase = createSupabaseBrowserClient();
+
+    if (!supabase) return null;
+
+    const { data } = await supabase.auth.getSession();
+
+    return data.session?.access_token ?? null;
+  }
+
+  async function refreshMailConnections() {
+    const accessToken = await getSupabaseAccessToken();
+
+    if (!accessToken) {
+      setMailAutomationMessage(
+        "앱 계정으로 로그인하면 Gmail 자동 수집을 연결할 수 있어."
+      );
+      return;
+    }
+
+    const response = await fetch("/api/purchase/mail/status", {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!response.ok) return;
+
+    const data = (await response.json()) as {
+      connections: MailConnectionStatus[];
+      message?: string;
+    };
+
+    setMailConnections(data.connections);
+    setMailAutomationMessage(data.message ?? null);
+  }
+
+  async function handleConnectGmail() {
+    const accessToken = await getSupabaseAccessToken();
+
+    if (!accessToken) {
+      setMailAutomationMessage("먼저 앱 계정으로 로그인해야 Gmail을 연결할 수 있어.");
+      return;
+    }
+
+    setIsMailAutomationBusy(true);
+
+    try {
+      const response = await fetch("/api/purchase/mail/gmail/start", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+      const data = (await response.json()) as {
+        authUrl?: string;
+        error?: string;
+      };
+
+      if (!response.ok || !data.authUrl) {
+        setMailAutomationMessage(
+          data.error ?? "Gmail 연결 준비에 실패했어."
+        );
+        return;
+      }
+
+      window.location.href = data.authUrl;
+    } finally {
+      setIsMailAutomationBusy(false);
+    }
+  }
+
+  async function handleSyncMailNow() {
+    const accessToken = await getSupabaseAccessToken();
+
+    if (!accessToken) {
+      setMailAutomationMessage("먼저 앱 계정으로 로그인해야 메일을 확인할 수 있어.");
+      return;
+    }
+
+    setIsMailAutomationBusy(true);
+
+    try {
+      const response = await fetch("/api/purchase/mail/sync", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+      const data = (await response.json()) as {
+        importedCount?: number;
+        messageCount?: number;
+        importedHistories?: PurchaseHistoryItem[];
+        message?: string;
+        error?: string;
+      };
+
+      if (!response.ok) {
+        setMailAutomationMessage(data.error ?? "메일 확인에 실패했어.");
+        return;
+      }
+
+      (data.importedHistories ?? []).forEach((history) => {
+        savePurchaseHistory(history);
+      });
+
+      setHistories(getPurchaseHistories());
+      await refreshMailConnections();
+      setMailAutomationMessage(
+        data.message ??
+          `메일 ${data.messageCount ?? 0}개를 확인했고 구매템 ${data.importedCount ?? 0}개를 저장했어.`
+      );
+    } finally {
+      setIsMailAutomationBusy(false);
+    }
+  }
+
+  async function handleConnectNaverMail() {
+    const accessToken = await getSupabaseAccessToken();
+
+    if (!accessToken) {
+      setMailAutomationMessage("먼저 앱 계정으로 로그인해야 네이버 메일을 연결할 수 있어.");
+      return;
+    }
+
+    setIsMailAutomationBusy(true);
+
+    try {
+      const response = await fetch("/api/purchase/mail/naver/connect", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify(naverMailDraft),
+      });
+      const data = (await response.json()) as {
+        error?: string;
+      };
+
+      if (!response.ok) {
+        setMailAutomationMessage(data.error ?? "네이버 메일 연결에 실패했어.");
+        return;
+      }
+
+      setNaverMailDraft({
+        email: "",
+        appPassword: "",
+      });
+      await refreshMailConnections();
+      setMailAutomationMessage(
+        "네이버 메일을 연결했어. 이제 ‘지금 메일 확인’을 누르면 쿠팡 메일을 자동으로 읽습니다."
+      );
+    } finally {
+      setIsMailAutomationBusy(false);
+    }
+  }
+
+  async function handleDeleteMailConnection(connectionId: string) {
+    const shouldDelete = window.confirm(
+      "메일 자동 수집 연결을 삭제할까요? 저장된 구매템은 그대로 유지됩니다."
+    );
+
+    if (!shouldDelete) return;
+
+    const accessToken = await getSupabaseAccessToken();
+
+    if (!accessToken) {
+      setMailAutomationMessage("로그인이 필요합니다.");
+      return;
+    }
+
+    const response = await fetch(
+      `/api/purchase/mail/connections/${connectionId}`,
+      {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      setMailAutomationMessage("메일 연결 삭제에 실패했어.");
+      return;
+    }
+
+    await refreshMailConnections();
+    setMailAutomationMessage("메일 자동 수집 연결을 삭제했어.");
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -351,6 +569,141 @@ export default function PurchaseHistoryManager() {
 
   return (
     <section className="space-y-5">
+      <section className="app-card p-5">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-black text-slate-900">
+              쿠팡 메일 자동 수집
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+              2026년 7월 14일 이후 도착한 쿠팡 메일을 읽어 구매템과 재구매
+              추천일을 자동으로 저장합니다.
+            </p>
+          </div>
+          <span className="shrink-0 rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-600">
+            자동화
+          </span>
+        </div>
+
+        <div className="mt-4 grid gap-2">
+          {mailConnections.length === 0 ? (
+            <p className="rounded-2xl bg-slate-50 p-4 text-xs font-bold leading-5 text-slate-500 ring-1 ring-slate-100">
+              아직 연결된 메일이 없습니다. Gmail은 공식 읽기 권한으로 연결하고,
+              네이버 메일은 IMAP 앱 비밀번호 방식이 필요합니다.
+            </p>
+          ) : (
+            mailConnections.map((connection) => (
+              <div
+                key={connection.id}
+                className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-100"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-black text-slate-900">
+                    {connection.provider === "gmail" ? "Gmail" : "네이버 메일"}
+                    {connection.email ? ` · ${connection.email}` : ""}
+                  </p>
+                  <span
+                    className={`rounded-full px-3 py-1 text-xs font-black ${
+                      connection.status === "active"
+                        ? "bg-emerald-50 text-emerald-600"
+                        : "bg-rose-50 text-rose-600"
+                    }`}
+                  >
+                    {connection.status === "active" ? "연결됨" : "확인 필요"}
+                  </span>
+                </div>
+                <p className="mt-2 text-xs font-bold text-slate-400">
+                  마지막 확인:{" "}
+                  {connection.last_sync_at
+                    ? formatDateLabel(connection.last_sync_at.slice(0, 10))
+                    : "아직 없음"}
+                </p>
+                {connection.last_error && (
+                  <p className="mt-2 text-xs font-bold text-rose-500">
+                    {connection.last_error}
+                  </p>
+                )}
+                <button
+                  type="button"
+                  onClick={() => handleDeleteMailConnection(connection.id)}
+                  className="mt-3 rounded-full bg-white px-3 py-1.5 text-xs font-black text-rose-500 ring-1 ring-rose-100"
+                >
+                  메일 연결 삭제
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+
+        {mailAutomationMessage && (
+          <p className="mt-4 rounded-2xl bg-blue-50 px-4 py-3 text-sm font-bold text-blue-700 ring-1 ring-blue-100">
+            {mailAutomationMessage}
+          </p>
+        )}
+
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            onClick={handleConnectGmail}
+            disabled={isMailAutomationBusy}
+            className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-black text-white disabled:bg-slate-300"
+          >
+            Gmail 연결
+          </button>
+          <button
+            type="button"
+            onClick={handleSyncMailNow}
+            disabled={isMailAutomationBusy}
+            className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white disabled:bg-slate-300"
+          >
+            지금 메일 확인
+          </button>
+        </div>
+
+        <div className="mt-4 rounded-3xl bg-slate-50 p-4 ring-1 ring-slate-100">
+          <p className="text-sm font-black text-slate-900">
+            네이버 메일 연결
+          </p>
+          <p className="mt-2 text-xs font-bold leading-5 text-slate-500">
+            네이버 메일은 IMAP 사용과 앱 비밀번호가 필요합니다. 입력한 값은
+            메일 수집 서버에서만 사용합니다.
+          </p>
+          <div className="mt-3 grid gap-2">
+            <input
+              value={naverMailDraft.email}
+              onChange={(event) =>
+                setNaverMailDraft((current) => ({
+                  ...current,
+                  email: event.target.value,
+                }))
+              }
+              placeholder="네이버 메일 주소"
+              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-blue-400"
+            />
+            <input
+              type="password"
+              value={naverMailDraft.appPassword}
+              onChange={(event) =>
+                setNaverMailDraft((current) => ({
+                  ...current,
+                  appPassword: event.target.value,
+                }))
+              }
+              placeholder="네이버 앱 비밀번호"
+              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-blue-400"
+            />
+            <button
+              type="button"
+              onClick={handleConnectNaverMail}
+              disabled={isMailAutomationBusy}
+              className="rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-700 ring-1 ring-slate-200 disabled:bg-slate-200"
+            >
+              네이버 메일 연결
+            </button>
+          </div>
+        </div>
+      </section>
+
       <section className="app-card p-5">
         <div className="flex items-start justify-between gap-3">
           <div>
