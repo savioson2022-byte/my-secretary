@@ -329,6 +329,27 @@ export default function PurchaseHistoryManager() {
     );
   }
 
+  async function handleCopyServerAutomationChecklist() {
+    await navigator.clipboard.writeText(
+      [
+        "Vercel Production 환경변수에 아래 값을 추가하세요.",
+        "",
+        "필수:",
+        "SUPABASE_SERVICE_ROLE_KEY=Supabase Project Settings > API > service_role key",
+        "CRON_SECRET=임의의 긴 비밀 문자열",
+        "OPENAI_API_KEY=OpenAI API Key",
+        "",
+        "Gmail 자동 수집을 쓸 경우 추가:",
+        "GOOGLE_CLIENT_ID=Google OAuth Client ID",
+        "GOOGLE_CLIENT_SECRET=Google OAuth Client Secret",
+        "GOOGLE_GMAIL_REDIRECT_URI=https://my-secretary-remote.vercel.app/api/purchase/mail/gmail/callback",
+        "",
+        "환경변수 저장 후 Vercel에서 다시 배포하면 서버 자동 수집이 활성화됩니다.",
+      ].join("\n")
+    );
+    setMailAutomationMessage("서버 자동 실행 설정 목록을 복사했어.");
+  }
+
   async function handleConnectGmail() {
     const accessToken = await getSupabaseAccessToken();
 
@@ -793,6 +814,25 @@ export default function PurchaseHistoryManager() {
                   className="mt-2 w-full rounded-2xl bg-white px-3 py-2 text-xs font-black text-slate-600 ring-1 ring-slate-100"
                 >
                   설정 후 다시 확인
+                </button>
+              </div>
+            )}
+
+          {mailAutomationConfig &&
+            mailAutomationConfig.hasPurchaseMailSchema &&
+            !mailAutomationConfig.hasSupabaseAdmin && (
+              <div className="rounded-2xl bg-amber-50 p-4 ring-1 ring-amber-100">
+                <p className="text-xs font-bold leading-5 text-amber-700">
+                  앱을 열 때 자동 확인은 동작하지만, 서버가 매일 알아서 전체
+                  사용자의 쿠팡 메일을 확인하려면 Vercel Production 환경변수에
+                  Supabase 서비스 역할 키가 필요합니다.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleCopyServerAutomationChecklist}
+                  className="mt-3 w-full rounded-2xl bg-white px-3 py-2 text-xs font-black text-amber-700 ring-1 ring-amber-100"
+                >
+                  서버 자동 실행 설정 목록 복사
                 </button>
               </div>
             )}
