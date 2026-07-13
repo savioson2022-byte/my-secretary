@@ -14,6 +14,10 @@ const AUTO_SYNC_STORAGE_KEY = "my-assistant-purchase-mail-auto-sync-at";
 const AUTO_SYNC_INTERVAL_MS = 1000 * 60 * 60 * 6;
 const AUTO_SYNC_TIMER_MS = 1000 * 60 * 15;
 
+function getAutoSyncStorageKey(userId: string) {
+  return `${AUTO_SYNC_STORAGE_KEY}:${userId}`;
+}
+
 function upsertLocalPurchaseHistory(history: PurchaseHistoryItem) {
   const histories = getPurchaseHistories();
   const existingHistory = histories.find((item) => item.id === history.id);
@@ -52,22 +56,24 @@ export default function PurchaseMailAutoSyncBridge() {
     async function syncPurchaseMailQuietly() {
       if (isSyncing) return;
 
-      const lastSyncedAt = Number(
-        window.localStorage.getItem(AUTO_SYNC_STORAGE_KEY) ?? 0
-      );
-
-      if (Date.now() - lastSyncedAt < AUTO_SYNC_INTERVAL_MS) {
-        return;
-      }
-
       const supabase = createSupabaseBrowserClient();
 
       if (!supabase) return;
 
       const { data } = await supabase.auth.getSession();
       const accessToken = data.session?.access_token;
+      const userId = data.session?.user.id;
 
-      if (!accessToken || isCancelled) return;
+      if (!accessToken || !userId || isCancelled) return;
+
+      const storageKey = getAutoSyncStorageKey(userId);
+      const lastSyncedAt = Number(
+        window.localStorage.getItem(storageKey) ?? 0
+      );
+
+      if (Date.now() - lastSyncedAt < AUTO_SYNC_INTERVAL_MS) {
+        return;
+      }
 
       isSyncing = true;
 
@@ -88,7 +94,7 @@ export default function PurchaseMailAutoSyncBridge() {
         };
 
         (result.importedHistories ?? []).forEach(upsertLocalPurchaseHistory);
-        window.localStorage.setItem(AUTO_SYNC_STORAGE_KEY, String(Date.now()));
+        window.localStorage.setItem(storageKey, String(Date.now()));
 
         if ((result.importedHistories ?? []).length > 0) {
           window.dispatchEvent(
@@ -101,7 +107,7 @@ export default function PurchaseMailAutoSyncBridge() {
           );
         }
       } catch {
-        window.localStorage.removeItem(AUTO_SYNC_STORAGE_KEY);
+        window.localStorage.removeItem(storageKey);
       } finally {
         isSyncing = false;
       }
