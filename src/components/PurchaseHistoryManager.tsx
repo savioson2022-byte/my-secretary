@@ -9,6 +9,11 @@ import {
   savePurchaseHistory,
   updatePurchaseHistory,
 } from "@/lib/purchaseHistoryStorage";
+import {
+  parseCoupangOrderMailFallback,
+  type MailImportCandidate,
+  type PurchaseMailImportResult,
+} from "@/lib/purchaseMailImport";
 import type { PurchaseHistoryItem } from "@/types/purchaseHistory";
 
 type PurchaseDraft = {
@@ -19,13 +24,6 @@ type PurchaseDraft = {
   maxBudgetKrw: string;
   autoRepurchaseEnabled: boolean;
   memo: string;
-};
-
-type MailImportCandidate = {
-  id: string;
-  productName: string;
-  productUrl: string;
-  priceText: string | null;
 };
 
 function createEmptyDraft(): PurchaseDraft {
@@ -58,72 +56,6 @@ function createCoupangSearchUrl(productName: string) {
   return `https://www.coupang.com/np/search?q=${encodeURIComponent(
     productName
   )}`;
-}
-
-function cleanImportedLine(line: string) {
-  return line
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/gi, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function looksLikeProductLine(line: string) {
-  if (line.length < 4 || line.length > 90) return false;
-
-  const blockedPatterns = [
-    /주문(이|을|번호|내역|완료|확인)/,
-    /결제|배송|도착|출고|취소|반품|교환|영수증/,
-    /쿠팡|Coupang|고객센터|수신거부|개인정보/,
-    /검색|메일|답장|전달|삭제|이동|목록|보기|열기|닫기|뒤로|앞으로/,
-    /네이버|NAVER|Naver|받은메일함|보낸메일함|스팸메일함/,
-    /전체|결과|상세|필터|정렬|설정|로그인|비회원/,
-    /총\s?상품|총\s?결제|합계|할인|배송비/,
-    /https?:\/\//,
-    /^\d+\s?개$/,
-    /^[\d\s,원\-:.]+$/,
-  ];
-
-  if (blockedPatterns.some((pattern) => pattern.test(line))) return false;
-
-  return /[가-힣A-Za-z]/.test(line);
-}
-
-function parseCoupangOrderMail(text: string): MailImportCandidate[] {
-  const urls = Array.from(text.matchAll(/https?:\/\/[^\s"'<>]+/g)).map(
-    (match) => match[0]
-  );
-  const coupangUrl = urls.find((url) => url.includes("coupang.com")) ?? "";
-  const lines = text
-    .split(/\r?\n/)
-    .map(cleanImportedLine)
-    .filter(Boolean);
-  const candidates = new Map<string, MailImportCandidate>();
-
-  lines.forEach((line, index) => {
-    const priceMatch = line.match(/([0-9]{1,3}(?:,[0-9]{3})+|[0-9]+)\s?원/);
-    const withoutPrice = cleanImportedLine(line.replace(/([0-9]{1,3}(?:,[0-9]{3})+|[0-9]+)\s?원/g, ""));
-    const candidateLine = looksLikeProductLine(withoutPrice)
-      ? withoutPrice
-      : looksLikeProductLine(line)
-        ? line
-        : "";
-
-    if (!candidateLine) return;
-
-    const normalized = candidateLine.toLowerCase().replace(/\s+/g, "");
-
-    if (candidates.has(normalized)) return;
-
-    candidates.set(normalized, {
-      id: `${index}-${normalized.slice(0, 16)}`,
-      productName: candidateLine,
-      productUrl: coupangUrl,
-      priceText: priceMatch?.[0] ?? null,
-    });
-  });
-
-  return Array.from(candidates.values()).slice(0, 8);
 }
 
 function normalizeDraft(
@@ -182,6 +114,7 @@ export default function PurchaseHistoryManager() {
   const [message, setMessage] = useState<string | null>(null);
   const [mailText, setMailText] = useState("");
   const [mailCandidates, setMailCandidates] = useState<MailImportCandidate[]>([]);
+  const [isImportingMail, setIsImportingMail] = useState(false);
 
   useEffect(() => {
     function refreshHistories() {
@@ -243,15 +176,49 @@ export default function PurchaseHistoryManager() {
     setMessage("로컬 실행 명령을 복사했어.");
   }
 
-  function handleParseMail() {
-    const candidates = parseCoupangOrderMail(mailText);
+  async function handleParseMail() {
+    if (!mailText.trim()) {
+      setMessage("쿠팡 주문 메일이나 구매 상세정보 내용을 먼저 붙여넣어줘.");
+      return;
+    }
 
-    setMailCandidates(candidates);
-    setMessage(
-      candidates.length > 0
-        ? `${candidates.length}개의 구매 후보를 찾았어. 맞는 상품만 저장하면 돼.`
-        : "상품 후보를 찾지 못했어. 쿠팡 주문 메일의 상품명 부분까지 복사했는지 확인해줘."
-    );
+    setIsImportingMail(true);
+
+    try {
+      const response = await fetch("/api/purchase/import", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text: mailText,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("구매 메일 분석 요청에 실패했습니다.");
+      }
+
+      const result = (await response.json()) as PurchaseMailImportResult;
+
+      setMailCandidates(result.candidates);
+      setMessage(
+        result.candidates.length > 0
+          ? `${result.source === "ai" ? "AI가" : "기본 분석으로"} ${result.candidates.length}개의 구매 후보를 찾았어. 맞는 상품만 저장하면 돼.`
+          : "상품 후보를 찾지 못했어. 쿠팡 주문 상세정보의 상품명/옵션/가격 부분까지 복사했는지 확인해줘."
+      );
+    } catch {
+      const candidates = parseCoupangOrderMailFallback(mailText);
+
+      setMailCandidates(candidates);
+      setMessage(
+        candidates.length > 0
+          ? `기본 분석으로 ${candidates.length}개의 구매 후보를 찾았어. 맞는 상품만 저장하면 돼.`
+          : "상품 후보를 찾지 못했어. 쿠팡 주문 상세정보의 상품명/옵션/가격 부분까지 복사했는지 확인해줘."
+      );
+    } finally {
+      setIsImportingMail(false);
+    }
   }
 
   function handleUseCandidate(candidate: MailImportCandidate) {
@@ -261,8 +228,8 @@ export default function PurchaseHistoryManager() {
       productName: candidate.productName,
       productUrl: candidate.productUrl,
       memo: candidate.priceText
-        ? `쿠팡 주문 메일에서 가져옴 · ${candidate.priceText}`
-        : "쿠팡 주문 메일에서 가져옴",
+        ? `쿠팡 주문 정보에서 가져옴 · ${candidate.priceText}`
+        : "쿠팡 주문 정보에서 가져옴",
     }));
     setMessage("상품 후보를 입력칸에 넣었어. 수량과 예산만 확인하고 저장하면 돼.");
   }
@@ -276,9 +243,8 @@ export default function PurchaseHistoryManager() {
               쿠팡 주문 메일 가져오기
             </h2>
             <p className="mt-2 text-sm leading-6 text-slate-500">
-              네이버 메일이나 Gmail에서 쿠팡 주문 메일을 열고 내용을
-              붙여넣으면, 앱이 상품 후보만 뽑아줍니다. 원문은 저장하지
-              않습니다.
+              네이버 메일, Gmail, 쿠팡 구매 상세정보를 붙여넣으면 AI가 실제
+              구매 상품 후보만 뽑아줍니다. 원문은 저장하지 않습니다.
             </p>
           </div>
           <span className="shrink-0 rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-500">
@@ -287,9 +253,8 @@ export default function PurchaseHistoryManager() {
         </div>
 
         <div className="mt-4 rounded-2xl bg-blue-50 p-4 text-xs font-bold leading-5 text-blue-700 ring-1 ring-blue-100">
-          자동 연결은 Gmail 읽기 전용 권한 또는 네이버 메일 IMAP 연결이
-          필요합니다. 먼저 붙여넣기 방식으로 구매템 후보를 안정적으로 만들고,
-          이후 같은 파서를 자동 메일 확인에 연결합니다.
+          구매 상세정보처럼 잡음이 많은 화면은 AI가 먼저 분석합니다. AI가
+          실패하거나 API 키가 없는 환경에서는 기본 분석으로 자동 전환됩니다.
         </div>
 
         <div className="mt-4 grid gap-3">
@@ -297,15 +262,16 @@ export default function PurchaseHistoryManager() {
             value={mailText}
             onChange={(event) => setMailText(event.target.value)}
             rows={6}
-            placeholder="쿠팡 주문 확인 메일 내용을 여기에 붙여넣으세요. 네이버 메일과 Gmail 모두 가능합니다."
+            placeholder="쿠팡 주문 확인 메일이나 구매 상세정보 내용을 여기에 붙여넣으세요. 네이버 메일과 Gmail 모두 가능합니다."
             className="w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none focus:border-blue-400"
           />
           <button
             type="button"
             onClick={handleParseMail}
-            className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-black text-white"
+            disabled={isImportingMail}
+            className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:bg-slate-300"
           >
-            상품 후보 찾기
+            {isImportingMail ? "AI가 확인 중" : "AI로 상품 후보 찾기"}
           </button>
         </div>
 
@@ -322,7 +288,14 @@ export default function PurchaseHistoryManager() {
                   {candidate.productName}
                 </span>
                 <span className="mt-1 block text-xs font-bold text-slate-400">
-                  {candidate.priceText ?? "가격 정보 없음"} · 눌러서 입력칸에 넣기
+                  {candidate.priceText ?? "가격 정보 없음"}
+                  {candidate.quantityText ? ` · ${candidate.quantityText}` : ""}
+                  {candidate.confidence === "high" ? " · 확실함" : ""}
+                  {candidate.confidence === "medium" ? " · 확인 필요" : ""}
+                  {candidate.confidence === "low" ? " · 낮은 확신" : ""}
+                </span>
+                <span className="mt-1 block text-[11px] font-semibold leading-5 text-slate-400">
+                  {candidate.reason}
                 </span>
               </button>
             ))}
