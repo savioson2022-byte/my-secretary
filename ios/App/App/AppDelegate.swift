@@ -71,10 +71,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             return false
         }
 
-        let target = [url.host, url.path]
-            .compactMap { $0 }
+        let target = ([url.host].compactMap { $0 } + url.pathComponents)
+            .filter { $0 != "/" && !$0.isEmpty }
             .joined(separator: "/")
-            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
 
         switch target {
         case "auth/callback":
@@ -87,6 +86,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             var path = "/auth/native-callback"
             if let fragment = url.fragment, !fragment.isEmpty {
                 path += "#\(fragment)"
+            } else if let query = url.query, !query.isEmpty {
+                path += "#\(query)"
             }
             openWebPath(path)
         case "voice", "record", "memo":
