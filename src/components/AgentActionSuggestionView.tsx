@@ -3,7 +3,10 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { getLocalDataUpdatedEventName } from "@/lib/localStorageRepository";
-import { getNextPurchaseDateFromToday } from "@/lib/purchaseAutomation";
+import {
+  getDueRepurchaseHistories,
+  getNextPurchaseDateFromToday,
+} from "@/lib/purchaseAutomation";
 import {
   createId,
   findMatchingPurchaseHistory,
@@ -107,6 +110,10 @@ function createPurchaseAssistantDraft(
   };
 }
 
+function createCoupangUrlFromHistory(history: PurchaseHistoryItem) {
+  return history.productUrl || createCoupangSearchUrl(history.productName);
+}
+
 export default function AgentActionSuggestionView({
   items,
   compact = false,
@@ -138,6 +145,10 @@ export default function AgentActionSuggestionView({
         item.actionType === "예약")
     );
   });
+  const dueRepurchaseHistories = getDueRepurchaseHistories(
+    purchaseHistories,
+    maxItems ?? 5
+  );
   const visibleItems =
     typeof maxItems === "number" ? agentItems.slice(0, maxItems) : agentItems;
 
@@ -213,6 +224,33 @@ export default function AgentActionSuggestionView({
       updatedAt: new Date().toISOString(),
     });
     setMessage("에이전트 준비 항목을 보류해뒀어.");
+  }
+
+  function postponeRepurchase(history: PurchaseHistoryItem) {
+    const nextPurchaseCheckDate =
+      getNextPurchaseDateFromToday(history) ?? history.nextPurchaseCheckDate;
+
+    updatePurchaseHistory({
+      ...history,
+      nextPurchaseCheckDate,
+      updatedAt: new Date().toISOString(),
+    });
+    setPurchaseHistories(getPurchaseHistories());
+    setMessage("재구매 확인을 다음 주기로 미뤘어.");
+  }
+
+  function completeRepurchase(history: PurchaseHistoryItem) {
+    const now = new Date().toISOString();
+
+    updatePurchaseHistory({
+      ...history,
+      lastPurchasedAt: now,
+      nextPurchaseCheckDate:
+        getNextPurchaseDateFromToday(history) ?? history.nextPurchaseCheckDate,
+      updatedAt: now,
+    });
+    setPurchaseHistories(getPurchaseHistories());
+    setMessage("구매 완료로 기록했고 다음 재구매일을 다시 잡았어.");
   }
 
   function upsertPurchaseHistory({
@@ -677,7 +715,7 @@ export default function AgentActionSuggestionView({
     );
   }
 
-  if (agentItems.length === 0) {
+  if (agentItems.length === 0 && dueRepurchaseHistories.length === 0) {
     if (compact) return null;
 
     return (
@@ -693,6 +731,14 @@ export default function AgentActionSuggestionView({
   }
 
   if (compact) {
+    const compactRepurchaseHistories =
+      typeof maxItems === "number"
+        ? dueRepurchaseHistories.slice(
+            0,
+            Math.max(maxItems - visibleItems.length, 0)
+          )
+        : dueRepurchaseHistories;
+
     return (
       <section className="app-card p-4">
         <div className="mb-3 flex items-center justify-between gap-3">
@@ -706,7 +752,7 @@ export default function AgentActionSuggestionView({
             href="/records"
             className="rounded-full bg-violet-50 px-3 py-1 text-xs font-black text-violet-600"
           >
-            전체 {agentItems.length}
+            전체 {agentItems.length + dueRepurchaseHistories.length}
           </Link>
         </div>
 
@@ -717,6 +763,52 @@ export default function AgentActionSuggestionView({
         )}
 
         <div className="space-y-2">
+          {compactRepurchaseHistories.map((history) => (
+            <article
+              key={history.id}
+              className="rounded-2xl bg-emerald-50 p-3 ring-1 ring-emerald-100"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-black text-slate-900">
+                    {history.productName}
+                  </p>
+                  <p className="mt-1 text-xs font-black text-emerald-600">
+                    재구매 확인
+                  </p>
+                </div>
+                <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[11px] font-black text-emerald-600 ring-1 ring-emerald-100">
+                  추천일
+                </span>
+              </div>
+
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                <a
+                  href={createCoupangUrlFromHistory(history)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-full bg-emerald-600 px-3 py-2 text-center text-xs font-black text-white"
+                >
+                  열기
+                </a>
+                <button
+                  type="button"
+                  onClick={() => completeRepurchase(history)}
+                  className="rounded-full bg-white px-3 py-2 text-xs font-black text-emerald-700 ring-1 ring-emerald-100"
+                >
+                  완료
+                </button>
+                <button
+                  type="button"
+                  onClick={() => postponeRepurchase(history)}
+                  className="rounded-full bg-white px-3 py-2 text-xs font-black text-slate-500 ring-1 ring-slate-100"
+                >
+                  나중에
+                </button>
+              </div>
+            </article>
+          ))}
+
           {visibleItems.map((item) => (
             <article
               key={item.id}
@@ -771,7 +863,7 @@ export default function AgentActionSuggestionView({
           )}
         </div>
         <span className="rounded-full bg-violet-50 px-3 py-1 text-xs font-black text-violet-600">
-          {agentItems.length}개
+          {agentItems.length + dueRepurchaseHistories.length}개
         </span>
       </div>
       {message && (
@@ -781,6 +873,61 @@ export default function AgentActionSuggestionView({
       )}
 
       <div className="space-y-2">
+        {dueRepurchaseHistories.map((history) => (
+          <article
+            key={history.id}
+            className="rounded-2xl bg-emerald-50 p-3 ring-1 ring-emerald-100"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="truncate text-sm font-black text-slate-900">
+                  {history.productName}
+                </p>
+                <p className="mt-1 text-xs font-black text-emerald-600">
+                  재구매 확인
+                </p>
+              </div>
+              <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[11px] font-black text-emerald-600 ring-1 ring-emerald-100">
+                추천일
+              </span>
+            </div>
+            <p className="mt-3 text-sm leading-6 text-slate-500">
+              쿠팡 메일에서 확인한 구매 주기를 기준으로 다시 살 때가 됐습니다.
+              결제 전에는 쿠팡에서 최종 확인해 주세요.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <a
+                href={createCoupangUrlFromHistory(history)}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-black text-white"
+              >
+                쿠팡 열기
+              </a>
+              <button
+                type="button"
+                onClick={() => completeRepurchase(history)}
+                className="rounded-full bg-white px-3 py-1.5 text-xs font-black text-emerald-700 ring-1 ring-emerald-100"
+              >
+                구매 완료
+              </button>
+              <button
+                type="button"
+                onClick={() => postponeRepurchase(history)}
+                className="rounded-full bg-white px-3 py-1.5 text-xs font-black text-slate-500 ring-1 ring-slate-100"
+              >
+                나중에
+              </button>
+              <Link
+                href="/purchase"
+                className="rounded-full bg-white px-3 py-1.5 text-xs font-black text-slate-600 ring-1 ring-slate-100"
+              >
+                자동화 설정
+              </Link>
+            </div>
+          </article>
+        ))}
+
         {visibleItems.map((item) => (
           <article
             key={item.id}
