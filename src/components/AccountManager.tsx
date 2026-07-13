@@ -9,10 +9,12 @@ import {
   getSupabaseBrowserConfig,
   isSupabaseConfigured,
 } from "@/lib/supabase/config";
+import { ensureUnifiedAccount } from "@/lib/unifiedAccount";
 import { getUserProfile, saveUserProfile } from "@/lib/userProfileStorage";
 import { RegisteredDevice, UserProfileRecord } from "@/types/device";
 import { UserProfile } from "@/types/userProfile";
 import { TravelMode } from "@/types/calendar";
+import type { UnifiedAccountState } from "@/types/unifiedAccount";
 
 type OAuthProvider = "google" | "apple" | "kakao";
 
@@ -181,6 +183,11 @@ export default function AccountManager() {
   const [deviceName, setDeviceName] = useState("");
   const [devices, setDevices] = useState<RegisteredDevice[]>([]);
   const [localProfile, setLocalProfile] = useState<UserProfile | null>(null);
+  const [unifiedAccount, setUnifiedAccount] =
+    useState<UnifiedAccountState | null>(null);
+  const [unifiedAccountMessage, setUnifiedAccountMessage] = useState<
+    string | null
+  >(null);
 
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
@@ -283,6 +290,7 @@ export default function AccountManager() {
           await ensureProfileAndDevice(nextUser);
         } else {
           setDevices([]);
+          setUnifiedAccount(null);
         }
       }
     );
@@ -323,6 +331,22 @@ export default function AccountManager() {
 
     const defaultName = getUserDisplayName(nextUser, "");
     const now = new Date().toISOString();
+
+    try {
+      const nextUnifiedAccount = await ensureUnifiedAccount({
+        supabase,
+        user: nextUser,
+      });
+      setUnifiedAccount(nextUnifiedAccount);
+      setUnifiedAccountMessage(null);
+    } catch (error) {
+      setUnifiedAccount(null);
+      setUnifiedAccountMessage(
+        error instanceof Error
+          ? `통합계정 DB 준비가 필요합니다: ${error.message}`
+          : "통합계정 DB 준비가 필요합니다."
+      );
+    }
 
     const { data: existingProfile } = await supabase
       .from("profiles")
@@ -440,6 +464,7 @@ export default function AccountManager() {
     await supabase.auth.signOut();
     setUser(null);
     setDevices([]);
+    setUnifiedAccount(null);
     setMessage("로그아웃했습니다.");
   }
 
@@ -715,6 +740,44 @@ export default function AccountManager() {
           >
             로그아웃
           </button>
+        </div>
+
+        <div className="mt-4 rounded-3xl bg-blue-50 p-4 ring-1 ring-blue-100">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-black text-blue-600">통합계정</p>
+              <h3 className="mt-1 text-sm font-black text-slate-900">
+                {unifiedAccount
+                  ? "이 로그인은 통합계정에 연결됐습니다."
+                  : "통합계정 연결 준비 중"}
+              </h3>
+              <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
+                카카오, Google, Apple, 이메일 로그인을 하나의 앱 계정으로
+                묶기 위한 기반입니다.
+              </p>
+            </div>
+            {unifiedAccount?.identity.provider && (
+              <span className="shrink-0 rounded-full bg-white px-3 py-1.5 text-xs font-black text-blue-700 ring-1 ring-blue-100">
+                {unifiedAccount.identity.provider}
+              </span>
+            )}
+          </div>
+
+          {unifiedAccount ? (
+            <div className="mt-3 grid gap-2 text-xs font-bold text-slate-500 sm:grid-cols-2">
+              <p className="rounded-2xl bg-white px-3 py-2 ring-1 ring-blue-100">
+                계정 ID {unifiedAccount.account.id.slice(0, 8)}
+              </p>
+              <p className="rounded-2xl bg-white px-3 py-2 ring-1 ring-blue-100">
+                로그인 경로 {unifiedAccount.identity.provider}
+              </p>
+            </div>
+          ) : (
+            <p className="mt-3 rounded-2xl bg-white px-3 py-2 text-xs font-bold leading-5 text-amber-700 ring-1 ring-amber-100">
+              {unifiedAccountMessage ??
+                "Supabase에 통합계정 테이블이 적용되면 자동 연결됩니다."}
+            </p>
+          )}
         </div>
 
         <div className="mt-4 space-y-3">
