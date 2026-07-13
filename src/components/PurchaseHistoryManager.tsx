@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { createCoupangSearchUrl } from "@/lib/coupangLinks";
 import { getCloudDataSyncedEventName } from "@/lib/dataSyncEvents";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import {
@@ -83,12 +84,6 @@ function createDraftFromHistory(history: PurchaseHistoryItem): PurchaseDraft {
     autoRepurchaseEnabled: history.autoRepurchaseEnabled,
     memo: history.memo,
   };
-}
-
-function createCoupangSearchUrl(productName: string) {
-  return `https://www.coupang.com/np/search?q=${encodeURIComponent(
-    productName
-  )}`;
 }
 
 function toDateInputValue(date: Date) {

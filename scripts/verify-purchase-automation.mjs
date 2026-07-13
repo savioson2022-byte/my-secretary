@@ -48,6 +48,7 @@ function stripImports(source) {
 
 const purchaseAutomation = runCommonJs(
   [
+    readSource("src/lib/coupangLinks.ts"),
     readSource("src/lib/purchaseName.ts"),
     stripImports(readSource("src/lib/purchaseAutomation.ts")),
   ].join("\n"),
@@ -107,6 +108,7 @@ const history = purchaseAutomation.createPurchaseHistoryFromCandidate({
 });
 
 assert.equal(history.productName, candidate.productName);
+assert.equal(history.productUrl, candidate.productUrl);
 assert.equal(history.defaultQuantity, 2);
 assert.equal(history.maxBudgetKrw, 12900);
 assert.equal(history.source, "mail");
@@ -114,6 +116,21 @@ assert.equal(history.sourceMessageId, "mail-current");
 assert.equal(history.repeatCycleDays, 28);
 assert.equal(history.nextPurchaseCheckDate, "2026-08-11");
 assert.equal(history.autoRepurchaseEnabled, true);
+
+const historyWithoutUrl = purchaseAutomation.createPurchaseHistoryFromCandidate({
+  candidate: {
+    ...candidate,
+    productUrl: "",
+  },
+  histories: [],
+  messageId: "mail-without-url",
+  purchasedAt,
+});
+
+assert.equal(
+  historyWithoutUrl.productUrl,
+  "https://www.coupang.com/np/search?q=%ED%83%90%EC%82%AC%EC%88%98%20%EC%83%9D%EC%88%98%202L%2012%EA%B0%9C"
+);
 
 const dueHistories = purchaseAutomation.getDueRepurchaseHistories(
   [

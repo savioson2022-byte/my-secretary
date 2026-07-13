@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { createCoupangSearchUrl } from "@/lib/coupangLinks";
 import { getLocalDataUpdatedEventName } from "@/lib/localStorageRepository";
 import {
   getDueRepurchaseHistories,
@@ -82,12 +83,6 @@ function extractPurchaseProductName(item: AssistantItem) {
     .trim();
 
   return cleanedText || item.title;
-}
-
-function createCoupangSearchUrl(productName: string) {
-  return `https://www.coupang.com/np/search?q=${encodeURIComponent(
-    productName
-  )}`;
 }
 
 function isHairDyeProduct(productName: string) {

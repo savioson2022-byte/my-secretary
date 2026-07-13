@@ -1,4 +1,5 @@
 import type { MailImportCandidate } from "@/lib/purchaseMailImport";
+import { createCoupangSearchUrl } from "@/lib/coupangLinks";
 import { normalizePurchaseName } from "./purchaseName";
 import type { PurchaseHistoryItem } from "@/types/purchaseHistory";
 
@@ -118,7 +119,8 @@ export function createPurchaseHistoryFromCandidate({
     id: crypto.randomUUID(),
     productName: candidate.productName,
     platform: "coupang",
-    productUrl: candidate.productUrl || null,
+    productUrl:
+      candidate.productUrl || createCoupangSearchUrl(candidate.productName),
     defaultQuantity: Number.isFinite(quantity) && quantity > 0 ? quantity : null,
     maxBudgetKrw: Number.isFinite(maxBudget) && maxBudget > 0 ? maxBudget : null,
     repeatCycleDays: cycle.repeatCycleDays,
