@@ -40,6 +40,15 @@ type MailConnectionStatus = {
   updated_at: string;
 };
 
+type MailAutomationConfig = {
+  hasGoogleOAuth: boolean;
+  hasSupabaseAdmin: boolean;
+  hasOpenAi: boolean;
+  hasCronSecret: boolean;
+  cronSchedule: string;
+  automationStartDate: string;
+};
+
 function createEmptyDraft(): PurchaseDraft {
   return {
     id: null,
@@ -202,6 +211,8 @@ export default function PurchaseHistoryManager() {
     email: "",
     appPassword: "",
   });
+  const [mailAutomationConfig, setMailAutomationConfig] =
+    useState<MailAutomationConfig | null>(null);
 
   useEffect(() => {
     function refreshHistories() {
@@ -221,6 +232,7 @@ export default function PurchaseHistoryManager() {
 
   useEffect(() => {
     void refreshMailConnections();
+    void refreshMailAutomationConfig();
   }, []);
 
   const enabledHistories = useMemo(() => {
@@ -280,6 +292,14 @@ export default function PurchaseHistoryManager() {
 
     setMailConnections(data.connections);
     setMailAutomationMessage(data.message ?? null);
+  }
+
+  async function refreshMailAutomationConfig() {
+    const response = await fetch("/api/purchase/mail/config");
+
+    if (!response.ok) return;
+
+    setMailAutomationConfig((await response.json()) as MailAutomationConfig);
   }
 
   async function handleConnectGmail() {
@@ -586,6 +606,42 @@ export default function PurchaseHistoryManager() {
         </div>
 
         <div className="mt-4 grid gap-2">
+          {mailAutomationConfig && (
+            <div className="grid grid-cols-2 gap-2 text-xs font-black sm:grid-cols-4">
+              <span
+                className={`rounded-2xl px-3 py-2 text-center ${
+                  mailAutomationConfig.hasOpenAi
+                    ? "bg-emerald-50 text-emerald-600"
+                    : "bg-rose-50 text-rose-600"
+                }`}
+              >
+                AI 분석 {mailAutomationConfig.hasOpenAi ? "준비" : "필요"}
+              </span>
+              <span
+                className={`rounded-2xl px-3 py-2 text-center ${
+                  mailAutomationConfig.hasSupabaseAdmin
+                    ? "bg-emerald-50 text-emerald-600"
+                    : "bg-amber-50 text-amber-600"
+                }`}
+              >
+                자동 실행{" "}
+                {mailAutomationConfig.hasSupabaseAdmin ? "준비" : "제한"}
+              </span>
+              <span
+                className={`rounded-2xl px-3 py-2 text-center ${
+                  mailAutomationConfig.hasGoogleOAuth
+                    ? "bg-emerald-50 text-emerald-600"
+                    : "bg-slate-100 text-slate-500"
+                }`}
+              >
+                Gmail {mailAutomationConfig.hasGoogleOAuth ? "준비" : "미설정"}
+              </span>
+              <span className="rounded-2xl bg-blue-50 px-3 py-2 text-center text-blue-600">
+                {mailAutomationConfig.cronSchedule}
+              </span>
+            </div>
+          )}
+
           {mailConnections.length === 0 ? (
             <p className="rounded-2xl bg-slate-50 p-4 text-xs font-bold leading-5 text-slate-500 ring-1 ring-slate-100">
               아직 연결된 메일이 없습니다. Gmail은 공식 읽기 권한으로 연결하고,
