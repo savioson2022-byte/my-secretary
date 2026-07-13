@@ -7,6 +7,8 @@ export type PurchaseHistoryItem = {
   productUrl?: string | null;
   defaultQuantity?: number | null;
   maxBudgetKrw?: number | null;
+  repeatCycleDays?: number | null;
+  nextPurchaseCheckDate?: string | null;
   autoRepurchaseEnabled: boolean;
   lastPurchasedAt: string;
   memo: string;

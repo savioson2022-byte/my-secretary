@@ -22,6 +22,8 @@ type PurchaseDraft = {
   productUrl: string;
   defaultQuantity: string;
   maxBudgetKrw: string;
+  repeatCycleDays: string;
+  nextPurchaseCheckDate: string;
   autoRepurchaseEnabled: boolean;
   memo: string;
 };
@@ -33,6 +35,8 @@ function createEmptyDraft(): PurchaseDraft {
     productUrl: "",
     defaultQuantity: "1",
     maxBudgetKrw: "",
+    repeatCycleDays: "",
+    nextPurchaseCheckDate: "",
     autoRepurchaseEnabled: false,
     memo: "",
   };
@@ -47,6 +51,10 @@ function createDraftFromHistory(history: PurchaseHistoryItem): PurchaseDraft {
       ? String(history.defaultQuantity)
       : "1",
     maxBudgetKrw: history.maxBudgetKrw ? String(history.maxBudgetKrw) : "",
+    repeatCycleDays: history.repeatCycleDays
+      ? String(history.repeatCycleDays)
+      : "",
+    nextPurchaseCheckDate: history.nextPurchaseCheckDate ?? "",
     autoRepurchaseEnabled: history.autoRepurchaseEnabled,
     memo: history.memo,
   };
@@ -58,6 +66,53 @@ function createCoupangSearchUrl(productName: string) {
   )}`;
 }
 
+function toDateInputValue(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function addDaysToDateInput(dateText: string, days: number) {
+  const baseDate = dateText ? new Date(`${dateText}T00:00:00`) : new Date();
+
+  if (Number.isNaN(baseDate.getTime())) {
+    return "";
+  }
+
+  baseDate.setDate(baseDate.getDate() + days);
+
+  return toDateInputValue(baseDate);
+}
+
+function formatDateLabel(dateText?: string | null) {
+  if (!dateText) return "미정";
+
+  const date = new Date(`${dateText}T00:00:00`);
+
+  if (Number.isNaN(date.getTime())) return "미정";
+
+  return new Intl.DateTimeFormat("ko-KR", {
+    month: "long",
+    day: "numeric",
+    weekday: "short",
+  }).format(date);
+}
+
+function getDaysUntil(dateText?: string | null) {
+  if (!dateText) return null;
+
+  const today = new Date();
+  const target = new Date(`${dateText}T00:00:00`);
+
+  today.setHours(0, 0, 0, 0);
+
+  if (Number.isNaN(target.getTime())) return null;
+
+  return Math.ceil((target.getTime() - today.getTime()) / 86400000);
+}
+
 function normalizeDraft(
   draft: PurchaseDraft,
   existingHistory?: PurchaseHistoryItem
@@ -65,7 +120,9 @@ function normalizeDraft(
   const now = new Date().toISOString();
   const quantity = Number(draft.defaultQuantity);
   const maxBudget = Number(draft.maxBudgetKrw);
+  const repeatCycleDays = Number(draft.repeatCycleDays);
   const productName = draft.productName.trim();
+  const nextPurchaseCheckDate = draft.nextPurchaseCheckDate.trim();
 
   return {
     id: draft.id ?? existingHistory?.id ?? createId(),
@@ -77,6 +134,11 @@ function normalizeDraft(
       Number.isFinite(quantity) && quantity > 0 ? quantity : null,
     maxBudgetKrw:
       Number.isFinite(maxBudget) && maxBudget > 0 ? maxBudget : null,
+    repeatCycleDays:
+      Number.isFinite(repeatCycleDays) && repeatCycleDays > 0
+        ? repeatCycleDays
+        : null,
+    nextPurchaseCheckDate: nextPurchaseCheckDate || null,
     autoRepurchaseEnabled: draft.autoRepurchaseEnabled,
     lastPurchasedAt: existingHistory?.lastPurchasedAt ?? now,
     memo: draft.memo.trim(),
@@ -114,6 +176,8 @@ export default function PurchaseHistoryManager() {
   const [message, setMessage] = useState<string | null>(null);
   const [mailText, setMailText] = useState("");
   const [mailCandidates, setMailCandidates] = useState<MailImportCandidate[]>([]);
+  const [selectedCandidate, setSelectedCandidate] =
+    useState<MailImportCandidate | null>(null);
   const [isImportingMail, setIsImportingMail] = useState(false);
 
   useEffect(() => {
@@ -136,8 +200,22 @@ export default function PurchaseHistoryManager() {
     return histories.filter((history) => history.autoRepurchaseEnabled);
   }, [histories]);
 
+  const upcomingHistories = useMemo(() => {
+    return histories
+      .filter((history) => history.nextPurchaseCheckDate)
+      .map((history) => ({
+        history,
+        daysUntil: getDaysUntil(history.nextPurchaseCheckDate),
+      }))
+      .sort((left, right) => {
+        return (left.daysUntil ?? 9999) - (right.daysUntil ?? 9999);
+      })
+      .slice(0, 3);
+  }, [histories]);
+
   function resetDraft() {
     setDraft(createEmptyDraft());
+    setSelectedCandidate(null);
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -222,16 +300,33 @@ export default function PurchaseHistoryManager() {
   }
 
   function handleUseCandidate(candidate: MailImportCandidate) {
+    setSelectedCandidate(candidate);
     setDraft((current) => ({
       ...current,
       id: null,
       productName: candidate.productName,
       productUrl: candidate.productUrl,
+      defaultQuantity: candidate.quantityText
+        ? candidate.quantityText.replace(/[^0-9]/g, "") || current.defaultQuantity
+        : current.defaultQuantity,
       memo: candidate.priceText
         ? `쿠팡 주문 정보에서 가져옴 · ${candidate.priceText}`
         : "쿠팡 주문 정보에서 가져옴",
     }));
-    setMessage("상품 후보를 입력칸에 넣었어. 수량과 예산만 확인하고 저장하면 돼.");
+    setMessage("이 상품이 맞는지 확인하고 재구매 주기를 정해 저장하면 돼.");
+  }
+
+  function handleRepeatCycleChange(value: string) {
+    const days = Number(value);
+
+    setDraft((current) => ({
+      ...current,
+      repeatCycleDays: value,
+      nextPurchaseCheckDate:
+        Number.isFinite(days) && days > 0
+          ? addDaysToDateInput("", days)
+          : current.nextPurchaseCheckDate,
+    }));
   }
 
   return (
@@ -297,6 +392,9 @@ export default function PurchaseHistoryManager() {
                 <span className="mt-1 block text-[11px] font-semibold leading-5 text-slate-400">
                   {candidate.reason}
                 </span>
+                <span className="mt-3 inline-flex rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-600">
+                  이 상품으로 저장 준비
+                </span>
               </button>
             ))}
           </div>
@@ -314,15 +412,42 @@ export default function PurchaseHistoryManager() {
               열어 결제 직전까지 빠르게 이동합니다.
             </p>
           </div>
-          <span className="shrink-0 rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-600">
-            {enabledHistories.length}개 허용
-          </span>
+          <div className="flex shrink-0 flex-col gap-2 text-right">
+            <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-600">
+              {enabledHistories.length}개 허용
+            </span>
+            <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-600">
+              {upcomingHistories.length}개 예정
+            </span>
+          </div>
         </div>
 
         {message && (
           <p className="mt-4 rounded-2xl bg-blue-50 px-4 py-3 text-sm font-bold text-blue-700 ring-1 ring-blue-100">
             {message}
           </p>
+        )}
+
+        {selectedCandidate && (
+          <div className="mt-4 rounded-3xl bg-slate-900 p-4 text-white">
+            <p className="text-xs font-black text-blue-200">저장 후보 확인</p>
+            <h3 className="mt-2 text-base font-black">
+              {selectedCandidate.productName}
+            </h3>
+            <p className="mt-2 text-xs font-bold leading-5 text-slate-300">
+              {selectedCandidate.priceText ?? "가격 정보 없음"}
+              {selectedCandidate.quantityText
+                ? ` · ${selectedCandidate.quantityText}`
+                : ""}
+              {selectedCandidate.orderDateText
+                ? ` · ${selectedCandidate.orderDateText}`
+                : ""}
+            </p>
+            <p className="mt-3 text-xs font-semibold leading-5 text-slate-300">
+              아래에서 수량, 예산, 재구매 주기를 확인한 뒤 저장하면 “내
+              구매템”으로 관리됩니다.
+            </p>
+          </div>
         )}
 
         <form onSubmit={handleSubmit} className="mt-5 grid gap-3">
@@ -396,6 +521,42 @@ export default function PurchaseHistoryManager() {
             </div>
           </div>
 
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="text-xs font-black text-slate-500">
+                재구매 주기
+              </label>
+              <select
+                value={draft.repeatCycleDays}
+                onChange={(event) => handleRepeatCycleChange(event.target.value)}
+                className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none focus:border-blue-400"
+              >
+                <option value="">정하지 않음</option>
+                <option value="14">2주마다</option>
+                <option value="30">30일마다</option>
+                <option value="45">45일마다</option>
+                <option value="60">60일마다</option>
+                <option value="90">90일마다</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-black text-slate-500">
+                다음 구매 확인일
+              </label>
+              <input
+                type="date"
+                value={draft.nextPurchaseCheckDate}
+                onChange={(event) =>
+                  setDraft((current) => ({
+                    ...current,
+                    nextPurchaseCheckDate: event.target.value,
+                  }))
+                }
+                className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none focus:border-blue-400"
+              />
+            </div>
+          </div>
+
           <label className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3 text-sm font-black text-slate-700 ring-1 ring-slate-100">
             재구매 자동화 허용
             <input
@@ -431,7 +592,7 @@ export default function PurchaseHistoryManager() {
               type="submit"
               className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white"
             >
-              {draft.id ? "수정 저장" : "구매 이력 저장"}
+              {draft.id ? "수정 저장" : "내 구매템 저장"}
             </button>
             <button
               type="button"
@@ -445,6 +606,36 @@ export default function PurchaseHistoryManager() {
       </section>
 
       <section className="space-y-3">
+        {upcomingHistories.length > 0 && (
+          <div className="app-card p-5">
+            <h2 className="text-base font-black text-slate-900">
+              곧 확인할 구매템
+            </h2>
+            <div className="mt-3 space-y-2">
+              {upcomingHistories.map(({ history, daysUntil }) => (
+                <button
+                  key={history.id}
+                  type="button"
+                  onClick={() => setDraft(createDraftFromHistory(history))}
+                  className="w-full rounded-2xl bg-slate-50 p-3 text-left ring-1 ring-slate-100"
+                >
+                  <span className="block text-sm font-black text-slate-900">
+                    {history.productName}
+                  </span>
+                  <span className="mt-1 block text-xs font-bold text-slate-500">
+                    {formatDateLabel(history.nextPurchaseCheckDate)}
+                    {daysUntil !== null
+                      ? daysUntil <= 0
+                        ? " · 오늘 확인"
+                        : ` · ${daysUntil}일 후`
+                      : ""}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {histories.length === 0 ? (
           <div className="app-card p-5 text-sm font-semibold leading-6 text-slate-500">
             아직 등록된 구매 이력이 없습니다. 즉시처리 확인함에서 “이미 산 적
@@ -463,6 +654,12 @@ export default function PurchaseHistoryManager() {
                     {history.maxBudgetKrw
                       ? `${history.maxBudgetKrw.toLocaleString("ko-KR")}원 이하`
                       : "예산 미설정"}
+                    {history.repeatCycleDays
+                      ? ` · ${history.repeatCycleDays}일마다`
+                      : ""}
+                  </p>
+                  <p className="mt-1 text-xs font-bold text-blue-500">
+                    다음 확인: {formatDateLabel(history.nextPurchaseCheckDate)}
                   </p>
                 </div>
                 <span
