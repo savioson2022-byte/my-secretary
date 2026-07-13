@@ -80,6 +80,13 @@ function getEmailConfirmationUrl() {
   return callbackUrl.toString();
 }
 
+function getPasswordResetRedirectUrl() {
+  const callbackUrl = new URL("/auth/callback", window.location.origin);
+  callbackUrl.searchParams.set("next", "/account?reset_password=1");
+
+  return callbackUrl.toString();
+}
+
 function normalizeLoginId(loginId: string) {
   return loginId.trim().toLowerCase();
 }
@@ -109,6 +116,9 @@ export default function AccountManager() {
   const [signupName, setSignupName] = useState("");
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [newPasswordConfirm, setNewPasswordConfirm] = useState("");
+  const [passwordResetMode, setPasswordResetMode] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -152,6 +162,11 @@ export default function AccountManager() {
 
     if (authError) {
       setMessage(authError);
+    }
+
+    if (searchParams.get("reset_password") === "1") {
+      setPasswordResetMode(true);
+      setMessage("새 비밀번호를 설정해주세요.");
     }
 
     const savedProfile = getUserProfile();
@@ -510,6 +525,68 @@ export default function AccountManager() {
     setMessage("로그인했습니다. 이 기기와 통합계정 연결도 확인했습니다.");
   }
 
+  async function handleSendPasswordResetEmail() {
+    if (!supabase) return;
+
+    const resetEmail = loginId.trim().includes("@")
+      ? loginId.trim().toLowerCase()
+      : signupEmail.trim().toLowerCase();
+
+    if (!resetEmail || !resetEmail.includes("@")) {
+      setMessage("비밀번호 재설정을 위해 아이디 칸에 가입 이메일을 입력해주세요.");
+      return;
+    }
+
+    setIsSaving(true);
+    setMessage(null);
+
+    const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
+      redirectTo: getPasswordResetRedirectUrl(),
+    });
+
+    setIsSaving(false);
+
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+
+    setMessage("비밀번호 재설정 메일을 보냈습니다. 메일 링크를 열어 새 비밀번호를 설정해주세요.");
+  }
+
+  async function handleUpdatePassword() {
+    if (!supabase || !user) return;
+
+    if (newPassword.length < 8) {
+      setMessage("새 비밀번호는 8자 이상으로 만들어주세요.");
+      return;
+    }
+
+    if (newPassword !== newPasswordConfirm) {
+      setMessage("새 비밀번호 확인이 서로 다릅니다.");
+      return;
+    }
+
+    setIsSaving(true);
+    setMessage(null);
+
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword,
+    });
+
+    setIsSaving(false);
+
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+
+    setNewPassword("");
+    setNewPasswordConfirm("");
+    setPasswordResetMode(false);
+    setMessage("새 비밀번호를 저장했습니다. 다음부터는 이 비밀번호로 로그인하세요.");
+  }
+
   async function handleSignOut() {
     if (!supabase) return;
 
@@ -804,6 +881,17 @@ export default function AccountManager() {
                 인증 메일 다시 보내기
               </button>
             )}
+
+            {authMode === "login" && (
+              <button
+                type="button"
+                onClick={handleSendPasswordResetEmail}
+                disabled={isSaving || !loginId.trim()}
+                className="w-full rounded-2xl bg-slate-100 px-4 py-3 text-sm font-black text-slate-600 transition hover:bg-slate-200 disabled:text-slate-300"
+              >
+                비밀번호 재설정 메일 보내기
+              </button>
+            )}
           </div>
 
           <div className="mt-4 rounded-3xl bg-slate-50 p-4 ring-1 ring-slate-100">
@@ -914,6 +1002,46 @@ export default function AccountManager() {
             </p>
           )}
         </div>
+
+        {passwordResetMode && (
+          <div className="mt-4 rounded-3xl bg-slate-950 p-4 text-white">
+            <p className="text-xs font-black text-blue-200">비밀번호 재설정</p>
+            <h3 className="mt-1 text-base font-black">새 비밀번호 만들기</h3>
+            <p className="mt-1 text-xs font-semibold leading-5 text-slate-300">
+              앞으로 앱에서 사용할 비밀번호를 다시 설정합니다.
+            </p>
+            <div className="mt-3 space-y-2">
+              <input
+                value={newPassword}
+                onChange={(event) => setNewPassword(event.target.value)}
+                type="password"
+                autoComplete="new-password"
+                placeholder="새 비밀번호"
+                className="w-full rounded-2xl border border-white/10 bg-white px-4 py-3 text-sm font-semibold text-slate-950 outline-none focus:border-blue-300"
+              />
+              <input
+                value={newPasswordConfirm}
+                onChange={(event) =>
+                  setNewPasswordConfirm(event.target.value)
+                }
+                type="password"
+                autoComplete="new-password"
+                placeholder="새 비밀번호 확인"
+                className="w-full rounded-2xl border border-white/10 bg-white px-4 py-3 text-sm font-semibold text-slate-950 outline-none focus:border-blue-300"
+              />
+              <button
+                type="button"
+                onClick={handleUpdatePassword}
+                disabled={
+                  isSaving || !newPassword.trim() || !newPasswordConfirm.trim()
+                }
+                className="w-full rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white transition hover:bg-blue-500 disabled:bg-slate-500"
+              >
+                새 비밀번호 저장
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="mt-4 space-y-3">
           <input
