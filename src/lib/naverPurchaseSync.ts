@@ -23,6 +23,8 @@ function isCoupangMail({
   return /쿠팡|coupang/i.test(`${subject ?? ""} ${from ?? ""}`);
 }
 
+const MAX_NAVER_MESSAGES_PER_SYNC = 200;
+
 export async function syncNaverPurchaseMails({
   supabase,
   connection,
@@ -56,9 +58,11 @@ export async function syncNaverPurchaseMails({
     try {
       const searchSince = new Date(connection.sync_after);
       const uids = await client.search({ since: searchSince });
-      const uidList = Array.isArray(uids) ? uids : [];
+      const uidList = Array.isArray(uids)
+        ? uids.slice(-MAX_NAVER_MESSAGES_PER_SYNC)
+        : [];
 
-      for await (const message of client.fetch(uidList.slice(-20), {
+      for await (const message of client.fetch(uidList, {
         envelope: true,
         source: true,
       })) {

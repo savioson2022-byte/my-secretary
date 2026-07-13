@@ -41,6 +41,8 @@ type MailConnectionRow = {
   sync_after: string;
 };
 
+const MAX_GMAIL_MESSAGES_PER_SYNC = 100;
+
 function getGoogleOAuthConfig() {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
@@ -158,29 +160,44 @@ async function fetchGmailMessageIds({
 }) {
   const afterDate = new Date(syncAfter);
   const afterQuery = `${afterDate.getFullYear()}/${afterDate.getMonth() + 1}/${afterDate.getDate()}`;
-  const gmailUrl = new URL("https://gmail.googleapis.com/gmail/v1/users/me/messages");
+  const messageIds: string[] = [];
+  let pageToken: string | undefined;
 
-  gmailUrl.searchParams.set(
-    "q",
-    `after:${afterQuery} (from:coupang OR from:no-reply@coupang.com OR subject:쿠팡 OR subject:Coupang)`
-  );
-  gmailUrl.searchParams.set("maxResults", "10");
+  do {
+    const gmailUrl = new URL(
+      "https://gmail.googleapis.com/gmail/v1/users/me/messages"
+    );
 
-  const response = await fetch(gmailUrl, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-  });
+    gmailUrl.searchParams.set(
+      "q",
+      `after:${afterQuery} (from:coupang OR from:no-reply@coupang.com OR subject:쿠팡 OR subject:Coupang)`
+    );
+    gmailUrl.searchParams.set("maxResults", "50");
 
-  if (!response.ok) {
-    throw new Error("Gmail 메일 목록을 가져오지 못했습니다.");
-  }
+    if (pageToken) {
+      gmailUrl.searchParams.set("pageToken", pageToken);
+    }
 
-  const data = (await response.json()) as {
-    messages?: Array<{ id: string }>;
-  };
+    const response = await fetch(gmailUrl, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
 
-  return data.messages?.map((message) => message.id) ?? [];
+    if (!response.ok) {
+      throw new Error("Gmail 메일 목록을 가져오지 못했습니다.");
+    }
+
+    const data = (await response.json()) as {
+      messages?: Array<{ id: string }>;
+      nextPageToken?: string;
+    };
+
+    messageIds.push(...(data.messages?.map((message) => message.id) ?? []));
+    pageToken = data.nextPageToken;
+  } while (pageToken && messageIds.length < MAX_GMAIL_MESSAGES_PER_SYNC);
+
+  return messageIds.slice(0, MAX_GMAIL_MESSAGES_PER_SYNC);
 }
 
 async function fetchGmailMessage({
