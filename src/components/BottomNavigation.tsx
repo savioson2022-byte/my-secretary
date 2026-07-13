@@ -35,42 +35,51 @@ export default function BottomNavigation() {
   const pathname = usePathname();
 
   return (
-    <nav className="sticky bottom-0 z-30 -mx-4 mt-6 border-t border-slate-100 bg-white/92 px-4 pb-3 pt-2 backdrop-blur md:rounded-b-[38px]">
-      <div className="grid grid-cols-5 gap-1">
-        {LINKS.map((link) => {
-          const isActive =
-            pathname === link.href ||
-            (link.href === "/calendar/monthly" &&
-              pathname.startsWith("/calendar")) ||
-            (link.href === "/schedule/manage" &&
-              pathname.startsWith("/schedule")) ||
-            (link.href === "/settings" && pathname.startsWith("/settings"));
+    <>
+      <nav className="fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-[430px] border-t border-slate-100 bg-white/95 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2 shadow-[0_-14px_38px_rgba(15,23,42,0.08)] backdrop-blur md:rounded-t-[28px] md:border md:border-slate-100">
+        <div className="grid grid-cols-5 gap-1">
+          {LINKS.map((link) => {
+            const isActive =
+              pathname === link.href ||
+              (link.href === "/calendar/monthly" &&
+                pathname.startsWith("/calendar")) ||
+              (link.href === "/schedule/manage" &&
+                pathname.startsWith("/schedule")) ||
+              (link.href === "/settings" && pathname.startsWith("/settings"));
 
-          return (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={`flex flex-col items-center justify-center gap-1 rounded-2xl px-2 py-2 text-[11px] font-black transition ${
-                isActive ? "text-blue-600" : "text-slate-400 hover:text-slate-600"
-              }`}
-            >
-              <svg
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-                className="h-5 w-5"
-                fill={isActive ? "currentColor" : "none"}
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                scroll
+                className={`flex min-h-[54px] flex-col items-center justify-center gap-1 rounded-2xl px-2 py-2 text-[11px] font-black transition ${
+                  isActive
+                    ? "bg-blue-50 text-blue-600"
+                    : "text-slate-400 hover:bg-slate-50 hover:text-slate-600"
+                }`}
               >
-                <path d={link.icon} />
-              </svg>
-              <span>{link.label}</span>
-            </Link>
-          );
-        })}
-      </div>
-    </nav>
+                <svg
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                  className="h-5 w-5"
+                  fill={isActive ? "currentColor" : "none"}
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d={link.icon} />
+                </svg>
+                <span>{link.label}</span>
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
+      <div
+        aria-hidden="true"
+        className="h-[calc(5.5rem+env(safe-area-inset-bottom))]"
+      />
+    </>
   );
 }
