@@ -10,11 +10,13 @@ import {
 } from "@/lib/purchaseAutomation";
 import {
   createId,
+  deletePurchaseHistory,
   findMatchingPurchaseHistory,
   getPurchaseHistories,
   savePurchaseHistory,
   updatePurchaseHistory,
 } from "@/lib/purchaseHistoryStorage";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { updateItem } from "@/lib/storage";
 import { getUserProfile } from "@/lib/userProfileStorage";
 import type { AssistantItem } from "@/types/assistant";
@@ -246,6 +248,68 @@ export default function AgentActionSuggestionView({
     });
     setPurchaseHistories(getPurchaseHistories());
     setMessage("구매 완료로 기록했고 다음 재구매일을 다시 잡았어.");
+  }
+
+  async function updateRemotePurchaseHistory(history: PurchaseHistoryItem) {
+    const supabase = createSupabaseBrowserClient();
+
+    if (!supabase) return;
+
+    const { data } = await supabase.auth.getSession();
+
+    if (!data.session?.user) return;
+
+    await supabase
+      .from("purchase_history")
+      .update({
+        auto_repurchase_enabled: history.autoRepurchaseEnabled,
+        next_purchase_check_date: history.nextPurchaseCheckDate,
+        updated_at: history.updatedAt,
+      })
+      .eq("user_id", data.session.user.id)
+      .eq("id", history.id);
+  }
+
+  async function deleteRemotePurchaseHistory(historyId: string) {
+    const supabase = createSupabaseBrowserClient();
+
+    if (!supabase) return;
+
+    const { data } = await supabase.auth.getSession();
+
+    if (!data.session?.user) return;
+
+    await supabase
+      .from("purchase_history")
+      .delete()
+      .eq("user_id", data.session.user.id)
+      .eq("id", historyId);
+  }
+
+  function disableRepurchaseRecommendation(history: PurchaseHistoryItem) {
+    const nextHistory = {
+      ...history,
+      autoRepurchaseEnabled: false,
+      updatedAt: new Date().toISOString(),
+    };
+
+    updatePurchaseHistory(nextHistory);
+    setPurchaseHistories(getPurchaseHistories());
+    setMessage("이 구매템의 재구매 추천을 껐어.");
+    void updateRemotePurchaseHistory(nextHistory);
+  }
+
+  function removeRepurchaseHistory(history: PurchaseHistoryItem) {
+    const shouldDelete = window.confirm(
+      `"${history.productName}" 구매템 정보를 삭제할까요? 삭제하면 재구매 추천에서도 사라집니다.`
+    );
+
+    if (!shouldDelete) return;
+
+    deletePurchaseHistory(history.id);
+    setPurchaseHistories(getPurchaseHistories());
+    setMessage("구매템 정보를 삭제했어.");
+    void deleteRemotePurchaseHistory(history.id);
   }
 
   function upsertPurchaseHistory({
@@ -801,6 +865,22 @@ export default function AgentActionSuggestionView({
                   나중에
                 </button>
               </div>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => disableRepurchaseRecommendation(history)}
+                  className="rounded-full bg-white px-3 py-2 text-xs font-black text-slate-500 ring-1 ring-slate-100"
+                >
+                  추천 끄기
+                </button>
+                <button
+                  type="button"
+                  onClick={() => removeRepurchaseHistory(history)}
+                  className="rounded-full bg-white px-3 py-2 text-xs font-black text-rose-500 ring-1 ring-rose-100"
+                >
+                  삭제
+                </button>
+              </div>
             </article>
           ))}
 
@@ -912,6 +992,20 @@ export default function AgentActionSuggestionView({
                 className="rounded-full bg-white px-3 py-1.5 text-xs font-black text-slate-500 ring-1 ring-slate-100"
               >
                 나중에
+              </button>
+              <button
+                type="button"
+                onClick={() => disableRepurchaseRecommendation(history)}
+                className="rounded-full bg-white px-3 py-1.5 text-xs font-black text-slate-500 ring-1 ring-slate-100"
+              >
+                추천 끄기
+              </button>
+              <button
+                type="button"
+                onClick={() => removeRepurchaseHistory(history)}
+                className="rounded-full bg-white px-3 py-1.5 text-xs font-black text-rose-500 ring-1 ring-rose-100"
+              >
+                삭제
               </button>
               <Link
                 href="/purchase"
