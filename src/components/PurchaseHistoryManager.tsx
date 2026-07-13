@@ -44,6 +44,7 @@ type MailConnectionStatus = {
 type MailAutomationConfig = {
   hasGoogleOAuth: boolean;
   hasSupabaseAdmin: boolean;
+  hasServerAutomation: boolean;
   hasOpenAi: boolean;
   hasCronSecret: boolean;
   canCheckSchema: boolean;
@@ -729,13 +730,13 @@ export default function PurchaseHistoryManager() {
               </span>
               <span
                 className={`rounded-2xl px-3 py-2 text-center ${
-                  mailAutomationConfig.hasSupabaseAdmin
+                  mailAutomationConfig.hasServerAutomation
                     ? "bg-emerald-50 text-emerald-600"
                     : "bg-amber-50 text-amber-600"
                 }`}
               >
                 자동 실행{" "}
-                {mailAutomationConfig.hasSupabaseAdmin ? "준비" : "제한"}
+                {mailAutomationConfig.hasServerAutomation ? "준비" : "제한"}
               </span>
               <span
                 className={`rounded-2xl px-3 py-2 text-center ${
@@ -815,12 +816,14 @@ export default function PurchaseHistoryManager() {
 
           {mailAutomationConfig &&
             mailAutomationConfig.hasPurchaseMailSchema &&
-            !mailAutomationConfig.hasSupabaseAdmin && (
+            !mailAutomationConfig.hasServerAutomation && (
               <div className="rounded-2xl bg-amber-50 p-4 ring-1 ring-amber-100">
                 <p className="text-xs font-bold leading-5 text-amber-700">
                   앱을 열 때 자동 확인은 동작하지만, 서버가 매일 알아서 전체
-                  사용자의 쿠팡 메일을 확인하려면 Vercel Production 환경변수에
-                  Supabase 서비스 역할 키가 필요합니다.
+                  사용자의 쿠팡 메일을 확인하려면 Vercel Production 환경변수에{" "}
+                  <span className="font-black">SUPABASE_SERVICE_ROLE_KEY</span>
+                  와 <span className="font-black">CRON_SECRET</span>이 모두
+                  필요합니다.
                 </p>
                 <button
                   type="button"

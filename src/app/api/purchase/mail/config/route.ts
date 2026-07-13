@@ -42,12 +42,14 @@ export async function GET(request: Request) {
   const hasSupabaseAdmin = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY);
   const hasOpenAi = Boolean(process.env.OPENAI_API_KEY);
   const hasCronSecret = Boolean(process.env.CRON_SECRET);
+  const hasServerAutomation = hasSupabaseAdmin && hasCronSecret;
 
   const schemaStatus = await checkPurchaseMailSchema(request);
 
   return NextResponse.json({
     hasGoogleOAuth,
     hasSupabaseAdmin,
+    hasServerAutomation,
     hasOpenAi,
     hasCronSecret,
     ...schemaStatus,
