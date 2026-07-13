@@ -90,6 +90,16 @@ assert.equal(cycle.repeatCycleDays, 28);
 assert.equal(cycle.nextPurchaseCheckDate, "2026-08-11");
 assert.equal(cycle.confidence, "medium");
 
+const similarNameCycle = purchaseAutomation.estimatePurchaseCycle({
+  productName: "탐사수 2L 생수 12병",
+  purchasedAt,
+  histories: [previousHistory],
+});
+
+assert.equal(similarNameCycle.repeatCycleDays, 28);
+assert.equal(similarNameCycle.nextPurchaseCheckDate, "2026-08-11");
+assert.equal(similarNameCycle.confidence, "medium");
+
 const candidate = {
   id: "candidate",
   productName: "탐사수 생수 2L 12개",

@@ -34,6 +34,47 @@ function getCandidateKey(productName: string) {
   return normalizePurchaseName(productName).slice(0, 24);
 }
 
+function getPurchaseTokens(productName: string) {
+  return productName
+    .split(/[\s/,+()[\]{}|·_\-]+/)
+    .map((token) => normalizePurchaseName(token))
+    .filter((token) => token.length >= 2);
+}
+
+function getTokenOverlapScore(leftTokens: string[], rightTokens: string[]) {
+  if (leftTokens.length === 0 || rightTokens.length === 0) return 0;
+
+  const rightTokenSet = new Set(rightTokens);
+  const overlappingTokenCount = leftTokens.filter((token) => {
+    return rightTokenSet.has(token);
+  }).length;
+
+  return (
+    overlappingTokenCount / Math.max(leftTokens.length, rightTokens.length)
+  );
+}
+
+function isSimilarPurchaseName(left: string, right: string) {
+  const normalizedLeft = normalizePurchaseName(left);
+  const normalizedRight = normalizePurchaseName(right);
+
+  if (!normalizedLeft || !normalizedRight) return false;
+  if (normalizedLeft === normalizedRight) return true;
+  if (
+    normalizedLeft.includes(normalizedRight) ||
+    normalizedRight.includes(normalizedLeft)
+  ) {
+    return true;
+  }
+  if (getCandidateKey(left) === getCandidateKey(right)) return true;
+
+  const leftTokens = getPurchaseTokens(left);
+  const rightTokens = getPurchaseTokens(right);
+  const overlapScore = getTokenOverlapScore(leftTokens, rightTokens);
+
+  return overlapScore >= 0.6 && Math.min(leftTokens.length, rightTokens.length) >= 3;
+}
+
 function daysBetween(left: Date, right: Date) {
   return Math.round((right.getTime() - left.getTime()) / 86400000);
 }
@@ -47,10 +88,9 @@ export function estimatePurchaseCycle({
   purchasedAt: Date;
   histories: PurchaseHistoryItem[];
 }): PurchaseCycleEstimate {
-  const key = getCandidateKey(productName);
   const matchingHistories = histories
     .filter((history) => {
-      return getCandidateKey(history.productName) === key;
+      return isSimilarPurchaseName(history.productName, productName);
     })
     .sort((left, right) => {
       return (
