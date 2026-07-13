@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { getCloudDataSyncedEventName } from "@/lib/dataSyncEvents";
 import {
   getPurchaseHistories,
   savePurchaseHistory,
@@ -11,6 +12,7 @@ import type { PurchaseHistoryItem } from "@/types/purchaseHistory";
 
 const AUTO_SYNC_STORAGE_KEY = "my-assistant-purchase-mail-auto-sync-at";
 const AUTO_SYNC_INTERVAL_MS = 1000 * 60 * 60 * 6;
+const AUTO_SYNC_TIMER_MS = 1000 * 60 * 15;
 
 function upsertLocalPurchaseHistory(history: PurchaseHistoryItem) {
   const histories = getPurchaseHistories();
@@ -45,8 +47,11 @@ function upsertLocalPurchaseHistory(history: PurchaseHistoryItem) {
 export default function PurchaseMailAutoSyncBridge() {
   useEffect(() => {
     let isCancelled = false;
+    let isSyncing = false;
 
     async function syncPurchaseMailQuietly() {
+      if (isSyncing) return;
+
       const lastSyncedAt = Number(
         window.localStorage.getItem(AUTO_SYNC_STORAGE_KEY) ?? 0
       );
@@ -64,7 +69,7 @@ export default function PurchaseMailAutoSyncBridge() {
 
       if (!accessToken || isCancelled) return;
 
-      window.localStorage.setItem(AUTO_SYNC_STORAGE_KEY, String(Date.now()));
+      isSyncing = true;
 
       try {
         const response = await fetch("/api/purchase/mail/sync", {
@@ -74,22 +79,53 @@ export default function PurchaseMailAutoSyncBridge() {
           },
         });
 
-        if (!response.ok || isCancelled) return;
+        if (!response.ok || isCancelled) {
+          return;
+        }
 
         const result = (await response.json()) as {
           importedHistories?: PurchaseHistoryItem[];
         };
 
         (result.importedHistories ?? []).forEach(upsertLocalPurchaseHistory);
+        window.localStorage.setItem(AUTO_SYNC_STORAGE_KEY, String(Date.now()));
+
+        if ((result.importedHistories ?? []).length > 0) {
+          window.dispatchEvent(
+            new CustomEvent(getCloudDataSyncedEventName(), {
+              detail: {
+                source: "purchase-mail-auto-sync",
+                importedCount: result.importedHistories?.length ?? 0,
+              },
+            })
+          );
+        }
       } catch {
         window.localStorage.removeItem(AUTO_SYNC_STORAGE_KEY);
+      } finally {
+        isSyncing = false;
+      }
+    }
+
+    function syncWhenVisible() {
+      if (document.visibilityState === "visible") {
+        void syncPurchaseMailQuietly();
       }
     }
 
     syncPurchaseMailQuietly();
+    const intervalId = window.setInterval(() => {
+      void syncPurchaseMailQuietly();
+    }, AUTO_SYNC_TIMER_MS);
+
+    document.addEventListener("visibilitychange", syncWhenVisible);
+    window.addEventListener("focus", syncWhenVisible);
 
     return () => {
       isCancelled = true;
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", syncWhenVisible);
+      window.removeEventListener("focus", syncWhenVisible);
     };
   }, []);
 
