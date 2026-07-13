@@ -387,18 +387,51 @@ export default function AccountManager() {
       return;
     }
 
-    const nextUser = data.user ?? data.session?.user ?? null;
-    setUser(nextUser);
+    const nextUser = data.session?.user ?? null;
 
     if (nextUser) {
+      setUser(nextUser);
       await ensureProfileAndDevice(nextUser, nextLoginId);
+      setMessage("회원가입과 로그인이 완료됐습니다.");
+      return;
     }
 
     setMessage(
-      data.session
-        ? "회원가입과 로그인이 완료됐습니다."
-        : "인증 메일을 보냈습니다. 메일 확인 후 이 아이디와 비밀번호로 로그인하세요."
+      data.user?.identities?.length === 0
+        ? "이미 가입된 이메일일 수 있습니다. 메일이 오지 않으면 로그인 탭에서 기존 아이디로 로그인하거나 아래 재발송을 눌러보세요."
+        : "인증 메일을 보냈습니다. 메일 확인 후 이 아이디와 비밀번호로 로그인하세요. 메일이 안 보이면 스팸함도 확인해주세요."
     );
+  }
+
+  async function handleResendSignupEmail() {
+    if (!supabase) return;
+
+    const nextEmail = signupEmail.trim().toLowerCase();
+
+    if (!nextEmail || !nextEmail.includes("@")) {
+      setMessage("인증 이메일을 정확히 입력해주세요.");
+      return;
+    }
+
+    setIsSaving(true);
+    setMessage(null);
+
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email: nextEmail,
+      options: {
+        emailRedirectTo: getEmailConfirmationUrl(),
+      },
+    });
+
+    setIsSaving(false);
+
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+
+    setMessage("인증 메일을 다시 보냈습니다. 받은메일함과 스팸함을 확인해주세요.");
   }
 
   async function handlePasswordLogin() {
@@ -741,6 +774,17 @@ export default function AccountManager() {
             >
               {authMode === "signup" ? "통합계정 만들기" : "로그인"}
             </button>
+
+            {authMode === "signup" && (
+              <button
+                type="button"
+                onClick={handleResendSignupEmail}
+                disabled={isSaving || !signupEmail.trim()}
+                className="w-full rounded-2xl bg-slate-100 px-4 py-3 text-sm font-black text-slate-600 transition hover:bg-slate-200 disabled:text-slate-300"
+              >
+                인증 메일 다시 보내기
+              </button>
+            )}
           </div>
 
           <div className="mt-4 rounded-3xl bg-slate-50 p-4 ring-1 ring-slate-100">
