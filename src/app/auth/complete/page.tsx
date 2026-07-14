@@ -12,10 +12,33 @@ function getSafeNextPath(value: string | null) {
   return value;
 }
 
+function createNativeSessionUrl({
+  accessToken,
+  refreshToken,
+  nextPath,
+}: {
+  accessToken: string;
+  refreshToken: string;
+  nextPath: string;
+}) {
+  const nativeUrl = new URL("mysecretary://auth/session");
+  const hashParams = new URLSearchParams({
+    access_token: accessToken,
+    refresh_token: refreshToken,
+    next: nextPath,
+  });
+
+  nativeUrl.hash = hashParams.toString();
+
+  return nativeUrl.toString();
+}
+
 function AuthCompleteContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [message, setMessage] = useState("로그인을 확인하고 있습니다.");
+  const [webContinuePath, setWebContinuePath] = useState("/account");
+  const [nativeSessionUrl, setNativeSessionUrl] = useState<string | null>(null);
 
   useEffect(() => {
     async function completeLogin() {
@@ -29,6 +52,7 @@ function AuthCompleteContent() {
       const code = searchParams.get("code");
       const error = searchParams.get("error_description") ?? searchParams.get("error");
       const nextPath = getSafeNextPath(searchParams.get("next"));
+      setWebContinuePath(nextPath);
 
       if (error) {
         setMessage(error);
@@ -39,7 +63,14 @@ function AuthCompleteContent() {
         const { data } = await supabase.auth.getSession();
 
         if (data.session) {
-          router.replace(nextPath);
+          setNativeSessionUrl(
+            createNativeSessionUrl({
+              accessToken: data.session.access_token,
+              refreshToken: data.session.refresh_token,
+              nextPath,
+            })
+          );
+          setMessage("로그인이 확인됐습니다. 앱으로 돌아가거나 웹에서 계속할 수 있습니다.");
           return;
         }
 
@@ -55,7 +86,28 @@ function AuthCompleteContent() {
         return;
       }
 
-      router.replace(nextPath);
+      const { data: sessionData } = await supabase.auth.getSession();
+      const session = sessionData.session;
+
+      if (!session) {
+        setMessage("로그인은 확인됐지만 세션을 저장하지 못했습니다. 다시 시도해주세요.");
+        return;
+      }
+
+      const nativeUrl = createNativeSessionUrl({
+        accessToken: session.access_token,
+        refreshToken: session.refresh_token,
+        nextPath,
+      });
+
+      setNativeSessionUrl(nativeUrl);
+      setMessage("로그인이 확인됐습니다. 앱으로 돌아가거나 웹에서 계속할 수 있습니다.");
+
+      const timer = window.setTimeout(() => {
+        window.location.href = nativeUrl;
+      }, 700);
+
+      return () => window.clearTimeout(timer);
     }
 
     completeLogin();
@@ -69,6 +121,26 @@ function AuthCompleteContent() {
         </div>
         <h1 className="text-2xl font-black">로그인 연결 중</h1>
         <p className="mt-3 text-sm leading-6 text-slate-500">{message}</p>
+        {nativeSessionUrl && (
+          <div className="mt-6 grid w-full gap-3">
+            <a
+              href={nativeSessionUrl}
+              className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white shadow-lg shadow-blue-100"
+            >
+              나의 비서 앱으로 돌아가기
+            </a>
+            <button
+              type="button"
+              onClick={() => router.replace(webContinuePath)}
+              className="rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-600 ring-1 ring-slate-200"
+            >
+              웹에서 계속하기
+            </button>
+            <p className="text-xs font-semibold leading-5 text-slate-400">
+              앱이 자동으로 열리지 않으면 위 버튼을 한 번 눌러주세요.
+            </p>
+          </div>
+        )}
       </section>
     </main>
   );

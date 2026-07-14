@@ -29,16 +29,9 @@ const ENERGY_PATTERN_OPTIONS: Array<{
   { value: "night", label: "저녁형" },
 ];
 
-const LOCAL_APP_SESSION_KEY = "my-secretary-local-app-session";
-const LOCAL_APP_SESSION_CHANGED_EVENT = "my-secretary-local-app-session-changed";
+const AUTH_EMAIL_COOLDOWN_KEY = "my-secretary-auth-email-sent-at";
+const AUTH_EMAIL_COOLDOWN_MS = 90_000;
 
-type LocalAppSession = {
-  id: string;
-  loginId: string;
-  email: string;
-  displayName: string;
-  createdAt: string;
-};
 
 function detectDeviceType() {
   if (typeof navigator === "undefined") return "unknown";
@@ -116,51 +109,22 @@ function getLoginIdFromUser(user: User) {
   return null;
 }
 
-function createLocalUser(session: LocalAppSession): User {
-  const now = session.createdAt;
-
-  return {
-    id: session.id,
-    app_metadata: {
-      provider: "local_app",
-      providers: ["local_app"],
-    },
-    user_metadata: {
-      login_id: session.loginId,
-      name: session.displayName,
-      full_name: session.displayName,
-    },
-    aud: "authenticated",
-    created_at: now,
-    email: session.email,
-    phone: "",
-    role: "authenticated",
-    updated_at: now,
-    identities: [],
-  } as User;
-}
-
-function getStoredLocalSession() {
+function getAuthEmailCooldownSeconds() {
   if (typeof window === "undefined") return null;
 
-  try {
-    const rawSession = window.localStorage.getItem(LOCAL_APP_SESSION_KEY);
-    return rawSession ? (JSON.parse(rawSession) as LocalAppSession) : null;
-  } catch {
-    return null;
-  }
+  const lastSentAt = Number(window.localStorage.getItem(AUTH_EMAIL_COOLDOWN_KEY));
+
+  if (!Number.isFinite(lastSentAt) || lastSentAt <= 0) return null;
+
+  const remainingMs = AUTH_EMAIL_COOLDOWN_MS - (Date.now() - lastSentAt);
+
+  return remainingMs > 0 ? Math.ceil(remainingMs / 1000) : null;
 }
 
-function saveLocalSession(session: LocalAppSession) {
-  window.localStorage.setItem(LOCAL_APP_SESSION_KEY, JSON.stringify(session));
-  window.dispatchEvent(new Event(LOCAL_APP_SESSION_CHANGED_EVENT));
-}
+function rememberAuthEmailSent() {
+  if (typeof window === "undefined") return;
 
-function clearLocalSession() {
-  if (typeof window !== "undefined") {
-    window.localStorage.removeItem(LOCAL_APP_SESSION_KEY);
-    window.dispatchEvent(new Event(LOCAL_APP_SESSION_CHANGED_EVENT));
-  }
+  window.localStorage.setItem(AUTH_EMAIL_COOLDOWN_KEY, String(Date.now()));
 }
 
 export default function AccountManager() {
@@ -180,7 +144,6 @@ export default function AccountManager() {
   const [message, setMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [isLocalSession, setIsLocalSession] = useState(false);
 
   const [displayName, setDisplayName] = useState("");
   const [classificationPreference, setClassificationPreference] = useState("");
@@ -257,14 +220,7 @@ export default function AccountManager() {
     );
     setDeviceName(getDefaultDeviceName());
 
-    const storedLocalSession = getStoredLocalSession();
-
     if (!supabase) {
-      if (storedLocalSession) {
-        setUser(createLocalUser(storedLocalSession));
-        setDisplayName(storedLocalSession.displayName);
-        setIsLocalSession(true);
-      }
       setIsLoading(false);
       return;
     }
@@ -276,7 +232,6 @@ export default function AccountManager() {
 
       if (sessionUser) {
         setUser(sessionUser);
-        setIsLocalSession(false);
         await ensureProfileAndDevice(sessionUser);
         setIsLoading(false);
         return;
@@ -286,12 +241,7 @@ export default function AccountManager() {
 
       if (userData.user) {
         setUser(userData.user);
-        setIsLocalSession(false);
         await ensureProfileAndDevice(userData.user);
-      } else if (storedLocalSession) {
-        setUser(createLocalUser(storedLocalSession));
-        setDisplayName(storedLocalSession.displayName);
-        setIsLocalSession(true);
       }
 
       setIsLoading(false);
@@ -305,21 +255,11 @@ export default function AccountManager() {
 
         if (nextUser) {
           setUser(nextUser);
-          setIsLocalSession(false);
           await ensureProfileAndDevice(nextUser);
         } else {
-          const nextLocalSession = getStoredLocalSession();
-
-          if (nextLocalSession) {
-            setUser(createLocalUser(nextLocalSession));
-            setDisplayName(nextLocalSession.displayName);
-            setIsLocalSession(true);
-          } else {
-            setUser(null);
-            setDevices([]);
-            setUnifiedAccount(null);
-            setIsLocalSession(false);
-          }
+          setUser(null);
+          setDevices([]);
+          setUnifiedAccount(null);
         }
       }
     );
@@ -465,6 +405,7 @@ export default function AccountManager() {
 
     setIsSaving(true);
     setMessage(null);
+    rememberAuthEmailSent();
 
     const { data, error } = await supabase.auth.signUp({
       email: nextEmail,
@@ -504,6 +445,15 @@ export default function AccountManager() {
   async function handleResendSignupEmail() {
     if (!supabase) return;
 
+    const cooldownSeconds = getAuthEmailCooldownSeconds();
+
+    if (cooldownSeconds) {
+      setMessage(
+        `이메일 발송 제한을 피하려고 잠시 막아뒀습니다. ${cooldownSeconds}초 뒤 다시 눌러주세요.`
+      );
+      return;
+    }
+
     const nextEmail = signupEmail.trim().toLowerCase();
 
     if (!nextEmail || !nextEmail.includes("@")) {
@@ -513,6 +463,7 @@ export default function AccountManager() {
 
     setIsSaving(true);
     setMessage(null);
+    rememberAuthEmailSent();
 
     const { error } = await supabase.auth.resend({
       type: "signup",
@@ -525,7 +476,11 @@ export default function AccountManager() {
     setIsSaving(false);
 
     if (error) {
-      setMessage(error.message);
+      setMessage(
+        error.message.includes("Invalid login credentials")
+          ? "아이디 또는 비밀번호가 맞지 않습니다. 이메일 확인이 끝난 계정인지 확인하고, 비밀번호를 모르면 재설정 메일을 요청해주세요."
+          : error.message
+      );
       return;
     }
 
@@ -611,6 +566,15 @@ export default function AccountManager() {
   async function handleSendPasswordResetEmail() {
     if (!supabase) return;
 
+    const cooldownSeconds = getAuthEmailCooldownSeconds();
+
+    if (cooldownSeconds) {
+      setMessage(
+        `이메일 발송 제한을 피하려고 잠시 막아뒀습니다. ${cooldownSeconds}초 뒤 다시 눌러주세요.`
+      );
+      return;
+    }
+
     const resetEmail = loginId.trim().includes("@")
       ? loginId.trim().toLowerCase()
       : signupEmail.trim().toLowerCase();
@@ -622,6 +586,7 @@ export default function AccountManager() {
 
     setIsSaving(true);
     setMessage(null);
+    rememberAuthEmailSent();
 
     const { error } = await supabase.auth.resetPasswordForEmail(resetEmail, {
       redirectTo: getPasswordResetRedirectUrl(),
@@ -670,51 +635,24 @@ export default function AccountManager() {
     setMessage("새 비밀번호를 저장했습니다. 다음부터는 이 비밀번호로 로그인하세요.");
   }
 
-  function handleLocalAppLogin() {
-    const identifier = loginId.trim() || signupEmail.trim();
+  async function handleCopyAuthSetupSql() {
+    const response = await fetch("/api/auth/setup-sql");
 
-    if (!identifier) {
-      setMessage("오늘 바로 시작하려면 아이디 또는 이메일을 입력해주세요.");
+    if (!response.ok) {
+      setMessage("통합계정 설정 SQL을 불러오지 못했습니다.");
       return;
     }
 
-    const normalizedIdentifier = normalizeLoginId(identifier);
-    const fallbackName =
-      signupName.trim() ||
-      displayName.trim() ||
-      normalizedIdentifier.split("@")[0] ||
-      "사용자";
-    const now = new Date().toISOString();
-    const session: LocalAppSession = {
-      id:
-        typeof crypto !== "undefined" && "randomUUID" in crypto
-          ? `local-${crypto.randomUUID()}`
-          : `local-${Date.now()}`,
-      loginId: normalizedIdentifier,
-      email: identifier.includes("@")
-        ? identifier.toLowerCase()
-        : `${normalizedIdentifier}@local.my-secretary`,
-      displayName: fallbackName,
-      createdAt: now,
-    };
-
-    saveLocalSession(session);
-    setUser(createLocalUser(session));
-    setDisplayName(session.displayName);
-    setDevices([]);
-    setUnifiedAccount(null);
-    setIsLocalSession(true);
-    setMessage("오늘 바로 앱을 열었습니다. 정식 계정 연결은 이메일 한도 문제를 해결한 뒤 이어서 붙이면 됩니다.");
+    const sql = await response.text();
+    await navigator.clipboard.writeText(sql);
+    setMessage("통합계정 설정 SQL을 복사했습니다. Supabase SQL Editor에서 실행해주세요.");
   }
 
   async function handleSignOut() {
-    clearLocalSession();
-
-    if (!supabase || isLocalSession) {
+    if (!supabase) {
       setUser(null);
       setDevices([]);
       setUnifiedAccount(null);
-      setIsLocalSession(false);
       setMessage("로그아웃했습니다.");
       return;
     }
@@ -723,7 +661,6 @@ export default function AccountManager() {
     setUser(null);
     setDevices([]);
     setUnifiedAccount(null);
-    setIsLocalSession(false);
     setMessage("로그아웃했습니다.");
   }
 
@@ -851,9 +788,9 @@ export default function AccountManager() {
           <h2 className="text-lg font-black text-slate-900">
             Supabase 연결 필요
           </h2>
-          <p className="mt-2 text-sm leading-6 text-slate-500">
+            <p className="mt-2 text-sm leading-6 text-slate-500">
             모든 기기를 같은 사용자로 묶으려면 Supabase Auth와 DB가 필요합니다.
-            지금은 이 브라우저에만 저장되는 임시 프로필을 사용할 수 있습니다.
+            로그인은 임시 계정 없이 실제 계정으로만 처리합니다.
           </p>
           <div className="mt-4 rounded-2xl bg-slate-50 p-4 text-xs font-bold leading-6 text-slate-500 ring-1 ring-slate-100">
             <p>NEXT_PUBLIC_SUPABASE_URL</p>
@@ -1023,17 +960,10 @@ export default function AccountManager() {
               </button>
             )}
 
-            <button
-              type="button"
-              onClick={handleLocalAppLogin}
-              disabled={isSaving || (!loginId.trim() && !signupEmail.trim())}
-              className="w-full rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white transition hover:bg-slate-800 disabled:bg-slate-300"
-            >
-              오늘 바로 앱 열기
-            </button>
-            <p className="text-xs font-semibold leading-5 text-slate-400">
-              이메일 발송 제한이 풀릴 때까지 이 기기에서 앱 화면과 기능을 먼저
-              확인하는 임시 로그인입니다.
+            <p className="rounded-2xl bg-blue-50 p-3 text-xs font-semibold leading-5 text-blue-700 ring-1 ring-blue-100">
+              이메일 링크를 누르면 웹에서 확인된 뒤 앱으로 돌아가기 버튼이
+              표시됩니다. 앱에서 비회원으로 보이면 그 버튼을 눌러 세션을 앱에
+              저장해주세요.
             </p>
           </div>
 
@@ -1095,9 +1025,7 @@ export default function AccountManager() {
                 {user.email}
               </p>
               <p className="mt-1 text-xs font-black text-emerald-600">
-                {isLocalSession
-                  ? "이 기기에서 바로 시작"
-                  : currentDevice
+                {currentDevice
                     ? "현재 기기 연결됨"
                     : "현재 기기 연결 확인 중"}
               </p>
@@ -1116,42 +1044,26 @@ export default function AccountManager() {
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-xs font-black text-blue-600">
-                {isLocalSession ? "오늘용 임시 로그인" : "통합계정"}
+                통합계정
               </p>
               <h3 className="mt-1 text-sm font-black text-slate-900">
-                {isLocalSession
-                  ? "이 기기에서 앱 화면을 확인 중입니다."
-                  : unifiedAccount
+                {unifiedAccount
                   ? "이 로그인은 통합계정에 연결됐습니다."
                   : "통합계정 연결 준비 중"}
               </h3>
               <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
-                {isLocalSession
-                  ? "Supabase 이메일 제한이 풀리면 정식 계정으로 다시 연결하면 됩니다."
-                  : "카카오, Google, Apple, 이메일 로그인을 하나의 앱 계정으로 묶기 위한 기반입니다."}
+                카카오, Google, Apple, 이메일 로그인을 하나의 앱 계정으로
+                묶기 위한 기반입니다.
               </p>
             </div>
-            {isLocalSession ? (
-              <span className="shrink-0 rounded-full bg-white px-3 py-1.5 text-xs font-black text-blue-700 ring-1 ring-blue-100">
-                local
-              </span>
-            ) : unifiedAccount?.identity.provider ? (
+            {unifiedAccount?.identity.provider ? (
               <span className="shrink-0 rounded-full bg-white px-3 py-1.5 text-xs font-black text-blue-700 ring-1 ring-blue-100">
                 {unifiedAccount.identity.provider}
               </span>
             ) : null}
           </div>
 
-          {isLocalSession ? (
-            <div className="mt-3 grid gap-2 text-xs font-bold text-slate-500 sm:grid-cols-2">
-              <p className="rounded-2xl bg-white px-3 py-2 ring-1 ring-blue-100">
-                임시 계정 {getLoginIdFromUser(user) ?? "local"}
-              </p>
-              <p className="rounded-2xl bg-white px-3 py-2 ring-1 ring-blue-100">
-                저장 위치 현재 기기
-              </p>
-            </div>
-          ) : unifiedAccount ? (
+          {unifiedAccount ? (
             <div className="mt-3 grid gap-2 text-xs font-bold text-slate-500 sm:grid-cols-2">
               <p className="rounded-2xl bg-white px-3 py-2 ring-1 ring-blue-100">
                 계정 ID {unifiedAccount.account.id.slice(0, 8)}
@@ -1161,10 +1073,29 @@ export default function AccountManager() {
               </p>
             </div>
           ) : (
-            <p className="mt-3 rounded-2xl bg-white px-3 py-2 text-xs font-bold leading-5 text-amber-700 ring-1 ring-amber-100">
-              {unifiedAccountMessage ??
-                "Supabase에 통합계정 테이블이 적용되면 자동 연결됩니다."}
-            </p>
+            <div className="mt-3 rounded-2xl bg-white p-3 ring-1 ring-amber-100">
+              <p className="text-xs font-bold leading-5 text-amber-700">
+                {unifiedAccountMessage ??
+                  "Supabase에 통합계정 테이블이 적용되면 자동 연결됩니다."}
+              </p>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={handleCopyAuthSetupSql}
+                  className="rounded-2xl bg-amber-50 px-3 py-2 text-xs font-black text-amber-700 ring-1 ring-amber-100"
+                >
+                  설정 SQL 복사
+                </button>
+                <a
+                  href="https://supabase.com/dashboard/project/fesrtvxmqalkispmmhro/sql/new"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-2xl bg-slate-950 px-3 py-2 text-center text-xs font-black text-white"
+                >
+                  SQL Editor
+                </a>
+              </div>
+            </div>
           )}
         </div>
 

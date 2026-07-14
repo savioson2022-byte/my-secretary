@@ -5,15 +5,6 @@ import type { User } from "@supabase/supabase-js";
 import Link from "next/link";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
-const LOCAL_APP_SESSION_KEY = "my-secretary-local-app-session";
-const LOCAL_APP_SESSION_CHANGED_EVENT = "my-secretary-local-app-session-changed";
-
-type LocalAppSession = {
-  displayName?: string;
-  email?: string;
-  loginId?: string;
-};
-
 function getDisplayName(user: User | null, profileName: string) {
   if (profileName.trim()) {
     return profileName.trim();
@@ -31,42 +22,14 @@ function getDisplayName(user: User | null, profileName: string) {
   return user?.email?.split("@")[0] ?? "비회원";
 }
 
-function getLocalSession() {
-  if (typeof window === "undefined") return null;
-
-  try {
-    const rawSession = window.localStorage.getItem(LOCAL_APP_SESSION_KEY);
-    return rawSession ? (JSON.parse(rawSession) as LocalAppSession) : null;
-  } catch {
-    return null;
-  }
-}
-
 export default function UserStatusBadge() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [user, setUser] = useState<User | null>(null);
   const [profileName, setProfileName] = useState("");
-  const [localSession, setLocalSession] = useState<LocalAppSession | null>(
-    null
-  );
 
   useEffect(() => {
-    function loadLocalSession() {
-      setLocalSession(getLocalSession());
-    }
-
-    loadLocalSession();
-    window.addEventListener(LOCAL_APP_SESSION_CHANGED_EVENT, loadLocalSession);
-    window.addEventListener("storage", loadLocalSession);
-
     if (!supabase) {
-      return () => {
-        window.removeEventListener(
-          LOCAL_APP_SESSION_CHANGED_EVENT,
-          loadLocalSession
-        );
-        window.removeEventListener("storage", loadLocalSession);
-      };
+      return;
     }
 
     async function loadUser() {
@@ -95,20 +58,10 @@ export default function UserStatusBadge() {
 
     return () => {
       listener.subscription.unsubscribe();
-      window.removeEventListener(
-        LOCAL_APP_SESSION_CHANGED_EVENT,
-        loadLocalSession
-      );
-      window.removeEventListener("storage", loadLocalSession);
     };
   }, [supabase]);
 
-  const displayName =
-    user || !localSession
-      ? getDisplayName(user, profileName)
-      : localSession.displayName?.trim() ||
-        localSession.loginId?.trim() ||
-        "사용자";
+  const displayName = getDisplayName(user, profileName);
   const initial = displayName.slice(0, 1).toUpperCase() || "나";
 
   return (
@@ -127,7 +80,7 @@ export default function UserStatusBadge() {
           {displayName}
         </p>
         <p className="text-[10px] font-bold text-slate-400">
-          {user ? "로그인됨" : localSession ? "바로 시작" : "로그인 필요"}
+          {user ? "로그인됨" : "로그인 필요"}
         </p>
       </div>
     </Link>
