@@ -1,9 +1,7 @@
 import AccountManager from "@/components/AccountManager";
-import AppRuntimeControls from "@/components/AppRuntimeControls";
 import BottomNavigation from "@/components/BottomNavigation";
 import CloudSyncStatusCard from "@/components/CloudSyncStatusCard";
 import LocalDataTransfer from "@/components/LocalDataTransfer";
-import MobileInstallGuide from "@/components/MobileInstallGuide";
 import SavedPlaceManager from "@/components/SavedPlaceManager";
 import UserStatusBadge from "@/components/UserStatusBadge";
 import Link from "next/link";
@@ -25,7 +23,6 @@ export default function SettingsPage() {
       </header>
 
       <div className="space-y-5">
-        <AppRuntimeControls />
         <AccountManager />
         <CloudSyncStatusCard />
 
@@ -89,7 +86,6 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        <MobileInstallGuide />
         <SavedPlaceManager />
         <LocalDataTransfer />
       </div>

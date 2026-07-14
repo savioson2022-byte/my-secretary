@@ -31,6 +31,8 @@ const ENERGY_PATTERN_OPTIONS: Array<{
 
 const AUTH_EMAIL_COOLDOWN_KEY = "my-secretary-auth-email-sent-at";
 const AUTH_EMAIL_COOLDOWN_MS = 90_000;
+const DEVICE_ID_KEY = "my-secretary-stable-device-id";
+const DEVICE_USER_AGENT_PREFIX = "my-secretary-device:";
 
 
 function detectDeviceType() {
@@ -127,6 +129,45 @@ function rememberAuthEmailSent() {
   window.localStorage.setItem(AUTH_EMAIL_COOLDOWN_KEY, String(Date.now()));
 }
 
+function getBrowserUserAgent() {
+  if (typeof navigator === "undefined") return "";
+
+  return navigator.userAgent;
+}
+
+function getStableDeviceUserAgent() {
+  if (typeof window === "undefined") return "";
+
+  let deviceId = window.localStorage.getItem(DEVICE_ID_KEY);
+
+  if (!deviceId) {
+    deviceId =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    window.localStorage.setItem(DEVICE_ID_KEY, deviceId);
+  }
+
+  return `${DEVICE_USER_AGENT_PREFIX}${deviceId}`;
+}
+
+function getCurrentDeviceUserAgentCandidates() {
+  const stableDeviceUserAgent = getStableDeviceUserAgent();
+  const browserUserAgent = getBrowserUserAgent();
+
+  return Array.from(
+    new Set([stableDeviceUserAgent, browserUserAgent].filter(Boolean))
+  );
+}
+
+function clearPasswordResetUrlFlag() {
+  if (typeof window === "undefined") return;
+
+  const url = new URL(window.location.href);
+  url.searchParams.delete("reset_password");
+  window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+}
+
 export default function AccountManager() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const configured = isSupabaseConfigured();
@@ -189,6 +230,7 @@ export default function AccountManager() {
     if (searchParams.get("reset_password") === "1") {
       setPasswordResetMode(true);
       setMessage("새 비밀번호를 설정해주세요.");
+      clearPasswordResetUrlFlag();
     }
 
     const savedProfile = getUserProfile();
@@ -343,12 +385,16 @@ export default function AccountManager() {
       );
     }
 
+    const deviceUserAgent = getStableDeviceUserAgent();
+    const deviceUserAgentCandidates = getCurrentDeviceUserAgentCandidates();
     const { data: existingDevices } = await supabase
       .from("devices")
       .select("*")
       .eq("user_id", nextUser.id)
-      .eq("user_agent", navigator.userAgent)
-      .limit(1);
+      .in("user_agent", deviceUserAgentCandidates)
+      .order("last_seen_at", {
+        ascending: false,
+      });
     const existingDevice = existingDevices?.[0] as RegisteredDevice | undefined;
 
     if (existingDevice) {
@@ -357,17 +403,28 @@ export default function AccountManager() {
         .update({
           device_name: existingDevice.device_name || getDefaultDeviceName(),
           device_type: detectDeviceType(),
+          user_agent: deviceUserAgent,
           trusted: true,
           last_seen_at: now,
           updated_at: now,
         })
         .eq("id", existingDevice.id);
+
+      const duplicateDeviceIds =
+        existingDevices
+          ?.slice(1)
+          .map((device) => device.id)
+          .filter(Boolean) ?? [];
+
+      if (duplicateDeviceIds.length > 0) {
+        await supabase.from("devices").delete().in("id", duplicateDeviceIds);
+      }
     } else {
       await supabase.from("devices").insert({
         user_id: nextUser.id,
         device_name: deviceName.trim() || getDefaultDeviceName(),
         device_type: detectDeviceType(),
-        user_agent: navigator.userAgent,
+        user_agent: deviceUserAgent,
         trusted: true,
         last_seen_at: now,
       });
@@ -634,7 +691,15 @@ export default function AccountManager() {
     setNewPassword("");
     setNewPasswordConfirm("");
     setPasswordResetMode(false);
+    clearPasswordResetUrlFlag();
     setMessage("새 비밀번호를 저장했습니다. 다음부터는 이 비밀번호로 로그인하세요.");
+  }
+
+  function closePasswordResetMode() {
+    setPasswordResetMode(false);
+    setNewPassword("");
+    setNewPasswordConfirm("");
+    clearPasswordResetUrlFlag();
   }
 
   async function handleCopyAuthSetupSql() {
@@ -724,9 +789,12 @@ export default function AccountManager() {
     setMessage(null);
 
     const now = new Date().toISOString();
+    const deviceUserAgent = getStableDeviceUserAgent();
+    const deviceUserAgentCandidates = getCurrentDeviceUserAgentCandidates();
     const nextDevice = {
       device_name: deviceName.trim() || getDefaultDeviceName(),
       device_type: detectDeviceType(),
+      user_agent: deviceUserAgent,
       trusted: true,
       last_seen_at: now,
       updated_at: now,
@@ -736,8 +804,10 @@ export default function AccountManager() {
       .from("devices")
       .select("id")
       .eq("user_id", user.id)
-      .eq("user_agent", navigator.userAgent)
-      .limit(1);
+      .in("user_agent", deviceUserAgentCandidates)
+      .order("last_seen_at", {
+        ascending: false,
+      });
 
     const existingDeviceId = existingDevices?.[0]?.id;
     const { error } = existingDeviceId
@@ -747,7 +817,6 @@ export default function AccountManager() {
           .eq("id", existingDeviceId)
       : await supabase.from("devices").insert({
           user_id: user.id,
-          user_agent: navigator.userAgent,
           ...nextDevice,
         });
 
@@ -756,6 +825,16 @@ export default function AccountManager() {
     if (error) {
       setMessage(error.message);
       return;
+    }
+
+    const duplicateDeviceIds =
+      existingDevices
+        ?.slice(1)
+        .map((device) => device.id)
+        .filter(Boolean) ?? [];
+
+    if (duplicateDeviceIds.length > 0) {
+      await supabase.from("devices").delete().in("id", duplicateDeviceIds);
     }
 
     setMessage("현재 기기를 이 사용자에게 연결했습니다.");
@@ -1002,11 +1081,13 @@ export default function AccountManager() {
   }
 
   const visibleName = getUserDisplayName(user, displayName);
+  const currentDeviceUserAgentCandidates =
+    typeof window === "undefined" ? [] : getCurrentDeviceUserAgentCandidates();
   const currentDevice =
-    typeof navigator === "undefined"
+    currentDeviceUserAgentCandidates.length === 0
       ? null
       : devices.find((device) => {
-          return device.user_agent === navigator.userAgent;
+          return currentDeviceUserAgentCandidates.includes(device.user_agent);
         });
 
   return (
@@ -1103,8 +1184,23 @@ export default function AccountManager() {
 
         {passwordResetMode && (
           <div className="mt-4 rounded-3xl bg-slate-950 p-4 text-white">
-            <p className="text-xs font-black text-blue-200">비밀번호 재설정</p>
-            <h3 className="mt-1 text-base font-black">새 비밀번호 만들기</h3>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-black text-blue-200">
+                  비밀번호 재설정
+                </p>
+                <h3 className="mt-1 text-base font-black">
+                  새 비밀번호 만들기
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={closePasswordResetMode}
+                className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-black text-slate-200"
+              >
+                닫기
+              </button>
+            </div>
             <p className="mt-1 text-xs font-semibold leading-5 text-slate-300">
               앞으로 앱에서 사용할 비밀번호를 다시 설정합니다.
             </p>
