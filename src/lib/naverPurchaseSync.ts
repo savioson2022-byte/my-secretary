@@ -14,11 +14,26 @@ type NaverMailConnectionRow = {
   sync_after: string;
 };
 
+export function normalizeNaverMailAppPassword(appPassword: string) {
+  return appPassword.replace(/[\s-]/g, "");
+}
+
+function getNaverLoginCandidates(email: string) {
+  const normalizedEmail = email.trim().toLowerCase();
+  const localPart = normalizedEmail.endsWith("@naver.com")
+    ? normalizedEmail.slice(0, -10)
+    : "";
+
+  return Array.from(
+    new Set([normalizedEmail, localPart].filter((candidate) => candidate))
+  );
+}
+
 function createNaverMailClient({
-  email,
+  loginId,
   appPassword,
 }: {
-  email: string;
+  loginId: string;
   appPassword: string;
 }) {
   return new ImapFlow({
@@ -26,7 +41,7 @@ function createNaverMailClient({
     port: 993,
     secure: true,
     auth: {
-      user: email,
+      user: loginId,
       pass: appPassword,
     },
     logger: false,
@@ -67,18 +82,57 @@ export async function verifyNaverMailConnection({
   email: string;
   appPassword: string;
 }) {
-  const client = createNaverMailClient({ email, appPassword });
+  const normalizedAppPassword = normalizeNaverMailAppPassword(appPassword);
+  const loginCandidates = getNaverLoginCandidates(email);
+  let lastError: unknown = null;
 
-  try {
-    await client.connect();
-  } catch (error) {
-    throw new Error(getReadableNaverMailError(error));
-  } finally {
+  for (const loginId of loginCandidates) {
+    const client = createNaverMailClient({
+      loginId,
+      appPassword: normalizedAppPassword,
+    });
+
     try {
+      await client.connect();
       await client.logout();
-    } catch {
-      // Connection may have failed before login completed.
+      return {
+        loginId,
+        appPassword: normalizedAppPassword,
+      };
+    } catch (error) {
+      lastError = error;
+
+      try {
+        await client.logout();
+      } catch {
+        // Connection may have failed before login completed.
+      }
     }
+  }
+
+  throw new Error(getReadableNaverMailError(lastError));
+}
+
+async function connectNaverMailWithFallback({
+  email,
+  appPassword,
+}: {
+  email: string;
+  appPassword: string;
+}) {
+  const verified = await verifyNaverMailConnection({ email, appPassword });
+
+  return createNaverMailClient({
+    loginId: verified.loginId,
+    appPassword: verified.appPassword,
+  });
+}
+
+async function safeLogout(client: ImapFlow) {
+  try {
+    await client.logout();
+  } catch {
+    // Ignore logout failures after network or authentication errors.
   }
 }
 
@@ -107,15 +161,15 @@ export async function syncNaverPurchaseMails({
     throw new Error("네이버 메일 주소와 앱 비밀번호가 필요합니다.");
   }
 
-  const client = createNaverMailClient({
-    email: connection.email,
-    appPassword: connection.refresh_token,
-  });
+  let client: ImapFlow;
   const importedHistories: PurchaseHistoryItem[] = [];
   let messageCount = 0;
 
   try {
-    await client.connect();
+    client = await connectNaverMailWithFallback({
+      email: connection.email,
+      appPassword: connection.refresh_token,
+    });
   } catch (error) {
     throw new Error(getReadableNaverMailError(error));
   }
@@ -209,7 +263,7 @@ export async function syncNaverPurchaseMails({
       lock.release();
     }
   } finally {
-    await client.logout();
+    await safeLogout(client);
   }
 
   await supabase

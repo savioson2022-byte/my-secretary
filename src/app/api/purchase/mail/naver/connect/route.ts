@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { getAuthedSupabaseForRequest } from "@/lib/apiAuth";
-import { verifyNaverMailConnection } from "@/lib/naverPurchaseSync";
+import {
+  normalizeNaverMailAppPassword,
+  verifyNaverMailConnection,
+} from "@/lib/naverPurchaseSync";
 
 export async function POST(request: Request) {
   const context = await getAuthedSupabaseForRequest(request);
@@ -49,12 +52,14 @@ export async function POST(request: Request) {
     );
   }
 
+  const normalizedAppPassword = normalizeNaverMailAppPassword(appPassword);
+
   const { error } = await context.supabase.from("purchase_mail_connections").upsert(
     {
       user_id: context.auth.user.id,
       provider: "naver",
       email,
-      refresh_token: appPassword,
+      refresh_token: normalizedAppPassword,
       access_token: null,
       access_token_expires_at: null,
       sync_after: "2026-07-14T00:00:00+09:00",
