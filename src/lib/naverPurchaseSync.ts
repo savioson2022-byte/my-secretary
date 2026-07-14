@@ -61,7 +61,7 @@ function getReadableNaverMailError(error: unknown) {
   const combined = `${message} ${response} ${responseText}`;
 
   if (/authentication failed|AUTH|password|login/i.test(combined)) {
-    return "네이버 메일 로그인에 실패했습니다. 네이버 메일의 IMAP/SMTP 사용 설정을 켜고, 계정 비밀번호가 아니라 새로 발급한 앱 비밀번호를 입력해주세요.";
+    return "네이버 메일 로그인에 실패했습니다. IMAP/SMTP 사용 설정, 새로 발급한 앱 비밀번호, 네이버 보안설정의 해외 로그인 차단 여부를 확인해주세요. 나의 비서 서버는 해외 리전에서 메일 서버에 접속할 수 있습니다.";
   }
 
   if (/timed out|timeout|network|connection/i.test(combined)) {
@@ -69,7 +69,7 @@ function getReadableNaverMailError(error: unknown) {
   }
 
   if (/command failed/i.test(combined)) {
-    return "네이버 메일 서버가 요청을 거절했습니다. IMAP 사용 설정과 앱 비밀번호를 확인해주세요.";
+    return "네이버 메일 서버가 요청을 거절했습니다. IMAP/SMTP 사용 설정, 앱 비밀번호, 해외 로그인 차단 설정을 확인해주세요.";
   }
 
   return message || "네이버 메일을 확인하지 못했습니다.";
