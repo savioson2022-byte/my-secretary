@@ -1,4 +1,9 @@
 {
+  "functions": {
+    "src/app/api/purchase/mail/**/route.ts": {
+      "regions": ["icn1"]
+    }
+  },
   "crons": [
     {
       "path": "/api/purchase/mail/cron",
