@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAuthedSupabaseForRequest } from "@/lib/apiAuth";
+import { verifyNaverMailConnection } from "@/lib/naverPurchaseSync";
 
 export async function POST(request: Request) {
   const context = await getAuthedSupabaseForRequest(request);
@@ -22,6 +23,25 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         error: "네이버 메일 주소와 앱 비밀번호를 입력해야 합니다.",
+      },
+      {
+        status: 400,
+      }
+    );
+  }
+
+  try {
+    await verifyNaverMailConnection({
+      email,
+      appPassword,
+    });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "네이버 메일 연결 정보를 확인하지 못했습니다.",
       },
       {
         status: 400,

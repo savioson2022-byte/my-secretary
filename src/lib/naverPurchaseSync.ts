@@ -14,6 +14,74 @@ type NaverMailConnectionRow = {
   sync_after: string;
 };
 
+function createNaverMailClient({
+  email,
+  appPassword,
+}: {
+  email: string;
+  appPassword: string;
+}) {
+  return new ImapFlow({
+    host: "imap.naver.com",
+    port: 993,
+    secure: true,
+    auth: {
+      user: email,
+      pass: appPassword,
+    },
+    logger: false,
+  });
+}
+
+function getReadableNaverMailError(error: unknown) {
+  const response =
+    typeof error === "object" && error && "response" in error
+      ? String((error as { response?: unknown }).response ?? "")
+      : "";
+  const responseText =
+    typeof error === "object" && error && "responseText" in error
+      ? String((error as { responseText?: unknown }).responseText ?? "")
+      : "";
+  const message = error instanceof Error ? error.message : String(error);
+  const combined = `${message} ${response} ${responseText}`;
+
+  if (/authentication failed|AUTH|password|login/i.test(combined)) {
+    return "네이버 메일 로그인에 실패했습니다. 네이버 메일의 IMAP/SMTP 사용 설정을 켜고, 계정 비밀번호가 아니라 새로 발급한 앱 비밀번호를 입력해주세요.";
+  }
+
+  if (/timed out|timeout|network|connection/i.test(combined)) {
+    return "네이버 메일 서버에 연결하지 못했습니다. 잠시 후 다시 시도해주세요.";
+  }
+
+  if (/command failed/i.test(combined)) {
+    return "네이버 메일 서버가 요청을 거절했습니다. IMAP 사용 설정과 앱 비밀번호를 확인해주세요.";
+  }
+
+  return message || "네이버 메일을 확인하지 못했습니다.";
+}
+
+export async function verifyNaverMailConnection({
+  email,
+  appPassword,
+}: {
+  email: string;
+  appPassword: string;
+}) {
+  const client = createNaverMailClient({ email, appPassword });
+
+  try {
+    await client.connect();
+  } catch (error) {
+    throw new Error(getReadableNaverMailError(error));
+  } finally {
+    try {
+      await client.logout();
+    } catch {
+      // Connection may have failed before login completed.
+    }
+  }
+}
+
 function isCoupangMail({
   subject,
   from,
@@ -39,20 +107,18 @@ export async function syncNaverPurchaseMails({
     throw new Error("네이버 메일 주소와 앱 비밀번호가 필요합니다.");
   }
 
-  const client = new ImapFlow({
-    host: "imap.naver.com",
-    port: 993,
-    secure: true,
-    auth: {
-      user: connection.email,
-      pass: connection.refresh_token,
-    },
-    logger: false,
+  const client = createNaverMailClient({
+    email: connection.email,
+    appPassword: connection.refresh_token,
   });
   const importedHistories: PurchaseHistoryItem[] = [];
   let messageCount = 0;
 
-  await client.connect();
+  try {
+    await client.connect();
+  } catch (error) {
+    throw new Error(getReadableNaverMailError(error));
+  }
 
   try {
     const lock = await client.getMailboxLock("INBOX");
