@@ -476,11 +476,7 @@ export default function AccountManager() {
     setIsSaving(false);
 
     if (error) {
-      setMessage(
-        error.message.includes("Invalid login credentials")
-          ? "아이디 또는 비밀번호가 맞지 않습니다. 이메일 확인이 끝난 계정인지 확인하고, 비밀번호를 모르면 재설정 메일을 요청해주세요."
-          : error.message
-      );
+      setMessage(error.message);
       return;
     }
 
@@ -546,7 +542,13 @@ export default function AccountManager() {
     setIsSaving(false);
 
     if (error) {
-      setMessage(error.message);
+      setMessage(
+        error.message.includes("Invalid login credentials")
+          ? loginIdentifier.includes("@")
+            ? "이메일은 확인했지만 비밀번호가 맞지 않습니다. 비밀번호 재설정 메일을 보낸 뒤, 메일 링크에서 ‘나의 비서 앱으로 돌아가기’를 눌러 새 비밀번호를 저장해주세요."
+            : "아이디는 이메일까지 찾았지만 비밀번호가 맞지 않습니다. 아이디 칸에 가입 이메일을 넣고 비밀번호 재설정을 진행해주세요."
+          : error.message
+      );
       return;
     }
 

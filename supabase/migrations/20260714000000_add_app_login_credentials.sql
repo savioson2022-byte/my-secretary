@@ -68,9 +68,32 @@ language sql
 security definer
 set search_path = public
 as $$
-  select credentials.email
-  from public.app_login_credentials credentials
-  where lower(credentials.login_id) = lower(trim(login_id_input))
+  with normalized as (
+    select lower(trim(login_id_input)) as login_id
+  ),
+  credential_match as (
+    select credentials.email, credentials.updated_at
+    from public.app_login_credentials credentials, normalized
+    where lower(credentials.login_id) = normalized.login_id
+  ),
+  account_identity_match as (
+    select
+      coalesce(nullif(identities.email, ''), nullif(accounts.primary_email, '')) as email,
+      greatest(accounts.updated_at, identities.updated_at) as updated_at
+    from public.app_accounts accounts
+    left join public.account_identities identities
+      on identities.app_account_id = accounts.id,
+      normalized
+    where lower(accounts.login_id) = normalized.login_id
+  )
+  select email
+  from (
+    select email, updated_at from credential_match
+    union all
+    select email, updated_at from account_identity_match
+  ) matches
+  where email is not null and length(trim(email)) > 0
+  order by updated_at desc
   limit 1
 $$;
 
