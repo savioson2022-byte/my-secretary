@@ -87,6 +87,13 @@ export async function GET(request: Request) {
     .eq("status", "active");
 
   if (error) {
+    console.error("구매 메일 예약 수집 연결 조회 실패", {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    });
+
     return NextResponse.json(
       {
         error: "메일 연결 정보를 불러오지 못했습니다.",
@@ -101,10 +108,23 @@ export async function GET(request: Request) {
   let checkedConnections = 0;
 
   for (const connection of connections ?? []) {
-    const { data: historyRows } = await supabase
+    const { data: historyRows, error: historyError } = await supabase
       .from("purchase_history")
       .select("*")
       .eq("user_id", connection.user_id);
+
+    if (historyError) {
+      console.error("구매 메일 예약 수집 구매 이력 조회 실패", {
+        connectionId: connection.id,
+        provider: connection.provider,
+        code: historyError.code,
+        message: historyError.message,
+        details: historyError.details,
+        hint: historyError.hint,
+      });
+      continue;
+    }
+
     const existingHistories = ((historyRows ?? []) as PurchaseHistoryRow[]).map(
       rowToHistory
     );
@@ -126,6 +146,13 @@ export async function GET(request: Request) {
       importedCount += result.importedCount;
       checkedConnections += 1;
     } catch (syncError) {
+      console.error("구매 메일 예약 수집 실패", {
+        connectionId: connection.id,
+        provider: connection.provider,
+        message:
+          syncError instanceof Error ? syncError.message : String(syncError),
+      });
+
       await supabase
         .from("purchase_mail_connections")
         .update({
