@@ -479,7 +479,7 @@ export default function AgentActionSuggestionView({
       selectedProduct,
     });
     setMessage(
-      `"${selectedProduct.title}"을 구매 후보로 저장했어. 구매 자동화 페이지에서 실행할 수 있어.`
+      `"${selectedProduct.title}"을 구매 후보로 저장했어. 구매 준비 화면에서 실행할 수 있어.`
     );
   }
 
@@ -493,7 +493,7 @@ export default function AgentActionSuggestionView({
       matchedHistory,
     });
     quickConfirm(item);
-    setMessage("구매 완료로 기록했고, 다음부터 재구매 자동화 후보로 사용할게.");
+    setMessage("구매 완료로 기록했고, 다음부터 재구매 후보로 사용할게.");
   }
 
   function enableRepurchaseAutomation(
@@ -505,7 +505,7 @@ export default function AgentActionSuggestionView({
       enableAutomation: true,
       matchedHistory,
     });
-    setMessage("이 상품은 다음부터 재구매 자동화 후보로 표시할게.");
+    setMessage("이 상품은 다음부터 재구매 후보로 표시할게.");
   }
 
   function PurchaseDelegationPanel({ item }: { item: AssistantItem }) {
@@ -767,7 +767,7 @@ export default function AgentActionSuggestionView({
             href="/purchase"
             className="rounded-full bg-white px-3 py-1.5 text-xs font-black text-slate-600 ring-1 ring-slate-100"
           >
-            자동화 설정
+            구매 준비
           </Link>
         </div>
       </div>
@@ -779,7 +779,7 @@ export default function AgentActionSuggestionView({
 
     return (
       <section className="app-card p-5">
-        <h2 className="text-lg font-black text-slate-900">즉시처리 확인함</h2>
+        <h2 className="text-lg font-black text-slate-900">위임 준비함</h2>
         <p className="mt-2 text-sm leading-6 text-slate-500">
           {instantActionEnabled
             ? "“쿠팡에서 시켜줘”, “네이버로 예약해줘” 같은 요청이 저장되면 이곳에서 필요한 확인사항을 모아볼 수 있습니다."
@@ -808,7 +808,7 @@ export default function AgentActionSuggestionView({
             </p>
           </div>
           <Link
-            href="/records"
+            href="/delegate"
             className="rounded-full bg-violet-50 px-3 py-1 text-xs font-black text-violet-600"
           >
             전체 {agentItems.length + dueRepurchaseHistories.length}
@@ -930,7 +930,7 @@ export default function AgentActionSuggestionView({
     <section className={compact ? "app-card p-4" : "app-card p-5"}>
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
-          <h2 className="font-black text-slate-900">즉시처리 확인함</h2>
+          <h2 className="font-black text-slate-900">위임 준비함</h2>
           {!compact && (
             <p className="mt-1 text-sm leading-6 text-slate-500">
               실제 구매와 예약은 사용자 확인 후 실행하도록 준비합니다.
@@ -1011,7 +1011,7 @@ export default function AgentActionSuggestionView({
                 href="/purchase"
                 className="rounded-full bg-white px-3 py-1.5 text-xs font-black text-slate-600 ring-1 ring-slate-100"
               >
-                자동화 설정
+                구매 준비
               </Link>
             </div>
           </article>

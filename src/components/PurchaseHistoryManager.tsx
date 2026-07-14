@@ -1169,11 +1169,11 @@ export default function PurchaseHistoryManager() {
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-black text-slate-900">
-              쿠팡 재구매 자동화
+              쿠팡 재구매 준비
             </h2>
             <p className="mt-2 text-sm leading-6 text-slate-500">
-              이미 산 적 있는 상품만 등록하고, 로컬 기기에서 쿠팡 페이지를
-              열어 결제 직전까지 빠르게 이동합니다.
+              이미 산 적 있는 상품만 등록하고, 쿠팡 페이지를 열어 결제
+              직전까지 빠르게 이동합니다.
             </p>
           </div>
           <div className="flex shrink-0 flex-col gap-2 text-right">
@@ -1343,7 +1343,7 @@ export default function PurchaseHistoryManager() {
           </div>
 
           <label className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3 text-sm font-black text-slate-700 ring-1 ring-slate-100">
-            재구매 자동화 허용
+            재구매 추천 허용
             <input
               type="checkbox"
               checked={draft.autoRepurchaseEnabled}

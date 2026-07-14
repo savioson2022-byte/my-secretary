@@ -304,7 +304,7 @@ export default function ClassificationResult({
                 </div>
               </div>
               <p className="mt-3 text-xs font-bold leading-5 text-violet-600">
-                이미 구매한 적 있는 상품만 재구매 자동화 후보로 표시됩니다.
+                이미 구매한 적 있는 상품만 재구매 후보로 표시됩니다.
                 처음 사는 상품은 쿠팡 검색까지만 도와줍니다.
               </p>
             </div>

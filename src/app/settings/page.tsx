@@ -50,10 +50,10 @@ export default function SettingsPage() {
           <div className="flex items-start justify-between gap-4">
             <div>
               <h2 className="text-lg font-black text-slate-900">
-                구매 자동화
+                구매 준비
               </h2>
               <p className="mt-2 text-sm leading-6 text-slate-500">
-                이미 산 적 있는 쿠팡 상품만 재구매 후보로 관리합니다.
+                이미 산 적 있는 쿠팡 상품을 재구매 후보로 관리합니다.
                 결제수단과 비밀번호는 앱에 저장하지 않습니다.
               </p>
             </div>

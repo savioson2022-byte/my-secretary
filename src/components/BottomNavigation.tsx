@@ -20,9 +20,9 @@ const LINKS = [
     icon: "M7 4h10a2 2 0 0 1 2 2v15l-7-3-7 3V6a2 2 0 0 1 2-2Z",
   },
   {
-    href: "/schedule/manage",
-    label: "관리",
-    icon: "M4 6h16M4 12h10M4 18h16M17 10l3 3-3 3",
+    href: "/delegate",
+    label: "위임",
+    icon: "M6 12h12M13 7l5 5-5 5M5 5h4a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5",
   },
   {
     href: "/settings",
@@ -43,8 +43,7 @@ export default function BottomNavigation() {
               pathname === link.href ||
               (link.href === "/calendar/monthly" &&
                 pathname.startsWith("/calendar")) ||
-              (link.href === "/schedule/manage" &&
-                pathname.startsWith("/schedule")) ||
+              (link.href === "/delegate" && pathname.startsWith("/delegate")) ||
               (link.href === "/settings" && pathname.startsWith("/settings"));
 
             return (

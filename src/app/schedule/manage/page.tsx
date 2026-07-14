@@ -81,7 +81,7 @@ export default function ScheduleManagePage() {
       <section className="mb-5 grid gap-3 sm:grid-cols-3">
         {[
           ["장소 관리", "자주 가는 장소와 실제 주소", "/places"],
-          ["구매 자동화", "이미 산 상품 재구매 후보", "/purchase"],
+          ["구매 준비", "이미 산 상품 재구매 후보", "/purchase"],
           ["기본 설정", "로그인, 이동수단, 앱 설치", "/settings"],
         ].map(([title, body, href]) => (
           <Link

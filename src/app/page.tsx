@@ -468,7 +468,7 @@ export default function Home() {
                 ["일정", todayScheduleItems.length, "/calendar/monthly"],
                 ["중요", todayItems.length, "/records"],
                 ["메모", openMemoCount, "/records"],
-                ["준비", pendingAgentCount, "/records"],
+                ["위임", pendingAgentCount, "/delegate"],
               ].map(([label, count, href]) => (
                 <Link
                   key={label}

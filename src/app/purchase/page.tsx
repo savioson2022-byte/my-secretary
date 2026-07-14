@@ -9,11 +9,11 @@ export default function PurchasePage() {
         <div>
           <p className="text-sm font-black text-blue-600">나의 비서</p>
           <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-950">
-            구매 자동화
+            구매 준비
           </h1>
           <p className="mt-2 text-sm leading-6 text-slate-500">
-            이미 구매한 적 있는 상품만 재구매 후보로 관리하고, 로컬 기기에서
-            쿠팡 결제 직전까지 빠르게 이동합니다.
+            이미 구매한 적 있는 상품만 재구매 후보로 관리하고, 사용자가
+            확인한 뒤 쿠팡 결제 직전까지 빠르게 이동합니다.
           </p>
         </div>
         <UserStatusBadge />
