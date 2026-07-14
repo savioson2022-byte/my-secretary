@@ -226,6 +226,8 @@ export default function PurchaseHistoryManager() {
   const [pendingInitialMailImportProvider, setPendingInitialMailImportProvider] =
     useState<"gmail" | "naver" | null>(null);
   const [isMailAutomationBusy, setIsMailAutomationBusy] = useState(false);
+  const [showAdvancedMailSettings, setShowAdvancedMailSettings] =
+    useState(false);
   const [naverMailDraft, setNaverMailDraft] = useState({
     email: "",
     appPassword: "",
@@ -322,7 +324,7 @@ export default function PurchaseHistoryManager() {
 
     if (!accessToken) {
       setMailAutomationMessage(
-        "앱 계정으로 로그인하면 Gmail 자동 수집을 연결할 수 있어."
+        "앱 계정으로 로그인하면 Gmail 쿠팡 메일 검색을 연결할 수 있어."
       );
       return;
     }
@@ -385,12 +387,12 @@ export default function PurchaseHistoryManager() {
         "CRON_SECRET=임의의 긴 비밀 문자열",
         "OPENAI_API_KEY=OpenAI API Key",
         "",
-        "Gmail 자동 수집을 쓸 경우 추가:",
+        "Gmail 쿠팡 메일 검색을 쓸 경우 추가:",
         "GOOGLE_CLIENT_ID=Google OAuth Client ID",
         "GOOGLE_CLIENT_SECRET=Google OAuth Client Secret",
         "GOOGLE_GMAIL_REDIRECT_URI=https://my-secretary-remote.vercel.app/api/purchase/mail/gmail/callback",
         "",
-        "환경변수 저장 후 Vercel에서 다시 배포하면 서버 자동 수집이 활성화됩니다.",
+        "환경변수 저장 후 Vercel에서 다시 배포하면 서버 자동 검색이 활성화됩니다.",
       ].join("\n")
     );
     setMailAutomationMessage("서버 자동 실행 설정 목록을 복사했어.");
@@ -555,7 +557,7 @@ export default function PurchaseHistoryManager() {
 
   async function handleDeleteMailConnection(connectionId: string) {
     const shouldDelete = window.confirm(
-      "메일 자동 수집 연결을 삭제할까요? 저장된 구매템은 그대로 유지됩니다."
+      "메일 검색 연결을 삭제할까요? 저장된 구매템은 그대로 유지됩니다."
     );
 
     if (!shouldDelete) return;
@@ -583,7 +585,7 @@ export default function PurchaseHistoryManager() {
     }
 
     await refreshMailConnections();
-    setMailAutomationMessage("메일 자동 수집 연결을 삭제했어.");
+    setMailAutomationMessage("메일 검색 연결을 삭제했어.");
   }
 
   async function forgetMailImportDetails({
@@ -790,20 +792,49 @@ export default function PurchaseHistoryManager() {
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-black text-slate-900">
-              쿠팡 메일 자동 수집
+              쿠팡 메일 검색
             </h2>
             <p className="mt-2 text-sm leading-6 text-slate-500">
-              2026년 7월 14일 이후 도착한 쿠팡 메일을 읽어 구매템과 재구매
-              추천일을 자동으로 저장합니다.
+              메일함에서 쿠팡 주문 메일만 검색해 구매템과 재구매 추천일을
+              저장합니다. 일반 사용자는 Gmail 연결만 하면 됩니다.
             </p>
           </div>
           <span className="shrink-0 rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-600">
-            자동화
+            간편 연결
           </span>
         </div>
 
         <div className="mt-4 grid gap-2">
-          {mailAutomationConfig && (
+          <div className="rounded-3xl bg-slate-950 p-4 text-white">
+            <p className="text-xs font-black text-blue-200">기본 방식</p>
+            <h3 className="mt-1 text-lg font-black">
+              Gmail에서 “쿠팡” 메일만 찾아오기
+            </h3>
+            <p className="mt-2 text-sm font-semibold leading-6 text-slate-300">
+              앱이 전체 메일을 보여주거나 저장하지 않고, Gmail 검색으로
+              쿠팡/Coupang 주문 메일만 읽어 상품명과 가격 후보를 추출합니다.
+            </p>
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={handleConnectGmail}
+                disabled={isMailAutomationBusy}
+                className="rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-950 disabled:bg-slate-300"
+              >
+                Gmail 연결
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSyncMailNow()}
+                disabled={isMailAutomationBusy}
+                className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white disabled:bg-slate-300"
+              >
+                쿠팡 메일 검색
+              </button>
+            </div>
+          </div>
+
+          {mailAutomationConfig && showAdvancedMailSettings && (
             <div className="grid grid-cols-2 gap-2 text-xs font-black sm:grid-cols-4">
               <span
                 className={`rounded-2xl px-3 py-2 text-center ${
@@ -853,7 +884,20 @@ export default function PurchaseHistoryManager() {
             </div>
           )}
 
-          {mailAutomationConfig?.canCheckSchema &&
+          <button
+            type="button"
+            onClick={() =>
+              setShowAdvancedMailSettings((current) => !current)
+            }
+            className="rounded-2xl bg-slate-50 px-4 py-3 text-sm font-black text-slate-600 ring-1 ring-slate-100"
+          >
+            {showAdvancedMailSettings
+              ? "고급 설정 숨기기"
+              : "네이버/서버 고급 설정 보기"}
+          </button>
+
+          {showAdvancedMailSettings &&
+            mailAutomationConfig?.canCheckSchema &&
             !mailAutomationConfig.hasPurchaseMailSchema && (
               <div className="rounded-2xl bg-rose-50 p-4 ring-1 ring-rose-100">
                 <p className="text-xs font-bold leading-5 text-rose-600">
@@ -900,7 +944,8 @@ export default function PurchaseHistoryManager() {
               </div>
             )}
 
-          {mailAutomationConfig &&
+          {showAdvancedMailSettings &&
+            mailAutomationConfig &&
             mailAutomationConfig.hasPurchaseMailSchema &&
             !mailAutomationConfig.hasServerAutomation && (
               <div className="rounded-2xl bg-amber-50 p-4 ring-1 ring-amber-100">
@@ -923,8 +968,8 @@ export default function PurchaseHistoryManager() {
 
           {mailConnections.length === 0 ? (
             <p className="rounded-2xl bg-slate-50 p-4 text-xs font-bold leading-5 text-slate-500 ring-1 ring-slate-100">
-              아직 연결된 메일이 없습니다. Gmail은 공식 읽기 권한으로 연결하고,
-              네이버 메일은 IMAP 앱 비밀번호 방식이 필요합니다.
+              아직 연결된 메일이 없습니다. Gmail을 연결하면 앱이 메일함에서
+              쿠팡 주문 메일만 검색합니다.
             </p>
           ) : (
             mailConnections.map((connection) => (
@@ -947,6 +992,11 @@ export default function PurchaseHistoryManager() {
                     {connection.status === "active" ? "연결됨" : "확인 필요"}
                   </span>
                 </div>
+                <p className="mt-2 text-xs font-bold leading-5 text-slate-500">
+                  {connection.provider === "gmail"
+                    ? "Gmail 검색으로 쿠팡/Coupang 메일만 확인합니다."
+                    : "네이버 IMAP 방식입니다. 실패하면 Gmail 연결이나 아래 붙여넣기 방식을 권장합니다."}
+                </p>
                 <p className="mt-2 text-xs font-bold text-slate-400">
                   마지막 확인:{" "}
                   {connection.last_sync_at
@@ -1023,67 +1073,50 @@ export default function PurchaseHistoryManager() {
           </p>
         )}
 
-        <div className="mt-4 grid grid-cols-2 gap-3">
-          <button
-            type="button"
-            onClick={handleConnectGmail}
-            disabled={isMailAutomationBusy}
-            className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-black text-white disabled:bg-slate-300"
-          >
-            Gmail 연결
-          </button>
-          <button
-            type="button"
-            onClick={() => handleSyncMailNow()}
-            disabled={isMailAutomationBusy}
-            className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white disabled:bg-slate-300"
-          >
-            지금 메일 확인
-          </button>
-        </div>
-
-        <div className="mt-4 rounded-3xl bg-slate-50 p-4 ring-1 ring-slate-100">
-          <p className="text-sm font-black text-slate-900">
-            네이버 메일 연결
-          </p>
-          <p className="mt-2 text-xs font-bold leading-5 text-slate-500">
-            네이버 메일은 IMAP 사용과 앱 비밀번호가 필요합니다. 입력한 값은
-            메일 수집 서버에서만 사용합니다.
-          </p>
-          <div className="mt-3 grid gap-2">
-            <input
-              value={naverMailDraft.email}
-              onChange={(event) =>
-                setNaverMailDraft((current) => ({
-                  ...current,
-                  email: event.target.value,
-                }))
-              }
-              placeholder="네이버 메일 주소"
-              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-blue-400"
-            />
-            <input
-              type="password"
-              value={naverMailDraft.appPassword}
-              onChange={(event) =>
-                setNaverMailDraft((current) => ({
-                  ...current,
-                  appPassword: event.target.value,
-                }))
-              }
-              placeholder="네이버 앱 비밀번호"
-              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-blue-400"
-            />
-            <button
-              type="button"
-              onClick={handleConnectNaverMail}
-              disabled={isMailAutomationBusy}
-              className="rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-700 ring-1 ring-slate-200 disabled:bg-slate-200"
-            >
+        {showAdvancedMailSettings && (
+          <div className="mt-4 rounded-3xl bg-slate-50 p-4 ring-1 ring-slate-100">
+            <p className="text-sm font-black text-slate-900">
               네이버 메일 연결
-            </button>
+            </p>
+            <p className="mt-2 text-xs font-bold leading-5 text-slate-500">
+              네이버 메일은 IMAP 사용과 앱 비밀번호가 필요합니다. 일반
+              사용자에게는 Gmail 연결이나 아래 붙여넣기 방식을 권장합니다.
+            </p>
+            <div className="mt-3 grid gap-2">
+              <input
+                value={naverMailDraft.email}
+                onChange={(event) =>
+                  setNaverMailDraft((current) => ({
+                    ...current,
+                    email: event.target.value,
+                  }))
+                }
+                placeholder="네이버 메일 주소"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-blue-400"
+              />
+              <input
+                type="password"
+                value={naverMailDraft.appPassword}
+                onChange={(event) =>
+                  setNaverMailDraft((current) => ({
+                    ...current,
+                    appPassword: event.target.value,
+                  }))
+                }
+                placeholder="네이버 앱 비밀번호"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-blue-400"
+              />
+              <button
+                type="button"
+                onClick={handleConnectNaverMail}
+                disabled={isMailAutomationBusy}
+                className="rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-700 ring-1 ring-slate-200 disabled:bg-slate-200"
+              >
+                네이버 메일 연결
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </section>
 
       <section className="app-card p-5">
