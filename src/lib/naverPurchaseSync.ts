@@ -1,5 +1,6 @@
 import { ImapFlow } from "imapflow";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { extractReadableMailTextFromRawSource } from "@/lib/mailTextExtractor";
 import { createPurchaseHistoryFromCandidate } from "@/lib/purchaseAutomation";
 import { importPurchaseMailText } from "@/lib/purchaseMailAi";
 import { getNextPurchaseMailSyncAfter } from "@/lib/purchaseMailSyncWindow";
@@ -224,16 +225,20 @@ export async function syncNaverPurchaseMails({
 
         const { data: existingImport } = await supabase
           .from("purchase_mail_imports")
-          .select("id")
+          .select("id, candidate_count")
           .eq("user_id", connection.user_id)
           .eq("provider", "naver")
           .eq("message_id", messageId)
           .maybeSingle();
 
-        if (existingImport) continue;
+        if (existingImport && Number(existingImport.candidate_count) > 0) {
+          continue;
+        }
 
         const sentAt = message.envelope?.date ?? new Date();
-        const sourceText = message.source?.toString("utf8") ?? "";
+        const sourceText = extractReadableMailTextFromRawSource(
+          message.source?.toString("utf8") ?? ""
+        );
         const result = await importPurchaseMailText(`${subject}\n${sourceText}`);
         const nextHistories = [...existingHistories, ...importedHistories];
         const histories = result.candidates.map((candidate) => {
@@ -271,16 +276,21 @@ export async function syncNaverPurchaseMails({
           importedHistories.push(...histories);
         }
 
-        await supabase.from("purchase_mail_imports").insert({
-          user_id: connection.user_id,
-          connection_id: connection.id,
-          provider: "naver",
-          message_id: messageId,
-          subject,
-          sent_at: sentAt.toISOString(),
-          candidate_count: histories.length,
-          imported_product_names: histories.map((history) => history.productName),
-        });
+        await supabase.from("purchase_mail_imports").upsert(
+          {
+            user_id: connection.user_id,
+            connection_id: connection.id,
+            provider: "naver",
+            message_id: messageId,
+            subject,
+            sent_at: sentAt.toISOString(),
+            candidate_count: histories.length,
+            imported_product_names: histories.map((history) => history.productName),
+          },
+          {
+            onConflict: "user_id,provider,message_id",
+          }
+        );
       }
     } finally {
       lock.release();

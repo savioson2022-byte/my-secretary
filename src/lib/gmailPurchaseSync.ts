@@ -295,13 +295,15 @@ export async function syncGmailPurchaseMails({
   for (const messageId of messageIds) {
     const { data: existingImport } = await supabase
       .from("purchase_mail_imports")
-      .select("id")
+      .select("id, candidate_count")
       .eq("user_id", connection.user_id)
       .eq("provider", "gmail")
       .eq("message_id", messageId)
       .maybeSingle();
 
-    if (existingImport) continue;
+    if (existingImport && Number(existingImport.candidate_count) > 0) {
+      continue;
+    }
 
     const message = await fetchGmailMessage({ accessToken, messageId });
     const subject = getHeader(message, "subject");
@@ -348,16 +350,21 @@ export async function syncGmailPurchaseMails({
       importedHistories.push(...histories);
     }
 
-    await supabase.from("purchase_mail_imports").insert({
-      user_id: connection.user_id,
-      connection_id: connection.id,
-      provider: "gmail",
-      message_id: messageId,
-      subject,
-      sent_at: sentAt.toISOString(),
-      candidate_count: histories.length,
-      imported_product_names: histories.map((history) => history.productName),
-    });
+    await supabase.from("purchase_mail_imports").upsert(
+      {
+        user_id: connection.user_id,
+        connection_id: connection.id,
+        provider: "gmail",
+        message_id: messageId,
+        subject,
+        sent_at: sentAt.toISOString(),
+        candidate_count: histories.length,
+        imported_product_names: histories.map((history) => history.productName),
+      },
+      {
+        onConflict: "user_id,provider,message_id",
+      }
+    );
   }
 
   await supabase
