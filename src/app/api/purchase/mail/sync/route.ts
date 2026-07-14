@@ -2,9 +2,8 @@ import { NextResponse } from "next/server";
 import { getAuthedSupabaseForRequest } from "@/lib/apiAuth";
 import { syncGmailPurchaseMails } from "@/lib/gmailPurchaseSync";
 import { syncNaverPurchaseMails } from "@/lib/naverPurchaseSync";
+import { getPurchaseMailBackfillSyncAfter } from "@/lib/purchaseMailSyncWindow";
 import type { PurchaseHistoryItem } from "@/types/purchaseHistory";
-
-const PURCHASE_MAIL_AUTOMATION_START_AT = "2026-07-14T00:00:00+09:00";
 
 type PurchaseHistoryRow = {
   id: string;
@@ -121,7 +120,7 @@ export async function POST(request: Request) {
     const syncConnection = body.backfill
       ? {
           ...connection,
-          sync_after: PURCHASE_MAIL_AUTOMATION_START_AT,
+          sync_after: getPurchaseMailBackfillSyncAfter(),
         }
       : connection;
 

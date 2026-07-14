@@ -493,7 +493,7 @@ export default function PurchaseHistoryManager() {
 
   async function handleBackfillMailConnection(connection: MailConnectionStatus) {
     const shouldImport = window.confirm(
-      `${connection.provider === "gmail" ? "Gmail" : "네이버 메일"}${connection.email ? `(${connection.email})` : ""}에서 2026년 7월 14일 이후 쿠팡 메일을 다시 확인할까요? 이미 저장된 메일은 중복 저장하지 않습니다.`
+      `${connection.provider === "gmail" ? "Gmail" : "네이버 메일"}${connection.email ? `(${connection.email})` : ""}에서 최근 1년간의 쿠팡 메일을 다시 확인할까요? 이미 저장된 메일은 중복 저장하지 않습니다.`
     );
 
     if (!shouldImport) return;
@@ -1042,7 +1042,7 @@ export default function PurchaseHistoryManager() {
                 {pendingInitialMailImportProvider === "gmail"
                   ? "Gmail"
                   : "네이버 메일"}
-                에서 2026년 7월 14일 이후 쿠팡 메일을 확인해 구매템과
+                에서 최근 1년간의 쿠팡 메일을 확인해 구매템과
                 재구매 추천일을 저장합니다. 이미 가져온 메일은 중복 저장하지
                 않습니다.
               </p>

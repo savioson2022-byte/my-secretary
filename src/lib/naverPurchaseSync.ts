@@ -150,7 +150,8 @@ function isCoupangMail({
   return /쿠팡|coupang/i.test(`${subject ?? ""} ${from ?? ""}`);
 }
 
-const MAX_NAVER_MESSAGES_PER_SYNC = 200;
+const MAX_NAVER_MESSAGES_TO_SCAN = 1000;
+const MAX_NAVER_COUPANG_MESSAGES_PER_SYNC = 120;
 
 export async function syncNaverPurchaseMails({
   supabase,
@@ -185,23 +186,41 @@ export async function syncNaverPurchaseMails({
       const searchSince = new Date(connection.sync_after);
       const uids = await client.search({ since: searchSince });
       const uidList = Array.isArray(uids)
-        ? uids.slice(-MAX_NAVER_MESSAGES_PER_SYNC)
+        ? uids.slice(-MAX_NAVER_MESSAGES_TO_SCAN)
         : [];
-      messageCount = uidList.length;
+      const coupangMessageIds: number[] = [];
 
       for await (const message of uidList.length > 0
         ? client.fetch(uidList, {
             envelope: true,
-            source: true,
           })
         : []) {
-        const messageId = String(message.uid);
         const subject = message.envelope?.subject ?? "";
         const from = message.envelope?.from
           ?.map((address) => address.address ?? address.name ?? "")
           .join(", ");
 
         if (!isCoupangMail({ subject, from })) continue;
+
+        if (typeof message.uid === "number") {
+          coupangMessageIds.push(message.uid);
+        }
+      }
+
+      const limitedCoupangMessageIds = coupangMessageIds.slice(
+        -MAX_NAVER_COUPANG_MESSAGES_PER_SYNC
+      );
+
+      messageCount = limitedCoupangMessageIds.length;
+
+      for await (const message of limitedCoupangMessageIds.length > 0
+        ? client.fetch(limitedCoupangMessageIds, {
+            envelope: true,
+            source: true,
+          })
+        : []) {
+        const messageId = String(message.uid);
+        const subject = message.envelope?.subject ?? "";
 
         const { data: existingImport } = await supabase
           .from("purchase_mail_imports")
