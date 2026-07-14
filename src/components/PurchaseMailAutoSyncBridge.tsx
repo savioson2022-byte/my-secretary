@@ -11,6 +11,8 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { PurchaseHistoryItem } from "@/types/purchaseHistory";
 
 const AUTO_SYNC_STORAGE_KEY = "my-assistant-purchase-mail-auto-sync-at";
+const INITIAL_MAIL_IMPORT_PENDING_KEY =
+  "my-assistant-purchase-mail-initial-import-pending";
 const AUTO_SYNC_INTERVAL_MS = 1000 * 60 * 60 * 6;
 const AUTO_SYNC_TIMER_MS = 1000 * 60 * 15;
 
@@ -55,6 +57,12 @@ export default function PurchaseMailAutoSyncBridge() {
 
     async function syncPurchaseMailQuietly() {
       if (isSyncing) return;
+      if (new URLSearchParams(window.location.search).has("mail_connected")) {
+        return;
+      }
+      if (window.sessionStorage.getItem(INITIAL_MAIL_IMPORT_PENDING_KEY)) {
+        return;
+      }
 
       const supabase = createSupabaseBrowserClient();
 

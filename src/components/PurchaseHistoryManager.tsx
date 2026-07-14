@@ -55,6 +55,9 @@ type MailAutomationConfig = {
   automationStartDate: string;
 };
 
+const INITIAL_MAIL_IMPORT_PENDING_KEY =
+  "my-assistant-purchase-mail-initial-import-pending";
+
 function createEmptyDraft(): PurchaseDraft {
   return {
     id: null,
@@ -206,6 +209,8 @@ export default function PurchaseHistoryManager() {
   const [mailAutomationMessage, setMailAutomationMessage] = useState<
     string | null
   >(null);
+  const [pendingInitialMailImportProvider, setPendingInitialMailImportProvider] =
+    useState<"gmail" | "naver" | null>(null);
   const [isMailAutomationBusy, setIsMailAutomationBusy] = useState(false);
   const [naverMailDraft, setNaverMailDraft] = useState({
     email: "",
@@ -233,6 +238,37 @@ export default function PurchaseHistoryManager() {
   useEffect(() => {
     void refreshMailConnections();
     void refreshMailAutomationConfig();
+
+    const searchParams = new URLSearchParams(window.location.search);
+    const connectedProvider = searchParams.get("mail_connected");
+    const mailError = searchParams.get("mail_error");
+
+    if (connectedProvider === "gmail") {
+      window.sessionStorage.setItem(INITIAL_MAIL_IMPORT_PENDING_KEY, "1");
+      setPendingInitialMailImportProvider("gmail");
+      setMailAutomationMessage(
+        "Gmail을 연결했어. 기존 쿠팡 메일 정보를 지금 가져올 수 있어."
+      );
+    } else if (mailError) {
+      setMailAutomationMessage(
+        mailError === "missing_code"
+          ? "Gmail 인증 코드가 없어 연결하지 못했어."
+          : mailError === "expired_state"
+            ? "Gmail 연결 시간이 만료됐어. 다시 연결해줘."
+            : "메일 연결 중 문제가 생겼어."
+      );
+    }
+
+    if (connectedProvider || mailError) {
+      const cleanUrl = new URL(window.location.href);
+      cleanUrl.searchParams.delete("mail_connected");
+      cleanUrl.searchParams.delete("mail_error");
+      window.history.replaceState(
+        null,
+        "",
+        `${cleanUrl.pathname}${cleanUrl.search}${cleanUrl.hash}`
+      );
+    }
   }, []);
 
   const enabledHistories = useMemo(() => {
@@ -426,6 +462,20 @@ export default function PurchaseHistoryManager() {
     }
   }
 
+  async function handleInitialMailImportNow() {
+    await handleSyncMailNow();
+    window.sessionStorage.removeItem(INITIAL_MAIL_IMPORT_PENDING_KEY);
+    setPendingInitialMailImportProvider(null);
+  }
+
+  function dismissInitialMailImport() {
+    window.sessionStorage.removeItem(INITIAL_MAIL_IMPORT_PENDING_KEY);
+    setPendingInitialMailImportProvider(null);
+    setMailAutomationMessage(
+      "좋아. 이후 도착하는 쿠팡 메일은 자동 확인 설정에 따라 수집됩니다."
+    );
+  }
+
   async function handleConnectNaverMail() {
     const accessToken = await getSupabaseAccessToken();
 
@@ -459,8 +509,10 @@ export default function PurchaseHistoryManager() {
         appPassword: "",
       });
       await refreshMailConnections();
+      window.sessionStorage.setItem(INITIAL_MAIL_IMPORT_PENDING_KEY, "1");
+      setPendingInitialMailImportProvider("naver");
       setMailAutomationMessage(
-        "네이버 메일을 연결했어. 이제 ‘지금 메일 확인’을 누르면 쿠팡 메일을 자동으로 읽습니다."
+        "네이버 메일을 연결했어. 기존 쿠팡 메일 정보를 지금 가져올 수 있어."
       );
     } finally {
       setIsMailAutomationBusy(false);
@@ -881,6 +933,43 @@ export default function PurchaseHistoryManager() {
                 </button>
               </div>
             ))
+          )}
+
+          {pendingInitialMailImportProvider && (
+            <div className="rounded-3xl bg-blue-600 p-4 text-white shadow-soft">
+              <p className="text-xs font-black text-blue-100">
+                기존 메일 가져오기
+              </p>
+              <h3 className="mt-1 text-base font-black">
+                지금까지 받은 쿠팡 메일을 한번에 가져올까요?
+              </h3>
+              <p className="mt-2 text-xs font-semibold leading-5 text-blue-100">
+                {pendingInitialMailImportProvider === "gmail"
+                  ? "Gmail"
+                  : "네이버 메일"}
+                에서 2026년 7월 14일 이후 쿠팡 메일을 확인해 구매템과
+                재구매 추천일을 저장합니다. 이미 가져온 메일은 중복 저장하지
+                않습니다.
+              </p>
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={handleInitialMailImportNow}
+                  disabled={isMailAutomationBusy}
+                  className="rounded-2xl bg-white px-4 py-3 text-sm font-black text-blue-700 disabled:bg-blue-200 disabled:text-blue-500"
+                >
+                  예, 가져오기
+                </button>
+                <button
+                  type="button"
+                  onClick={dismissInitialMailImport}
+                  disabled={isMailAutomationBusy}
+                  className="rounded-2xl bg-blue-500 px-4 py-3 text-sm font-black text-white disabled:bg-blue-400"
+                >
+                  나중에
+                </button>
+              </div>
+            </div>
           )}
         </div>
 
