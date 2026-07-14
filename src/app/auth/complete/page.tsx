@@ -51,12 +51,55 @@ function AuthCompleteContent() {
 
       const code = searchParams.get("code");
       const error = searchParams.get("error_description") ?? searchParams.get("error");
-      const nextPath = getSafeNextPath(searchParams.get("next"));
+      const hashParams = new URLSearchParams(
+        window.location.hash.replace(/^#/, "")
+      );
+      const hashError =
+        hashParams.get("error_description") ?? hashParams.get("error");
+      const accessToken = hashParams.get("access_token");
+      const refreshToken = hashParams.get("refresh_token");
+      const hashType = hashParams.get("type");
+      const defaultNextPath =
+        hashType === "recovery" ? "/account?reset_password=1" : "/account";
+      const nextPath = getSafeNextPath(
+        searchParams.get("next") ?? hashParams.get("next") ?? defaultNextPath
+      );
       setWebContinuePath(nextPath);
 
-      if (error) {
-        setMessage(error);
+      if (error || hashError) {
+        setMessage(error ?? hashError ?? "로그인 링크 처리 중 오류가 생겼습니다.");
         return;
+      }
+
+      if (accessToken && refreshToken) {
+        const { error: sessionError } = await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        });
+
+        if (sessionError) {
+          setMessage(sessionError.message);
+          return;
+        }
+
+        const nativeUrl = createNativeSessionUrl({
+          accessToken,
+          refreshToken,
+          nextPath,
+        });
+
+        setNativeSessionUrl(nativeUrl);
+        setMessage(
+          hashType === "recovery"
+            ? "비밀번호 재설정 로그인이 확인됐습니다. 앱으로 돌아가 새 비밀번호를 저장하세요."
+            : "로그인이 확인됐습니다. 앱으로 돌아가거나 웹에서 계속할 수 있습니다."
+        );
+
+        const timer = window.setTimeout(() => {
+          window.location.href = nativeUrl;
+        }, 700);
+
+        return () => window.clearTimeout(timer);
       }
 
       if (!code) {
