@@ -4,6 +4,8 @@ import { syncGmailPurchaseMails } from "@/lib/gmailPurchaseSync";
 import { syncNaverPurchaseMails } from "@/lib/naverPurchaseSync";
 import type { PurchaseHistoryItem } from "@/types/purchaseHistory";
 
+const PURCHASE_MAIL_AUTOMATION_START_AT = "2026-07-14T00:00:00+09:00";
+
 type PurchaseHistoryRow = {
   id: string;
   product_name: string;
@@ -21,6 +23,11 @@ type PurchaseHistoryRow = {
   memo: string;
   created_at: string;
   updated_at: string;
+};
+
+type PurchaseMailSyncRequest = {
+  backfill?: boolean;
+  connectionId?: string;
 };
 
 function rowToHistory(row: PurchaseHistoryRow): PurchaseHistoryItem {
@@ -44,8 +51,17 @@ function rowToHistory(row: PurchaseHistoryRow): PurchaseHistoryItem {
   };
 }
 
+async function readSyncRequestBody(request: Request) {
+  try {
+    return (await request.json()) as PurchaseMailSyncRequest;
+  } catch {
+    return {};
+  }
+}
+
 export async function POST(request: Request) {
   const context = await getAuthedSupabaseForRequest(request);
+  const body = await readSyncRequestBody(request);
 
   if (!context?.supabase) {
     return NextResponse.json(
@@ -62,7 +78,8 @@ export async function POST(request: Request) {
     .from("purchase_mail_connections")
     .select("*")
     .eq("user_id", context.auth.user.id)
-    .eq("status", "active");
+    .eq("status", "active")
+    .match(body.connectionId ? { id: body.connectionId } : {});
 
   if (connectionError) {
     return NextResponse.json(
@@ -75,10 +92,14 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!connections || connections.length === 0) {
+  const targetConnections = connections ?? [];
+
+  if (targetConnections.length === 0) {
     return NextResponse.json({
       importedCount: 0,
-      message: "연결된 메일이 없습니다.",
+      message: body.connectionId
+        ? "선택한 메일 연결을 찾지 못했습니다."
+        : "연결된 메일이 없습니다.",
     });
   }
 
@@ -93,7 +114,14 @@ export async function POST(request: Request) {
   let messageCount = 0;
   const importedHistories: PurchaseHistoryItem[] = [];
 
-  for (const connection of connections) {
+  for (const connection of targetConnections) {
+    const syncConnection = body.backfill
+      ? {
+          ...connection,
+          sync_after: PURCHASE_MAIL_AUTOMATION_START_AT,
+        }
+      : connection;
+
     try {
       const result: {
         importedCount: number;
@@ -103,12 +131,12 @@ export async function POST(request: Request) {
         connection.provider === "gmail"
           ? await syncGmailPurchaseMails({
               supabase: context.supabase,
-              connection,
+              connection: syncConnection,
               existingHistories,
             })
           : await syncNaverPurchaseMails({
               supabase: context.supabase,
-              connection,
+              connection: syncConnection,
               existingHistories,
             });
 

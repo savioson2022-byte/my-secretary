@@ -417,7 +417,10 @@ export default function PurchaseHistoryManager() {
     }
   }
 
-  async function handleSyncMailNow() {
+  async function handleSyncMailNow(options?: {
+    backfill?: boolean;
+    connectionId?: string;
+  }) {
     const accessToken = await getSupabaseAccessToken();
 
     if (!accessToken) {
@@ -431,8 +434,10 @@ export default function PurchaseHistoryManager() {
       const response = await fetch("/api/purchase/mail/sync", {
         method: "POST",
         headers: {
+          "Content-Type": "application/json",
           Authorization: `Bearer ${accessToken}`,
         },
+        body: JSON.stringify(options ?? {}),
       });
       const data = (await response.json()) as {
         importedCount?: number;
@@ -455,7 +460,7 @@ export default function PurchaseHistoryManager() {
       await refreshMailConnections();
       setMailAutomationMessage(
         data.message ??
-          `메일 ${data.messageCount ?? 0}개를 확인했고 구매템 ${data.importedCount ?? 0}개를 저장했어.`
+          `${options?.backfill ? "기존 메일을 다시 확인했어. " : ""}메일 ${data.messageCount ?? 0}개를 확인했고 구매템 ${data.importedCount ?? 0}개를 저장했어.`
       );
     } finally {
       setIsMailAutomationBusy(false);
@@ -463,9 +468,24 @@ export default function PurchaseHistoryManager() {
   }
 
   async function handleInitialMailImportNow() {
-    await handleSyncMailNow();
+    await handleSyncMailNow({
+      backfill: true,
+    });
     window.sessionStorage.removeItem(INITIAL_MAIL_IMPORT_PENDING_KEY);
     setPendingInitialMailImportProvider(null);
+  }
+
+  async function handleBackfillMailConnection(connection: MailConnectionStatus) {
+    const shouldImport = window.confirm(
+      `${connection.provider === "gmail" ? "Gmail" : "네이버 메일"}${connection.email ? `(${connection.email})` : ""}에서 2026년 7월 14일 이후 쿠팡 메일을 다시 확인할까요? 이미 저장된 메일은 중복 저장하지 않습니다.`
+    );
+
+    if (!shouldImport) return;
+
+    await handleSyncMailNow({
+      backfill: true,
+      connectionId: connection.id,
+    });
   }
 
   function dismissInitialMailImport() {
@@ -924,13 +944,23 @@ export default function PurchaseHistoryManager() {
                     {connection.last_error}
                   </p>
                 )}
-                <button
-                  type="button"
-                  onClick={() => handleDeleteMailConnection(connection.id)}
-                  className="mt-3 rounded-full bg-white px-3 py-1.5 text-xs font-black text-rose-500 ring-1 ring-rose-100"
-                >
-                  메일 연결 삭제
-                </button>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleBackfillMailConnection(connection)}
+                    disabled={isMailAutomationBusy}
+                    className="rounded-full bg-white px-3 py-2 text-xs font-black text-blue-600 ring-1 ring-blue-100 disabled:bg-slate-100 disabled:text-slate-400"
+                  >
+                    기존 메일 다시 불러오기
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteMailConnection(connection.id)}
+                    className="rounded-full bg-white px-3 py-2 text-xs font-black text-rose-500 ring-1 ring-rose-100"
+                  >
+                    메일 연결 삭제
+                  </button>
+                </div>
               </div>
             ))
           )}
@@ -990,7 +1020,7 @@ export default function PurchaseHistoryManager() {
           </button>
           <button
             type="button"
-            onClick={handleSyncMailNow}
+            onClick={() => handleSyncMailNow()}
             disabled={isMailAutomationBusy}
             className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white disabled:bg-slate-300"
           >
