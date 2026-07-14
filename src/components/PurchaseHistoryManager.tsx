@@ -796,7 +796,8 @@ export default function PurchaseHistoryManager() {
             </h2>
             <p className="mt-2 text-sm leading-6 text-slate-500">
               메일함에서 쿠팡 주문 메일만 검색해 구매템과 재구매 추천일을
-              저장합니다. 일반 사용자는 Gmail 연결만 하면 됩니다.
+              저장합니다. Gmail은 공식 읽기 권한으로, 네이버는 IMAP 앱
+              비밀번호 방식으로 연결합니다.
             </p>
           </div>
           <span className="shrink-0 rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-600">
@@ -995,7 +996,7 @@ export default function PurchaseHistoryManager() {
                 <p className="mt-2 text-xs font-bold leading-5 text-slate-500">
                   {connection.provider === "gmail"
                     ? "Gmail 검색으로 쿠팡/Coupang 메일만 확인합니다."
-                    : "네이버 IMAP 방식입니다. 실패하면 Gmail 연결이나 아래 붙여넣기 방식을 권장합니다."}
+                    : "네이버 IMAP으로 쿠팡 메일만 확인합니다."}
                 </p>
                 <p className="mt-2 text-xs font-bold text-slate-400">
                   마지막 확인:{" "}
@@ -1079,8 +1080,8 @@ export default function PurchaseHistoryManager() {
               네이버 메일 연결
             </p>
             <p className="mt-2 text-xs font-bold leading-5 text-slate-500">
-              네이버 메일은 IMAP 사용과 앱 비밀번호가 필요합니다. 일반
-              사용자에게는 Gmail 연결이나 아래 붙여넣기 방식을 권장합니다.
+              네이버 메일은 IMAP 사용과 앱 비밀번호가 필요합니다. 연결되면
+              쿠팡 메일만 찾아 구매 후보를 저장합니다.
             </p>
             <div className="mt-3 grid gap-2">
               <input
@@ -1117,6 +1118,7 @@ export default function PurchaseHistoryManager() {
             </div>
           </div>
         )}
+
       </section>
 
       <section className="app-card p-5">
