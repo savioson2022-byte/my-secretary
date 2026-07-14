@@ -124,6 +124,20 @@ function formatDateLabel(dateText?: string | null) {
   }).format(date);
 }
 
+function formatMailConnectionError(error: string | null) {
+  if (!error) return null;
+
+  if (/command failed/i.test(error)) {
+    return "메일 서버가 요청을 거절했어. 네이버 메일 IMAP 사용 설정과 앱 비밀번호를 확인한 뒤 다시 불러오기를 눌러줘.";
+  }
+
+  if (/auth|authentication|login|password|credentials/i.test(error)) {
+    return "메일 로그인 정보가 맞지 않는 것 같아. 앱 비밀번호를 새로 발급해서 다시 연결해줘.";
+  }
+
+  return error;
+}
+
 function getDaysUntil(dateText?: string | null) {
   if (!dateText) return null;
 
@@ -939,9 +953,9 @@ export default function PurchaseHistoryManager() {
                     ? formatDateLabel(connection.last_sync_at.slice(0, 10))
                     : "아직 없음"}
                 </p>
-                {connection.last_error && (
+                {formatMailConnectionError(connection.last_error) && (
                   <p className="mt-2 text-xs font-bold text-rose-500">
-                    {connection.last_error}
+                    {formatMailConnectionError(connection.last_error)}
                   </p>
                 )}
                 <div className="mt-3 grid grid-cols-2 gap-2">

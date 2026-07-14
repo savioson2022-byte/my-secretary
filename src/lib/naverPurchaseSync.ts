@@ -65,10 +65,12 @@ export async function syncNaverPurchaseMails({
         : [];
       messageCount = uidList.length;
 
-      for await (const message of client.fetch(uidList, {
-        envelope: true,
-        source: true,
-      })) {
+      for await (const message of uidList.length > 0
+        ? client.fetch(uidList, {
+            envelope: true,
+            source: true,
+          })
+        : []) {
         const messageId = String(message.uid);
         const subject = message.envelope?.subject ?? "";
         const from = message.envelope?.from

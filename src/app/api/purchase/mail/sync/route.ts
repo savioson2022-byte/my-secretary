@@ -78,7 +78,6 @@ export async function POST(request: Request) {
     .from("purchase_mail_connections")
     .select("*")
     .eq("user_id", context.auth.user.id)
-    .eq("status", "active")
     .match(body.connectionId ? { id: body.connectionId } : {});
 
   if (connectionError) {
@@ -93,8 +92,11 @@ export async function POST(request: Request) {
   }
 
   const targetConnections = connections ?? [];
+  const syncableConnections = body.connectionId
+    ? targetConnections
+    : targetConnections.filter((connection) => connection.status === "active");
 
-  if (targetConnections.length === 0) {
+  if (syncableConnections.length === 0) {
     return NextResponse.json({
       importedCount: 0,
       message: body.connectionId
@@ -112,9 +114,10 @@ export async function POST(request: Request) {
   );
   let importedCount = 0;
   let messageCount = 0;
+  let failedCount = 0;
   const importedHistories: PurchaseHistoryItem[] = [];
 
-  for (const connection of targetConnections) {
+  for (const connection of syncableConnections) {
     const syncConnection = body.backfill
       ? {
           ...connection,
@@ -144,7 +147,8 @@ export async function POST(request: Request) {
       messageCount += result.messageCount ?? 0;
       importedHistories.push(...result.importedHistories);
     } catch (error) {
-      console.error("Gmail 구매 메일 동기화 실패:", error);
+      failedCount += 1;
+      console.error("구매 메일 동기화 실패:", error);
 
       await context.supabase
         .from("purchase_mail_connections")
@@ -153,7 +157,7 @@ export async function POST(request: Request) {
           last_error:
             error instanceof Error
               ? error.message
-              : "Gmail 구매 메일 동기화 실패",
+              : "구매 메일 동기화 실패",
           updated_at: new Date().toISOString(),
         })
         .eq("id", connection.id);
@@ -163,6 +167,11 @@ export async function POST(request: Request) {
   return NextResponse.json({
     importedCount,
     messageCount,
+    failedCount,
     importedHistories,
+    message:
+      failedCount > 0
+        ? "일부 메일 연결을 확인하지 못했습니다. 연결 카드의 안내를 확인해주세요."
+        : undefined,
   });
 }
