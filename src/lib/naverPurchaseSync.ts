@@ -122,10 +122,14 @@ async function connectNaverMailWithFallback({
 }) {
   const verified = await verifyNaverMailConnection({ email, appPassword });
 
-  return createNaverMailClient({
+  const client = createNaverMailClient({
     loginId: verified.loginId,
     appPassword: verified.appPassword,
   });
+
+  await client.connect();
+
+  return client;
 }
 
 async function safeLogout(client: ImapFlow) {
