@@ -121,9 +121,19 @@ export async function importPurchaseMailText(
       candidates: MailImportCandidate[];
     };
 
+    const aiCandidates = normalizeAiCandidates(parsed.candidates);
+    const fallbackCandidates = parseCoupangOrderMailFallback(inputText);
+
     return {
-      candidates: normalizeAiCandidates(parsed.candidates),
-      source: "ai",
+      candidates:
+        aiCandidates.length > 0
+          ? aiCandidates
+          : fallbackCandidates.map((candidate) => ({
+              ...candidate,
+              reason:
+                "AI가 확정 후보를 찾지 못해 주문 메일 규칙으로 상품 후보를 잡았습니다.",
+            })),
+      source: aiCandidates.length > 0 ? "ai" : "fallback",
     };
   } catch (error) {
     console.error("구매 메일 AI 분석 실패:", error);

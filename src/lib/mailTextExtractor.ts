@@ -81,6 +81,10 @@ function decodeQuotedPrintableToBuffer(value: string) {
   return Buffer.from(bytes);
 }
 
+function encodeStringAsBinaryBuffer(value: string) {
+  return Buffer.from(value, "binary");
+}
+
 function decodeTransferEncodedBody({
   body,
   encoding,
@@ -103,7 +107,7 @@ function decodeTransferEncodedBody({
     return decodeBuffer(decodeQuotedPrintableToBuffer(body), charset);
   }
 
-  return body;
+  return decodeBuffer(encodeStringAsBinaryBuffer(body), charset);
 }
 
 function decodeHtmlEntities(value: string) {
@@ -171,13 +175,16 @@ function extractMimeText(raw: string, depth = 0): string[] {
   return [/text\/html/i.test(contentType) ? stripHtml(decoded) : decoded];
 }
 
-export function extractReadableMailTextFromRawSource(rawSource: string) {
-  const extracted = extractMimeText(rawSource)
+export function extractReadableMailTextFromRawSource(rawSource: string | Buffer) {
+  const rawText = Buffer.isBuffer(rawSource)
+    ? rawSource.toString("binary")
+    : rawSource;
+  const extracted = extractMimeText(rawText)
     .map((text) => text.trim())
     .filter(Boolean)
     .join("\n\n");
 
-  const fallback = stripHtml(rawSource);
+  const fallback = stripHtml(rawText);
   const text = extracted || fallback;
 
   return text

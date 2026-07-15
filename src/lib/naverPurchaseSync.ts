@@ -311,7 +311,7 @@ export async function syncNaverPurchaseMails({
 
           const sentAt = message.envelope?.date ?? new Date();
           const sourceText = extractReadableMailTextFromRawSource(
-            message.source?.toString("utf8") ?? ""
+            Buffer.isBuffer(message.source) ? message.source : ""
           );
           const result = await importPurchaseMailText(
             `${subject}\n${sourceText}`
