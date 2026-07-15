@@ -34,8 +34,16 @@ export async function GET(request: Request) {
     );
   }
 
+  const { data: recentImports } = await context.supabase
+    .from("purchase_mail_imports")
+    .select("id, provider, subject, sent_at, candidate_count, imported_product_names")
+    .eq("user_id", context.auth.user.id)
+    .order("sent_at", { ascending: false })
+    .limit(8);
+
   return NextResponse.json({
     connections: data ?? [],
+    recentImports: recentImports ?? [],
     isAuthenticated: true,
   });
 }

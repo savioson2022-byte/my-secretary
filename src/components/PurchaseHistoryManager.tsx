@@ -41,6 +41,15 @@ type MailConnectionStatus = {
   updated_at: string;
 };
 
+type RecentMailImportStatus = {
+  id: string;
+  provider: "gmail" | "naver";
+  subject: string | null;
+  sent_at: string | null;
+  candidate_count: number;
+  imported_product_names: string[];
+};
+
 type MailAutomationConfig = {
   hasGoogleOAuth: boolean;
   hasSupabaseAdmin: boolean;
@@ -220,6 +229,9 @@ export default function PurchaseHistoryManager() {
   const [mailConnections, setMailConnections] = useState<
     MailConnectionStatus[]
   >([]);
+  const [recentMailImports, setRecentMailImports] = useState<
+    RecentMailImportStatus[]
+  >([]);
   const [mailAutomationMessage, setMailAutomationMessage] = useState<
     string | null
   >(null);
@@ -339,10 +351,12 @@ export default function PurchaseHistoryManager() {
 
     const data = (await response.json()) as {
       connections: MailConnectionStatus[];
+      recentImports?: RecentMailImportStatus[];
       message?: string;
     };
 
     setMailConnections(data.connections);
+    setRecentMailImports(data.recentImports ?? []);
     setMailAutomationMessage(data.message ?? null);
   }
 
@@ -1022,6 +1036,47 @@ export default function PurchaseHistoryManager() {
                 </div>
               </div>
             ))
+          )}
+
+          {recentMailImports.length > 0 && (
+            <div className="rounded-2xl bg-white p-4 ring-1 ring-slate-100">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-black text-slate-900">
+                  최근 메일 분석 기록
+                </p>
+                <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-black text-slate-500">
+                  최근 {recentMailImports.length}개
+                </span>
+              </div>
+              <div className="mt-3 space-y-2">
+                {recentMailImports.slice(0, 5).map((mailImport) => (
+                  <div
+                    key={mailImport.id}
+                    className="rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-100"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="min-w-0 flex-1 truncate text-xs font-black text-slate-700">
+                        {mailImport.subject || "제목 없음"}
+                      </p>
+                      <span
+                        className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-black ${
+                          mailImport.candidate_count > 0
+                            ? "bg-emerald-50 text-emerald-600"
+                            : "bg-amber-50 text-amber-600"
+                        }`}
+                      >
+                        후보 {mailImport.candidate_count}개
+                      </span>
+                    </div>
+                    {mailImport.imported_product_names.length > 0 && (
+                      <p className="mt-1 truncate text-[11px] font-bold text-slate-500">
+                        {mailImport.imported_product_names.join(", ")}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
 
           {pendingInitialMailImportProvider && (
