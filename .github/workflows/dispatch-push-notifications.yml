@@ -1,0 +1,27 @@
+name: Dispatch push notifications
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    env:
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      DISPATCH_URL: https://my-secretary-remote.vercel.app/api/push/dispatch
+    steps:
+      - name: Check secret
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "CRON_SECRET repo secret is not configured. Skipping dispatch."
+            exit 0
+          fi
+
+      - name: Dispatch due push notifications
+        if: env.CRON_SECRET != ''
+        run: |
+          curl --fail --show-error --silent \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "$DISPATCH_URL"
