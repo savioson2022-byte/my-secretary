@@ -165,13 +165,9 @@ function isLikelyCoupangPurchaseMail(subject: string) {
     /구매/,
     /결제/,
     /영수증/,
-    /배송/,
-    /도착/,
-    /출고/,
     /order/,
     /payment/,
     /receipt/,
-    /delivery/,
   ];
   const marketingPatterns = [
     /광고/,
@@ -183,6 +179,14 @@ function isLikelyCoupangPurchaseMail(subject: string) {
     /할인/,
     /이벤트/,
     /와우/,
+    /정책/,
+    /개인정보/,
+    /이용/,
+    /제공/,
+    /수집/,
+    /약관/,
+    /공지/,
+    /안내/,
     /체험/,
     /마감/,
     /sale/,
@@ -251,7 +255,7 @@ async function listNaverMailboxesToScan(client: ImapFlow) {
 const MAX_NAVER_MAILBOXES_TO_SCAN = 20;
 const MAX_NAVER_MESSAGES_TO_SCAN_PER_MAILBOX = 700;
 const MAX_NAVER_COUPANG_MESSAGES_PER_SYNC = 180;
-const MAX_NAVER_PURCHASE_MESSAGES_PER_SYNC = 35;
+const MAX_NAVER_PURCHASE_MESSAGES_PER_SYNC = 12;
 
 export async function syncNaverPurchaseMails({
   supabase,
@@ -298,16 +302,24 @@ export async function syncNaverPurchaseMails({
 
       try {
         const searchSince = new Date(connection.sync_after);
-        const uids = await client.search({ since: searchSince });
+        const uids = await client.search({ since: searchSince }, { uid: true });
         const uidList = Array.isArray(uids)
           ? uids.slice(-MAX_NAVER_MESSAGES_TO_SCAN_PER_MAILBOX)
           : [];
         const coupangMessageIds: number[] = [];
-        const purchaseMessageIds: number[] = [];
+        const purchaseMessages = new Map<
+          number,
+          {
+            subject: string;
+            sentAt: Date;
+          }
+        >();
 
         for await (const message of uidList.length > 0
           ? client.fetch(uidList, {
               envelope: true,
+            }, {
+              uid: true,
             })
           : []) {
           const subject = message.envelope?.subject ?? "";
@@ -320,7 +332,10 @@ export async function syncNaverPurchaseMails({
           if (typeof message.uid === "number") {
             coupangMessageIds.push(message.uid);
             if (isLikelyCoupangPurchaseMail(subject)) {
-              purchaseMessageIds.push(message.uid);
+              purchaseMessages.set(message.uid, {
+                subject,
+                sentAt: message.envelope?.date ?? new Date(),
+              });
             } else if (
               skippedCoupangSubjects.length < 5 &&
               subject &&
@@ -343,7 +358,9 @@ export async function syncNaverPurchaseMails({
           remainingPurchaseAnalysisLimit
         );
         const limitedPurchaseMessageIds =
-          purchaseLimit > 0 ? purchaseMessageIds.slice(-purchaseLimit) : [];
+          purchaseLimit > 0
+            ? Array.from(purchaseMessages.keys()).slice(-purchaseLimit)
+            : [];
 
         messageCount += limitedCoupangMessageIds.length;
         remainingCoupangMessageLimit -= limitedCoupangMessageIds.length;
@@ -353,11 +370,17 @@ export async function syncNaverPurchaseMails({
           ? client.fetch(limitedPurchaseMessageIds, {
               envelope: true,
               source: true,
+            }, {
+              uid: true,
             })
           : []) {
           const legacyMessageId = String(message.uid);
           const messageId = `${mailboxPath}:${legacyMessageId}`;
-          const subject = message.envelope?.subject ?? "";
+          const purchaseMessage =
+            typeof message.uid === "number"
+              ? purchaseMessages.get(message.uid)
+              : null;
+          const subject = purchaseMessage?.subject ?? message.envelope?.subject ?? "";
 
           const { data: existingImports } = await supabase
             .from("purchase_mail_imports")
@@ -374,7 +397,7 @@ export async function syncNaverPurchaseMails({
             continue;
           }
 
-          const sentAt = message.envelope?.date ?? new Date();
+          const sentAt = purchaseMessage?.sentAt ?? message.envelope?.date ?? new Date();
           const sourceText = extractReadableMailTextFromRawSource(
             Buffer.isBuffer(message.source) ? message.source : ""
           );
