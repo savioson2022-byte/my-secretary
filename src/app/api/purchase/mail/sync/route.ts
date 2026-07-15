@@ -171,6 +171,8 @@ export async function POST(request: Request) {
     message:
       failedCount > 0
         ? "일부 메일 연결을 확인하지 못했습니다. 연결 카드의 안내를 확인해주세요."
+        : messageCount > 0 && importedCount === 0
+          ? `${body.backfill ? "기존 메일을 다시 확인했어. " : ""}쿠팡 메일 ${messageCount}개를 찾았지만 상품명과 가격을 확정할 수 있는 구매템은 아직 저장하지 못했어. 주문 상세 본문이 있는 메일부터 다시 분석하도록 계속 개선할게.`
         : undefined,
   });
 }

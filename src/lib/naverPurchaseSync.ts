@@ -15,6 +15,13 @@ type NaverMailConnectionRow = {
   sync_after: string;
 };
 
+type NaverMailboxListItem = {
+  path?: string;
+  flags?: Set<string> | string[];
+  specialUse?: string;
+  disabled?: boolean;
+};
+
 export function normalizeNaverMailAppPassword(appPassword: string) {
   return appPassword.replace(/[\s-]/g, "");
 }
@@ -151,8 +158,61 @@ function isCoupangMail({
   return /쿠팡|coupang/i.test(`${subject ?? ""} ${from ?? ""}`);
 }
 
-const MAX_NAVER_MESSAGES_TO_SCAN = 1000;
-const MAX_NAVER_COUPANG_MESSAGES_PER_SYNC = 120;
+function getMailboxFlagSet(mailbox: NaverMailboxListItem) {
+  const values =
+    mailbox.flags instanceof Set
+      ? Array.from(mailbox.flags)
+      : Array.isArray(mailbox.flags)
+        ? mailbox.flags
+        : [];
+
+  if (mailbox.specialUse) {
+    values.push(mailbox.specialUse);
+  }
+
+  return new Set(values.map((value) => String(value).toLowerCase()));
+}
+
+function shouldScanNaverMailbox(mailbox: NaverMailboxListItem) {
+  const path = mailbox.path?.trim();
+  if (!path || mailbox.disabled) return false;
+
+  const lowerPath = path.toLowerCase();
+  const flags = getMailboxFlagSet(mailbox);
+  const excludedFlags = [
+    "\\noselect",
+    "\\sent",
+    "\\drafts",
+    "\\trash",
+    "\\junk",
+  ];
+
+  if (excludedFlags.some((flag) => flags.has(flag))) {
+    return false;
+  }
+
+  return !/(sent|draft|trash|spam|junk|보낸|임시|휴지통|스팸)/i.test(
+    lowerPath
+  );
+}
+
+async function listNaverMailboxesToScan(client: ImapFlow) {
+  try {
+    const mailboxes = (await client.list()) as NaverMailboxListItem[];
+    const paths = mailboxes
+      .filter(shouldScanNaverMailbox)
+      .map((mailbox) => mailbox.path?.trim())
+      .filter((path): path is string => Boolean(path));
+
+    return Array.from(new Set(["INBOX", ...paths]));
+  } catch {
+    return ["INBOX"];
+  }
+}
+
+const MAX_NAVER_MAILBOXES_TO_SCAN = 20;
+const MAX_NAVER_MESSAGES_TO_SCAN_PER_MAILBOX = 700;
+const MAX_NAVER_COUPANG_MESSAGES_PER_SYNC = 180;
 
 export async function syncNaverPurchaseMails({
   supabase,
@@ -181,119 +241,138 @@ export async function syncNaverPurchaseMails({
   }
 
   try {
-    const lock = await client.getMailboxLock("INBOX");
+    const mailboxPaths = (await listNaverMailboxesToScan(client)).slice(
+      0,
+      MAX_NAVER_MAILBOXES_TO_SCAN
+    );
+    let remainingCoupangMessageLimit = MAX_NAVER_COUPANG_MESSAGES_PER_SYNC;
 
-    try {
-      const searchSince = new Date(connection.sync_after);
-      const uids = await client.search({ since: searchSince });
-      const uidList = Array.isArray(uids)
-        ? uids.slice(-MAX_NAVER_MESSAGES_TO_SCAN)
-        : [];
-      const coupangMessageIds: number[] = [];
+    for (const mailboxPath of mailboxPaths) {
+      if (remainingCoupangMessageLimit <= 0) break;
 
-      for await (const message of uidList.length > 0
-        ? client.fetch(uidList, {
-            envelope: true,
-          })
-        : []) {
-        const subject = message.envelope?.subject ?? "";
-        const from = message.envelope?.from
-          ?.map((address) => address.address ?? address.name ?? "")
-          .join(", ");
+      const lock = await client.getMailboxLock(mailboxPath);
 
-        if (!isCoupangMail({ subject, from })) continue;
+      try {
+        const searchSince = new Date(connection.sync_after);
+        const uids = await client.search({ since: searchSince });
+        const uidList = Array.isArray(uids)
+          ? uids.slice(-MAX_NAVER_MESSAGES_TO_SCAN_PER_MAILBOX)
+          : [];
+        const coupangMessageIds: number[] = [];
 
-        if (typeof message.uid === "number") {
-          coupangMessageIds.push(message.uid);
-        }
-      }
+        for await (const message of uidList.length > 0
+          ? client.fetch(uidList, {
+              envelope: true,
+            })
+          : []) {
+          const subject = message.envelope?.subject ?? "";
+          const from = message.envelope?.from
+            ?.map((address) => address.address ?? address.name ?? "")
+            .join(", ");
 
-      const limitedCoupangMessageIds = coupangMessageIds.slice(
-        -MAX_NAVER_COUPANG_MESSAGES_PER_SYNC
-      );
+          if (!isCoupangMail({ subject, from })) continue;
 
-      messageCount = limitedCoupangMessageIds.length;
-
-      for await (const message of limitedCoupangMessageIds.length > 0
-        ? client.fetch(limitedCoupangMessageIds, {
-            envelope: true,
-            source: true,
-          })
-        : []) {
-        const messageId = String(message.uid);
-        const subject = message.envelope?.subject ?? "";
-
-        const { data: existingImport } = await supabase
-          .from("purchase_mail_imports")
-          .select("id, candidate_count")
-          .eq("user_id", connection.user_id)
-          .eq("provider", "naver")
-          .eq("message_id", messageId)
-          .maybeSingle();
-
-        if (existingImport && Number(existingImport.candidate_count) > 0) {
-          continue;
+          if (typeof message.uid === "number") {
+            coupangMessageIds.push(message.uid);
+          }
         }
 
-        const sentAt = message.envelope?.date ?? new Date();
-        const sourceText = extractReadableMailTextFromRawSource(
-          message.source?.toString("utf8") ?? ""
+        const limitedCoupangMessageIds = coupangMessageIds.slice(
+          -remainingCoupangMessageLimit
         );
-        const result = await importPurchaseMailText(`${subject}\n${sourceText}`);
-        const nextHistories = [...existingHistories, ...importedHistories];
-        const histories = result.candidates.map((candidate) => {
-          return createPurchaseHistoryFromCandidate({
-            candidate,
-            histories: nextHistories,
-            messageId,
-            purchasedAt: sentAt,
-          });
-        });
 
-        if (histories.length > 0) {
-          await supabase.from("purchase_history").upsert(
-            histories.map((history) => ({
-              id: history.id,
-              user_id: connection.user_id,
-              product_name: history.productName,
-              platform: history.platform,
-              product_url: history.productUrl,
-              default_quantity: history.defaultQuantity,
-              max_budget_krw: history.maxBudgetKrw,
-              repeat_cycle_days: history.repeatCycleDays,
-              next_purchase_check_date: history.nextPurchaseCheckDate,
-              source: history.source,
-              source_message_id: history.sourceMessageId,
-              imported_at: history.importedAt,
-              auto_repurchase_enabled: history.autoRepurchaseEnabled,
-              last_purchased_at: history.lastPurchasedAt,
-              memo: history.memo,
-              created_at: history.createdAt,
-              updated_at: history.updatedAt,
-            }))
+        messageCount += limitedCoupangMessageIds.length;
+        remainingCoupangMessageLimit -= limitedCoupangMessageIds.length;
+
+        for await (const message of limitedCoupangMessageIds.length > 0
+          ? client.fetch(limitedCoupangMessageIds, {
+              envelope: true,
+              source: true,
+            })
+          : []) {
+          const legacyMessageId = String(message.uid);
+          const messageId = `${mailboxPath}:${legacyMessageId}`;
+          const subject = message.envelope?.subject ?? "";
+
+          const { data: existingImports } = await supabase
+            .from("purchase_mail_imports")
+            .select("id, candidate_count")
+            .eq("user_id", connection.user_id)
+            .eq("provider", "naver")
+            .in("message_id", [messageId, legacyMessageId]);
+
+          const importedAlready = (existingImports ?? []).some(
+            (existingImport) => Number(existingImport.candidate_count) > 0
           );
 
-          importedHistories.push(...histories);
-        }
-
-        await supabase.from("purchase_mail_imports").upsert(
-          {
-            user_id: connection.user_id,
-            connection_id: connection.id,
-            provider: "naver",
-            message_id: messageId,
-            subject,
-            sent_at: sentAt.toISOString(),
-            candidate_count: histories.length,
-            imported_product_names: histories.map((history) => history.productName),
-          },
-          {
-            onConflict: "user_id,provider,message_id",
+          if (importedAlready) {
+            continue;
           }
-        );
+
+          const sentAt = message.envelope?.date ?? new Date();
+          const sourceText = extractReadableMailTextFromRawSource(
+            message.source?.toString("utf8") ?? ""
+          );
+          const result = await importPurchaseMailText(
+            `${subject}\n${sourceText}`
+          );
+          const nextHistories = [...existingHistories, ...importedHistories];
+          const histories = result.candidates.map((candidate) => {
+            return createPurchaseHistoryFromCandidate({
+              candidate,
+              histories: nextHistories,
+              messageId,
+              purchasedAt: sentAt,
+            });
+          });
+
+          if (histories.length > 0) {
+            await supabase.from("purchase_history").upsert(
+              histories.map((history) => ({
+                id: history.id,
+                user_id: connection.user_id,
+                product_name: history.productName,
+                platform: history.platform,
+                product_url: history.productUrl,
+                default_quantity: history.defaultQuantity,
+                max_budget_krw: history.maxBudgetKrw,
+                repeat_cycle_days: history.repeatCycleDays,
+                next_purchase_check_date: history.nextPurchaseCheckDate,
+                source: history.source,
+                source_message_id: history.sourceMessageId,
+                imported_at: history.importedAt,
+                auto_repurchase_enabled: history.autoRepurchaseEnabled,
+                last_purchased_at: history.lastPurchasedAt,
+                memo: history.memo,
+                created_at: history.createdAt,
+                updated_at: history.updatedAt,
+              }))
+            );
+
+            importedHistories.push(...histories);
+          }
+
+          await supabase.from("purchase_mail_imports").upsert(
+            {
+              user_id: connection.user_id,
+              connection_id: connection.id,
+              provider: "naver",
+              message_id: messageId,
+              subject,
+              sent_at: sentAt.toISOString(),
+              candidate_count: histories.length,
+              imported_product_names: histories.map(
+                (history) => history.productName
+              ),
+            },
+            {
+              onConflict: "user_id,provider,message_id",
+            }
+          );
+        }
+      } finally {
+        lock.release();
       }
-    } finally {
-      lock.release();
     }
   } finally {
     await safeLogout(client);
