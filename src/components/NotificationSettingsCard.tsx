@@ -135,6 +135,66 @@ export default function NotificationSettingsCard() {
     void save(nextSettings);
   }
 
+  async function sendTestNotification() {
+    setMessage(null);
+
+    try {
+      const { Capacitor } = await import("@capacitor/core");
+
+      if (Capacitor.isNativePlatform()) {
+        const { LocalNotifications } = await import(
+          "@capacitor/local-notifications"
+        );
+        const permission = await LocalNotifications.requestPermissions();
+
+        if (permission.display !== "granted") {
+          setMessage("아이폰 알림 권한을 허용해야 테스트 알림을 보낼 수 있어.");
+          return;
+        }
+
+        await LocalNotifications.schedule({
+          notifications: [
+            {
+              id: Date.now() % 2147483647,
+              title: "나의 비서 테스트 알림",
+              body: "알림이 정상으로 울리고 있어요.",
+              schedule: {
+                at: new Date(Date.now() + 5000),
+              },
+            },
+          ],
+        });
+        setMessage("5초 뒤 아이폰 테스트 알림을 예약했어.");
+        return;
+      }
+    } catch {
+      // 웹에서는 브라우저 알림으로 이어서 처리합니다.
+    }
+
+    if (!("Notification" in window)) {
+      setMessage("이 브라우저에서는 알림 테스트를 지원하지 않아.");
+      return;
+    }
+
+    const permission =
+      Notification.permission === "granted"
+        ? "granted"
+        : await Notification.requestPermission();
+
+    if (permission !== "granted") {
+      setMessage("알림 권한을 허용해야 테스트 알림을 보낼 수 있어.");
+      return;
+    }
+
+    window.setTimeout(() => {
+      new Notification("나의 비서 테스트 알림", {
+        body: "알림이 정상으로 울리고 있어요.",
+        icon: "/icons/icon-192.png",
+      });
+    }, 5000);
+    setMessage("5초 뒤 브라우저 테스트 알림을 예약했어.");
+  }
+
   return (
     <section className="app-card p-5">
       <div>
@@ -219,6 +279,14 @@ export default function NotificationSettingsCard() {
           />
         </label>
       </div>
+
+      <button
+        type="button"
+        onClick={sendTestNotification}
+        className="mt-4 w-full rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white"
+      >
+        5초 뒤 테스트 알림 보내기
+      </button>
 
       {message && (
         <p className="mt-4 rounded-2xl bg-blue-50 px-4 py-3 text-sm font-bold text-blue-700 ring-1 ring-blue-100">
