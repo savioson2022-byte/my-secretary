@@ -158,6 +158,44 @@ function isCoupangMail({
   return /쿠팡|coupang/i.test(`${subject ?? ""} ${from ?? ""}`);
 }
 
+function isLikelyCoupangPurchaseMail(subject: string) {
+  const normalized = subject.toLowerCase();
+  const purchasePatterns = [
+    /주문/,
+    /구매/,
+    /결제/,
+    /영수증/,
+    /배송/,
+    /도착/,
+    /출고/,
+    /order/,
+    /payment/,
+    /receipt/,
+    /delivery/,
+  ];
+  const marketingPatterns = [
+    /광고/,
+    /추천/,
+    /특가/,
+    /쿠폰/,
+    /혜택/,
+    /세일/,
+    /할인/,
+    /이벤트/,
+    /와우/,
+    /체험/,
+    /마감/,
+    /sale/,
+    /event/,
+    /coupon/,
+  ];
+
+  return (
+    purchasePatterns.some((pattern) => pattern.test(normalized)) &&
+    !marketingPatterns.some((pattern) => pattern.test(normalized))
+  );
+}
+
 function getMailboxFlagSet(mailbox: NaverMailboxListItem) {
   const values =
     mailbox.flags instanceof Set
@@ -213,6 +251,7 @@ async function listNaverMailboxesToScan(client: ImapFlow) {
 const MAX_NAVER_MAILBOXES_TO_SCAN = 20;
 const MAX_NAVER_MESSAGES_TO_SCAN_PER_MAILBOX = 700;
 const MAX_NAVER_COUPANG_MESSAGES_PER_SYNC = 180;
+const MAX_NAVER_PURCHASE_MESSAGES_PER_SYNC = 35;
 
 export async function syncNaverPurchaseMails({
   supabase,
@@ -232,7 +271,9 @@ export async function syncNaverPurchaseMails({
   let client: ImapFlow;
   const importedHistories: PurchaseHistoryItem[] = [];
   let messageCount = 0;
+  let analyzedMessageCount = 0;
   const failedExtractionSubjects: string[] = [];
+  const skippedCoupangSubjects: string[] = [];
 
   try {
     client = await connectNaverMailWithFallback({
@@ -262,6 +303,7 @@ export async function syncNaverPurchaseMails({
           ? uids.slice(-MAX_NAVER_MESSAGES_TO_SCAN_PER_MAILBOX)
           : [];
         const coupangMessageIds: number[] = [];
+        const purchaseMessageIds: number[] = [];
 
         for await (const message of uidList.length > 0
           ? client.fetch(uidList, {
@@ -277,18 +319,38 @@ export async function syncNaverPurchaseMails({
 
           if (typeof message.uid === "number") {
             coupangMessageIds.push(message.uid);
+            if (isLikelyCoupangPurchaseMail(subject)) {
+              purchaseMessageIds.push(message.uid);
+            } else if (
+              skippedCoupangSubjects.length < 5 &&
+              subject &&
+              !skippedCoupangSubjects.includes(subject)
+            ) {
+              skippedCoupangSubjects.push(subject);
+            }
           }
         }
 
         const limitedCoupangMessageIds = coupangMessageIds.slice(
           -remainingCoupangMessageLimit
         );
+        const remainingPurchaseAnalysisLimit = Math.max(
+          0,
+          MAX_NAVER_PURCHASE_MESSAGES_PER_SYNC - analyzedMessageCount
+        );
+        const purchaseLimit = Math.min(
+          remainingCoupangMessageLimit,
+          remainingPurchaseAnalysisLimit
+        );
+        const limitedPurchaseMessageIds =
+          purchaseLimit > 0 ? purchaseMessageIds.slice(-purchaseLimit) : [];
 
         messageCount += limitedCoupangMessageIds.length;
         remainingCoupangMessageLimit -= limitedCoupangMessageIds.length;
+        analyzedMessageCount += limitedPurchaseMessageIds.length;
 
-        for await (const message of limitedCoupangMessageIds.length > 0
-          ? client.fetch(limitedCoupangMessageIds, {
+        for await (const message of limitedPurchaseMessageIds.length > 0
+          ? client.fetch(limitedPurchaseMessageIds, {
               envelope: true,
               source: true,
             })
@@ -409,7 +471,9 @@ export async function syncNaverPurchaseMails({
   return {
     importedCount: importedHistories.length,
     messageCount,
+    analyzedMessageCount,
     importedHistories,
     failedExtractionSubjects,
+    skippedCoupangSubjects,
   };
 }

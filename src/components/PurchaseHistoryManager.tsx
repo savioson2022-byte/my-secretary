@@ -492,12 +492,6 @@ export default function PurchaseHistoryManager() {
   }
 
   async function handleBackfillMailConnection(connection: MailConnectionStatus) {
-    const shouldImport = window.confirm(
-      `${connection.provider === "gmail" ? "Gmail" : "네이버 메일"}${connection.email ? `(${connection.email})` : ""}에서 최근 1년간의 쿠팡 메일을 다시 확인할까요? 이미 저장된 메일은 중복 저장하지 않습니다.`
-    );
-
-    if (!shouldImport) return;
-
     await handleSyncMailNow({
       backfill: true,
       connectionId: connection.id,
