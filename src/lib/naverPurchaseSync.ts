@@ -276,6 +276,7 @@ export async function syncNaverPurchaseMails({
   const importedHistories: PurchaseHistoryItem[] = [];
   let messageCount = 0;
   let analyzedMessageCount = 0;
+  let skippedAlreadyAnalyzedCount = 0;
   const failedExtractionSubjects: string[] = [];
   const skippedCoupangSubjects: string[] = [];
 
@@ -357,9 +358,39 @@ export async function syncNaverPurchaseMails({
           remainingCoupangMessageLimit,
           remainingPurchaseAnalysisLimit
         );
+        const candidatePurchaseMessageIds = Array.from(purchaseMessages.keys());
+        const candidateMessageIds = candidatePurchaseMessageIds.flatMap((uid) => {
+          const uidText = String(uid);
+
+          return [`${mailboxPath}:${uidText}`, uidText];
+        });
+        const { data: existingImportsForMailbox } =
+          candidateMessageIds.length > 0
+            ? await supabase
+                .from("purchase_mail_imports")
+                .select("message_id, candidate_count")
+                .eq("user_id", connection.user_id)
+                .eq("provider", "naver")
+                .in("message_id", candidateMessageIds)
+            : { data: [] };
+        const existingMessageIds = new Set(
+          (existingImportsForMailbox ?? []).map((row) => String(row.message_id))
+        );
+        const unprocessedPurchaseMessageIds =
+          forceReprocess && existingMessageIds.size > 0
+            ? candidatePurchaseMessageIds.filter((uid) => {
+                const uidText = String(uid);
+                const newId = `${mailboxPath}:${uidText}`;
+                const legacyId = uidText;
+
+                return !existingMessageIds.has(newId) && !existingMessageIds.has(legacyId);
+              })
+            : candidatePurchaseMessageIds;
+        skippedAlreadyAnalyzedCount +=
+          candidatePurchaseMessageIds.length - unprocessedPurchaseMessageIds.length;
         const limitedPurchaseMessageIds =
           purchaseLimit > 0
-            ? Array.from(purchaseMessages.keys()).slice(-purchaseLimit)
+            ? unprocessedPurchaseMessageIds.slice(-purchaseLimit)
             : [];
 
         messageCount += limitedCoupangMessageIds.length;
@@ -495,6 +526,7 @@ export async function syncNaverPurchaseMails({
     importedCount: importedHistories.length,
     messageCount,
     analyzedMessageCount,
+    skippedAlreadyAnalyzedCount,
     importedHistories,
     failedExtractionSubjects,
     skippedCoupangSubjects,

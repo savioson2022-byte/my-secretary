@@ -114,6 +114,7 @@ export async function POST(request: Request) {
   let importedCount = 0;
   let messageCount = 0;
   let analyzedMessageCount = 0;
+  let skippedAlreadyAnalyzedCount = 0;
   let failedCount = 0;
   const importedHistories: PurchaseHistoryItem[] = [];
   const failedExtractionSubjects: string[] = [];
@@ -132,6 +133,7 @@ export async function POST(request: Request) {
         importedCount: number;
         messageCount?: number;
         analyzedMessageCount?: number;
+        skippedAlreadyAnalyzedCount?: number;
         importedHistories: PurchaseHistoryItem[];
         failedExtractionSubjects?: string[];
         skippedCoupangSubjects?: string[];
@@ -152,6 +154,7 @@ export async function POST(request: Request) {
       importedCount += result.importedCount;
       messageCount += result.messageCount ?? 0;
       analyzedMessageCount += result.analyzedMessageCount ?? 0;
+      skippedAlreadyAnalyzedCount += result.skippedAlreadyAnalyzedCount ?? 0;
       importedHistories.push(...result.importedHistories);
       failedExtractionSubjects.push(...(result.failedExtractionSubjects ?? []));
       skippedCoupangSubjects.push(...(result.skippedCoupangSubjects ?? []));
@@ -177,6 +180,7 @@ export async function POST(request: Request) {
     importedCount,
     messageCount,
     analyzedMessageCount,
+    skippedAlreadyAnalyzedCount,
     failedCount,
     importedHistories,
     failedExtractionSubjects: failedExtractionSubjects.slice(0, 5),
@@ -185,7 +189,7 @@ export async function POST(request: Request) {
       failedCount > 0
         ? "일부 메일 연결을 확인하지 못했습니다. 연결 카드의 안내를 확인해주세요."
         : messageCount > 0 && importedCount === 0
-          ? `${body.backfill ? "기존 메일을 다시 확인했어. " : ""}쿠팡 메일 ${messageCount}개 중 주문 가능성이 높은 메일 ${analyzedMessageCount}개를 분석했지만 구매템은 아직 저장하지 못했어.${failedExtractionSubjects.length > 0 ? ` 분석 실패 예: ${failedExtractionSubjects.slice(0, 2).join(" / ")}` : skippedCoupangSubjects.length > 0 ? ` 제외한 메일 예: ${skippedCoupangSubjects.slice(0, 2).join(" / ")}` : ""}`
+          ? `${body.backfill ? "기존 메일을 다시 확인했어. " : ""}쿠팡 메일 ${messageCount}개 중 주문 가능성이 높은 새 메일 ${analyzedMessageCount}개를 분석했고, 이미 확인한 후보 ${skippedAlreadyAnalyzedCount}개는 건너뛰었어. 아직 구매템은 저장하지 못했어.${failedExtractionSubjects.length > 0 ? ` 분석 실패 예: ${failedExtractionSubjects.slice(0, 2).join(" / ")}` : skippedCoupangSubjects.length > 0 ? ` 제외한 메일 예: ${skippedCoupangSubjects.slice(0, 2).join(" / ")}` : ""}`
         : undefined,
   });
 }
