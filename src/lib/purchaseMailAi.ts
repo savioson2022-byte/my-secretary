@@ -63,10 +63,51 @@ function normalizeAiCandidates(
     .slice(0, 8);
 }
 
+function getRelevantPurchaseMailText(text: string) {
+  const normalizedText = text
+    .replace(/\u00a0/g, " ")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+  if (normalizedText.length <= 12000) {
+    return normalizedText;
+  }
+
+  const lines = normalizedText
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && line.length <= 500);
+  const selectedLineIndexes = new Set<number>();
+  const keywordPattern =
+    /쿠팡|coupang|주문|상품|제품|옵션|수량|가격|판매가|결제|구매|배송|영수증|원|order|product|payment/i;
+  const pricePattern = /[0-9]{1,3}(?:,[0-9]{3})+\s?원/;
+
+  lines.forEach((line, index) => {
+    if (!keywordPattern.test(line) && !pricePattern.test(line)) return;
+
+    for (let nearbyIndex = index - 4; nearbyIndex <= index + 8; nearbyIndex += 1) {
+      if (nearbyIndex >= 0 && nearbyIndex < lines.length) {
+        selectedLineIndexes.add(nearbyIndex);
+      }
+    }
+  });
+
+  if (selectedLineIndexes.size === 0) {
+    return normalizedText.slice(0, 30000);
+  }
+
+  return Array.from(selectedLineIndexes)
+    .sort((left, right) => left - right)
+    .map((index) => lines[index])
+    .join("\n")
+    .slice(0, 30000);
+}
+
 export async function importPurchaseMailText(
   text: string
 ): Promise<PurchaseMailImportResult> {
-  const inputText = text.trim().slice(0, 12000);
+  const inputText = getRelevantPurchaseMailText(text);
 
   if (!inputText || !process.env.OPENAI_API_KEY) {
     return {

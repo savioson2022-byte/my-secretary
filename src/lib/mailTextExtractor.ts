@@ -131,7 +131,12 @@ function stripHtml(value: string) {
     value
       .replace(/<style[\s\S]*?<\/style>/gi, " ")
       .replace(/<script[\s\S]*?<\/script>/gi, " ")
-      .replace(/<(br|p|div|tr|li|h[1-6])\b[^>]*>/gi, "\n")
+      .replace(/\s(?:alt|title|aria-label)="([^"]{2,200})"/gi, "\n$1\n")
+      .replace(/\s(?:alt|title|aria-label)='([^']{2,200})'/gi, "\n$1\n")
+      .replace(
+        /<(br|p|div|tr|td|th|table|tbody|thead|li|ul|ol|a|span|h[1-6])\b[^>]*>/gi,
+        "\n"
+      )
       .replace(/<[^>]+>/g, " ")
       .replace(/[ \t]+/g, " ")
       .replace(/\n\s+/g, "\n")
@@ -191,5 +196,5 @@ export function extractReadableMailTextFromRawSource(rawSource: string | Buffer)
     .replace(/\r/g, "")
     .replace(/\n{3,}/g, "\n\n")
     .trim()
-    .slice(0, 20000);
+    .slice(0, 80000);
 }

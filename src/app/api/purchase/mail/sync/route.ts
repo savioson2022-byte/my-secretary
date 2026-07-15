@@ -115,6 +115,7 @@ export async function POST(request: Request) {
   let messageCount = 0;
   let failedCount = 0;
   const importedHistories: PurchaseHistoryItem[] = [];
+  const failedExtractionSubjects: string[] = [];
 
   for (const connection of syncableConnections) {
     const syncConnection = body.backfill
@@ -129,6 +130,7 @@ export async function POST(request: Request) {
         importedCount: number;
         messageCount?: number;
         importedHistories: PurchaseHistoryItem[];
+        failedExtractionSubjects?: string[];
       } =
         connection.provider === "gmail"
           ? await syncGmailPurchaseMails({
@@ -145,6 +147,7 @@ export async function POST(request: Request) {
       importedCount += result.importedCount;
       messageCount += result.messageCount ?? 0;
       importedHistories.push(...result.importedHistories);
+      failedExtractionSubjects.push(...(result.failedExtractionSubjects ?? []));
     } catch (error) {
       failedCount += 1;
       console.error("구매 메일 동기화 실패:", error);
@@ -168,11 +171,12 @@ export async function POST(request: Request) {
     messageCount,
     failedCount,
     importedHistories,
+    failedExtractionSubjects: failedExtractionSubjects.slice(0, 5),
     message:
       failedCount > 0
         ? "일부 메일 연결을 확인하지 못했습니다. 연결 카드의 안내를 확인해주세요."
         : messageCount > 0 && importedCount === 0
-          ? `${body.backfill ? "기존 메일을 다시 확인했어. " : ""}쿠팡 메일 ${messageCount}개를 찾았지만 상품명과 가격을 확정할 수 있는 구매템은 아직 저장하지 못했어. 주문 상세 본문이 있는 메일부터 다시 분석하도록 계속 개선할게.`
+          ? `${body.backfill ? "기존 메일을 다시 확인했어. " : ""}쿠팡 메일 ${messageCount}개를 찾았지만 상품명과 가격을 확정할 수 있는 구매템은 아직 저장하지 못했어.${failedExtractionSubjects.length > 0 ? ` 확인한 메일 예: ${failedExtractionSubjects.slice(0, 2).join(" / ")}` : ""}`
         : undefined,
   });
 }

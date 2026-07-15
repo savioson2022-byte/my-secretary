@@ -230,6 +230,7 @@ export async function syncNaverPurchaseMails({
   let client: ImapFlow;
   const importedHistories: PurchaseHistoryItem[] = [];
   let messageCount = 0;
+  const failedExtractionSubjects: string[] = [];
 
   try {
     client = await connectNaverMailWithFallback({
@@ -350,6 +351,12 @@ export async function syncNaverPurchaseMails({
             );
 
             importedHistories.push(...histories);
+          } else if (
+            subject &&
+            failedExtractionSubjects.length < 5 &&
+            !failedExtractionSubjects.includes(subject)
+          ) {
+            failedExtractionSubjects.push(subject);
           }
 
           await supabase.from("purchase_mail_imports").upsert(
@@ -393,5 +400,6 @@ export async function syncNaverPurchaseMails({
     importedCount: importedHistories.length,
     messageCount,
     importedHistories,
+    failedExtractionSubjects,
   };
 }
