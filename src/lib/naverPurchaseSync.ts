@@ -255,7 +255,7 @@ async function listNaverMailboxesToScan(client: ImapFlow) {
 const MAX_NAVER_MAILBOXES_TO_SCAN = 20;
 const MAX_NAVER_MESSAGES_TO_SCAN_PER_MAILBOX = 700;
 const MAX_NAVER_COUPANG_MESSAGES_PER_SYNC = 180;
-const MAX_NAVER_PURCHASE_MESSAGES_PER_SYNC = 12;
+const MAX_NAVER_PURCHASE_MESSAGES_PER_SYNC = 3;
 
 export async function syncNaverPurchaseMails({
   supabase,
