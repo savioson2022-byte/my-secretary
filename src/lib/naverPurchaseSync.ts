@@ -218,10 +218,12 @@ export async function syncNaverPurchaseMails({
   supabase,
   connection,
   existingHistories,
+  forceReprocess = false,
 }: {
   supabase: SupabaseClient;
   connection: NaverMailConnectionRow;
   existingHistories: PurchaseHistoryItem[];
+  forceReprocess?: boolean;
 }) {
   if (!connection.email || !connection.refresh_token) {
     throw new Error("네이버 메일 주소와 앱 비밀번호가 필요합니다.");
@@ -306,7 +308,7 @@ export async function syncNaverPurchaseMails({
             (existingImport) => Number(existingImport.candidate_count) > 0
           );
 
-          if (importedAlready) {
+          if (importedAlready && !forceReprocess) {
             continue;
           }
 
@@ -328,6 +330,14 @@ export async function syncNaverPurchaseMails({
           });
 
           if (histories.length > 0) {
+            if (forceReprocess) {
+              await supabase
+                .from("purchase_history")
+                .delete()
+                .eq("user_id", connection.user_id)
+                .in("source_message_id", [messageId, legacyMessageId]);
+            }
+
             await supabase.from("purchase_history").upsert(
               histories.map((history) => ({
                 id: history.id,

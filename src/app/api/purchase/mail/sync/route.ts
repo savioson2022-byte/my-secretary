@@ -142,6 +142,7 @@ export async function POST(request: Request) {
               supabase: context.supabase,
               connection: syncConnection,
               existingHistories,
+              forceReprocess: Boolean(body.backfill),
             });
 
       importedCount += result.importedCount;
