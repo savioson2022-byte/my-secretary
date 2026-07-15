@@ -8,6 +8,7 @@ import ClassificationResult from "@/components/ClassificationResult";
 import FilterBar from "@/components/FilterBar";
 import InputBox from "@/components/InputBox";
 import ItemCard from "@/components/ItemCard";
+import NotificationSummaryCard from "@/components/NotificationSummaryCard";
 import UserStatusBadge from "@/components/UserStatusBadge";
 import { aiClassifyInput } from "@/lib/aiClassifyInput";
 import { classifyInput } from "@/lib/classifyInput";
@@ -667,6 +668,7 @@ export default function Home() {
           )}
 
           <AgentActionSuggestionView items={items} compact maxItems={2} />
+          <NotificationSummaryCard />
         </div>
 
         <BottomNavigation />

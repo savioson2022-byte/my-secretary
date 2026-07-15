@@ -8,6 +8,7 @@ export const STORAGE_KEYS = {
   suggestionFeedback: "my-assistant-suggestion-feedback",
   purchaseHistory: "my-assistant-purchase-history",
   userProfile: "my-assistant-user-profile",
+  notificationSettings: "my-assistant-notification-settings",
   voiceControlMode: "my-assistant-voice-control-mode",
 } as const;
 
@@ -41,4 +42,5 @@ export const USER_SCOPED_STORAGE_KEYS = [
   STORAGE_KEYS.suggestionFeedback,
   STORAGE_KEYS.purchaseHistory,
   STORAGE_KEYS.userProfile,
+  STORAGE_KEYS.notificationSettings,
 ] as const;

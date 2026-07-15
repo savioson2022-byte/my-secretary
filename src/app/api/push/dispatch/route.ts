@@ -22,6 +22,15 @@ type PushSubscriptionRecord = {
   auth: string;
 };
 
+type NotificationEventRecord = {
+  id: string;
+  user_id: string;
+  title: string;
+  body: string;
+  url: string;
+  scheduled_at: string;
+};
+
 function getKoreanTodayText() {
   const formatter = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Seoul",
@@ -52,6 +61,17 @@ function timeToMinutes(timeText: string) {
   const [hourText, minuteText] = timeText.split(":");
 
   return Number(hourText) * 60 + Number(minuteText);
+}
+
+function getDispatchWindow() {
+  const now = new Date();
+  const windowStart = new Date(now);
+  windowStart.setMinutes(windowStart.getMinutes() - 5);
+
+  return {
+    nowIso: now.toISOString(),
+    windowStartIso: windowStart.toISOString(),
+  };
 }
 
 function isAuthorized(request: NextRequest) {
@@ -86,6 +106,7 @@ export async function GET(request: NextRequest) {
 
   const todayText = getKoreanTodayText();
   const nowMinutes = getKoreanMinutesOfDay();
+  const { nowIso, windowStartIso } = getDispatchWindow();
   const { data: entries, error: entriesError } = await supabase
     .from("notification_schedule_entries")
     .select("*")
@@ -102,6 +123,67 @@ export async function GET(request: NextRequest) {
 
   let sentCount = 0;
   let skippedCount = 0;
+
+  const { data: notificationEvents } = await supabase
+    .from("notification_events")
+    .select("*")
+    .eq("active", true)
+    .lte("scheduled_at", nowIso)
+    .gte("scheduled_at", windowStartIso)
+    .returns<NotificationEventRecord[]>();
+
+  for (const event of notificationEvents ?? []) {
+    const { data: subscriptions } = await supabase
+      .from("push_subscriptions")
+      .select("*")
+      .eq("user_id", event.user_id)
+      .eq("enabled", true)
+      .returns<PushSubscriptionRecord[]>();
+
+    for (const subscription of subscriptions ?? []) {
+      const { data: existingDelivery } = await supabase
+        .from("notification_event_deliveries")
+        .select("id")
+        .eq("event_id", event.id)
+        .eq("subscription_id", subscription.id)
+        .maybeSingle<{ id: string }>();
+
+      if (existingDelivery) {
+        continue;
+      }
+
+      try {
+        await sendPushNotification({
+          subscription: {
+            endpoint: subscription.endpoint,
+            keys: {
+              p256dh: subscription.p256dh,
+              auth: subscription.auth,
+            },
+          },
+          title: event.title,
+          body: event.body,
+          url: event.url,
+          tag: event.id,
+        });
+
+        await supabase.from("notification_event_deliveries").insert({
+          user_id: event.user_id,
+          event_id: event.id,
+          subscription_id: subscription.id,
+        });
+        sentCount += 1;
+      } catch {
+        await supabase
+          .from("push_subscriptions")
+          .update({
+            enabled: false,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", subscription.id);
+      }
+    }
+  }
 
   for (const entry of entries ?? []) {
     const startMinutes = timeToMinutes(entry.start_time);
@@ -180,6 +262,6 @@ export async function GET(request: NextRequest) {
     ok: true,
     sentCount,
     skippedCount,
-    checkedCount: entries?.length ?? 0,
+    checkedCount: (entries?.length ?? 0) + (notificationEvents?.length ?? 0),
   });
 }

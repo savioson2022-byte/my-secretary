@@ -1,18 +1,23 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { buildNotificationEvents } from "@/lib/notificationEventBuilder";
+import { getNotificationSettings } from "@/lib/notificationSettingsStorage";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { getRoutineSchedules } from "@/lib/routineStorage";
 import { getSingleSchedules } from "@/lib/singleScheduleStorage";
 import { getItems } from "@/lib/storage";
 import { getUserProfile } from "@/lib/userProfileStorage";
+import type { NotificationEvent } from "@/types/notification";
 import { DayOfWeek, RoutineSchedule } from "@/types/routine";
 
 const REMINDER_OFFSETS = [10, 0];
 const NOTIFIED_KEY = "my-assistant-notified-reminders";
 const DIGEST_NOTIFIED_KEY = "my-assistant-notified-unresolved-digests";
+const NATIVE_SCHEDULED_KEY = "my-assistant-native-notification-event-ids";
 const PUSH_SYNC_DAYS = 14;
 const UNRESOLVED_DIGEST_HOURS = [8, 20];
+const LOCATION_DISTANCE_THRESHOLD_METERS = 300;
 
 type PushScheduleEntry = {
   sourceType: "single" | "routine";
@@ -87,22 +92,73 @@ function saveDigestNotifiedIds(ids: Set<string>) {
   localStorage.setItem(DIGEST_NOTIFIED_KEY, JSON.stringify(recentIds));
 }
 
-function showReminder(title: string, body: string) {
+function showReminder(title: string, body: string, url = "/") {
   if ("vibrate" in navigator) {
     navigator.vibrate([160, 80, 160]);
   }
 
   if ("Notification" in window && Notification.permission === "granted") {
-    new Notification(title, {
+    const notification = new Notification(title, {
       body,
       icon: "/icons/icon-192.png",
       badge: "/icons/icon-192.png",
       tag: title,
     });
+    notification.onclick = () => {
+      window.focus();
+      window.location.href = url;
+    };
     return;
   }
 
   window.alert(`${title}\n${body}`);
+}
+
+function getNumericNotificationId(id: string) {
+  let hash = 0;
+
+  for (let index = 0; index < id.length; index += 1) {
+    hash = (hash * 31 + id.charCodeAt(index)) >>> 0;
+  }
+
+  return Math.max(1, hash % 2147483647);
+}
+
+function getDistanceMeters({
+  fromLatitude,
+  fromLongitude,
+  toLatitude,
+  toLongitude,
+}: {
+  fromLatitude: number;
+  fromLongitude: number;
+  toLatitude: number;
+  toLongitude: number;
+}) {
+  const earthRadiusMeters = 6371000;
+  const toRadians = (degree: number) => (degree * Math.PI) / 180;
+  const deltaLatitude = toRadians(toLatitude - fromLatitude);
+  const deltaLongitude = toRadians(toLongitude - fromLongitude);
+  const latitude1 = toRadians(fromLatitude);
+  const latitude2 = toRadians(toLatitude);
+  const a =
+    Math.sin(deltaLatitude / 2) * Math.sin(deltaLatitude / 2) +
+    Math.cos(latitude1) *
+      Math.cos(latitude2) *
+      Math.sin(deltaLongitude / 2) *
+      Math.sin(deltaLongitude / 2);
+
+  return earthRadiusMeters * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+async function isNativeAppRuntime() {
+  try {
+    const { Capacitor } = await import("@capacitor/core");
+
+    return Capacitor.isNativePlatform();
+  } catch {
+    return false;
+  }
 }
 
 function urlBase64ToUint8Array(base64String: string) {
@@ -280,6 +336,136 @@ function checkUnresolvedDigest() {
   saveDigestNotifiedIds(digestIds);
 }
 
+async function shouldShowLocationEvent(event: NotificationEvent) {
+  if (!event.requiresLocationCheck || !event.latitude || !event.longitude) {
+    return true;
+  }
+
+  if (!(await isNativeAppRuntime())) {
+    return true;
+  }
+
+  try {
+    const { Geolocation } = await import("@capacitor/geolocation");
+    const permission = await Geolocation.requestPermissions();
+
+    if (permission.location !== "granted") {
+      return true;
+    }
+
+    const position = await Geolocation.getCurrentPosition({
+      enableHighAccuracy: true,
+      timeout: 8000,
+    });
+    const distanceMeters = getDistanceMeters({
+      fromLatitude: position.coords.latitude,
+      fromLongitude: position.coords.longitude,
+      toLatitude: event.latitude,
+      toLongitude: event.longitude,
+    });
+
+    return distanceMeters > LOCATION_DISTANCE_THRESHOLD_METERS;
+  } catch {
+    return true;
+  }
+}
+
+async function checkDueNotificationEvents(events: NotificationEvent[]) {
+  const now = Date.now();
+  const notifiedIds = getNotifiedIds();
+  const dueEvents = events.filter((event) => {
+    const scheduledAt = new Date(event.scheduledAt).getTime();
+
+    return (
+      scheduledAt <= now &&
+      scheduledAt > now - 60 * 1000 &&
+      !notifiedIds.has(event.id)
+    );
+  });
+
+  for (const event of dueEvents) {
+    const shouldShow = await shouldShowLocationEvent(event);
+
+    notifiedIds.add(event.id);
+
+    if (!shouldShow) {
+      continue;
+    }
+
+    showReminder(event.title, event.body, event.url);
+  }
+
+  saveNotifiedIds(notifiedIds);
+}
+
+function getStoredNativeNotificationIds() {
+  try {
+    return (JSON.parse(
+      localStorage.getItem(NATIVE_SCHEDULED_KEY) ?? "[]"
+    ) ?? []) as number[];
+  } catch {
+    return [];
+  }
+}
+
+function saveStoredNativeNotificationIds(ids: number[]) {
+  localStorage.setItem(NATIVE_SCHEDULED_KEY, JSON.stringify(ids.slice(0, 128)));
+}
+
+async function scheduleNativeNotifications(events: NotificationEvent[]) {
+  if (!(await isNativeAppRuntime())) {
+    return;
+  }
+
+  try {
+    const { LocalNotifications } = await import(
+      "@capacitor/local-notifications"
+    );
+    const permission = await LocalNotifications.requestPermissions();
+
+    if (permission.display !== "granted") {
+      return;
+    }
+
+    const previousIds = getStoredNativeNotificationIds();
+
+    if (previousIds.length > 0) {
+      await LocalNotifications.cancel({
+        notifications: previousIds.map((id) => ({ id })),
+      });
+    }
+
+    const now = Date.now();
+    const notifications = events
+      .filter((event) => new Date(event.scheduledAt).getTime() > now)
+      .slice(0, 64)
+      .map((event) => ({
+        id: getNumericNotificationId(event.id),
+        title: event.title,
+        body: event.body,
+        schedule: {
+          at: new Date(event.scheduledAt),
+        },
+        extra: {
+          url: event.url,
+          eventId: event.id,
+        },
+      }));
+
+    if (notifications.length === 0) {
+      saveStoredNativeNotificationIds([]);
+      return;
+    }
+
+    await LocalNotifications.schedule({ notifications });
+    saveStoredNativeNotificationIds(
+      notifications.map((notification) => notification.id)
+    );
+  } catch {
+    // 웹/PWA에서는 Capacitor 로컬 알림을 사용할 수 없으므로 조용히 건너뜁니다.
+  }
+}
+
 export default function SmartReminderAgent() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [isMounted, setIsMounted] = useState(false);
@@ -306,11 +492,18 @@ export default function SmartReminderAgent() {
     if (!canUseNotification) return;
 
     setPermission(Notification.permission);
-    checkDueReminders();
+    const settings = getNotificationSettings();
+    const events = buildNotificationEvents(settings);
+
+    void checkDueNotificationEvents(events);
     checkUnresolvedDigest();
+    void scheduleNativeNotifications(events);
 
     const timer = window.setInterval(() => {
-      checkDueReminders();
+      const nextSettings = getNotificationSettings();
+      const nextEvents = buildNotificationEvents(nextSettings);
+
+      void checkDueNotificationEvents(nextEvents);
       checkUnresolvedDigest();
     }, 30 * 1000);
 
@@ -395,6 +588,11 @@ export default function SmartReminderAgent() {
         return;
       }
 
+      const settings = getNotificationSettings();
+      const events = buildNotificationEvents(settings);
+
+      await syncNotificationEvents(accessToken, events);
+      await scheduleNativeNotifications(events);
       await syncPushSchedules(accessToken);
       setMessage("서버 푸시 알림을 연결했습니다.");
     } catch {
@@ -418,6 +616,24 @@ export default function SmartReminderAgent() {
         Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({ entries }),
+    });
+  }
+
+  async function syncNotificationEvents(
+    accessToken?: string,
+    events = buildNotificationEvents(getNotificationSettings())
+  ) {
+    const token = accessToken ?? (await getAccessToken());
+
+    if (!token || events.length === 0) return;
+
+    await fetch("/api/notifications/sync", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ events }),
     });
   }
 
