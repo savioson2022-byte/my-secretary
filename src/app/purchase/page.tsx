@@ -4,9 +4,9 @@ import UserStatusBadge from "@/components/UserStatusBadge";
 
 export default function PurchasePage() {
   return (
-    <main className="app-page mx-auto max-w-3xl px-4">
-      <header className="mb-5 flex items-start justify-between gap-4">
-        <div>
+    <main className="app-page mx-auto w-full max-w-6xl px-4 lg:px-8">
+      <header className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="max-w-2xl">
           <p className="text-sm font-black text-blue-600">나의 비서</p>
           <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-950">
             구매 준비
