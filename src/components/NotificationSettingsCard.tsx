@@ -215,16 +215,24 @@ export default function NotificationSettingsCard() {
       ok: boolean;
       sentCount?: number;
       failedCount?: number;
+      webPushSubscriptionCount?: number;
+      nativePushTokenCount?: number;
+      apnsConfigured?: boolean;
       reason?: string | null;
     };
 
     if (!result.ok) {
-      setMessage(result.reason ?? "서버 푸시 테스트에 실패했어.");
+      const statusText = `웹 푸시 ${result.webPushSubscriptionCount ?? 0}개 · 아이폰 앱 토큰 ${
+        result.nativePushTokenCount ?? 0
+      }개 · APNs ${result.apnsConfigured ? "설정됨" : "미설정"}`;
+      setMessage(`${result.reason ?? "서버 푸시 테스트에 실패했어."} (${statusText})`);
       return;
     }
 
     setMessage(
-      `서버 푸시를 보냈어. 연결된 기기 ${result.sentCount ?? 1}곳으로 발송했어.`
+      `서버 푸시를 보냈어. ${result.sentCount ?? 1}곳으로 발송했어. 웹 푸시 ${
+        result.webPushSubscriptionCount ?? 0
+      }개, 아이폰 앱 토큰 ${result.nativePushTokenCount ?? 0}개를 확인했어.`
     );
   }
 

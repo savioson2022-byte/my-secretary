@@ -1,4 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  isApnsConfigured,
+  sendApplePushNotification,
+} from "@/lib/apns";
 import { sendPushNotification } from "@/lib/push";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 
@@ -20,6 +24,12 @@ type PushSubscriptionRecord = {
   endpoint: string;
   p256dh: string;
   auth: string;
+};
+
+type NativePushTokenRecord = {
+  id: string;
+  user_id: string;
+  token: string;
 };
 
 type NotificationEventRecord = {
@@ -82,6 +92,71 @@ function isAuthorized(request: NextRequest) {
   }
 
   return request.headers.get("authorization") === `Bearer ${cronSecret}`;
+}
+
+async function sendNativePushesForEvent({
+  supabase,
+  event,
+}: {
+  supabase: NonNullable<ReturnType<typeof createSupabaseAdminClient>>;
+  event: NotificationEventRecord;
+}) {
+  if (!isApnsConfigured()) {
+    return 0;
+  }
+
+  const { data: nativeTokens, error } = await supabase
+    .from("native_push_tokens")
+    .select("*")
+    .eq("user_id", event.user_id)
+    .eq("enabled", true)
+    .returns<NativePushTokenRecord[]>();
+
+  if (error) {
+    return 0;
+  }
+
+  let sentCount = 0;
+
+  for (const nativeToken of nativeTokens ?? []) {
+    const { data: existingDelivery } = await supabase
+      .from("native_notification_event_deliveries")
+      .select("id")
+      .eq("event_id", event.id)
+      .eq("native_token_id", nativeToken.id)
+      .maybeSingle<{ id: string }>();
+
+    if (existingDelivery) {
+      continue;
+    }
+
+    try {
+      await sendApplePushNotification({
+        token: nativeToken.token,
+        title: event.title,
+        body: event.body,
+        url: event.url,
+        tag: event.id,
+      });
+
+      await supabase.from("native_notification_event_deliveries").insert({
+        user_id: event.user_id,
+        event_id: event.id,
+        native_token_id: nativeToken.id,
+      });
+      sentCount += 1;
+    } catch {
+      await supabase
+        .from("native_push_tokens")
+        .update({
+          enabled: false,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", nativeToken.id);
+    }
+  }
+
+  return sentCount;
 }
 
 export async function GET(request: NextRequest) {
@@ -183,6 +258,8 @@ export async function GET(request: NextRequest) {
           .eq("id", subscription.id);
       }
     }
+
+    sentCount += await sendNativePushesForEvent({ supabase, event });
   }
 
   for (const entry of entries ?? []) {
