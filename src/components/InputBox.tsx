@@ -90,6 +90,7 @@ export default function InputBox({
   const latestTextRef = useRef(value);
   const shouldClassifyOnEndRef = useRef(false);
   const pointerStartedVoiceRef = useRef(false);
+  const voiceIntentStartedRef = useRef(false);
   const [isListening, setIsListening] = useState(false);
   const [isSpeechSupported, setIsSpeechSupported] = useState(false);
   const [voiceMessage, setVoiceMessage] = useState<string | null>(null);
@@ -122,7 +123,7 @@ export default function InputBox({
       return;
     }
 
-    setVoiceMessage("마이크 버튼을 누르면 바로 음성 기록을 시작합니다.");
+    setVoiceMessage("단축어로 열렸어요. 음성 기록을 바로 시작합니다.");
   }, [voiceIntent]);
 
   function updateVoiceControlMode(nextMode: VoiceControlMode) {
@@ -251,6 +252,23 @@ export default function InputBox({
       setVoiceMessage("음성 인식을 시작하지 못했습니다. 잠시 후 다시 시도해주세요.");
     }
   }
+
+  useEffect(() => {
+    if (!voiceIntent || voiceIntentStartedRef.current || isListening) {
+      return;
+    }
+
+    voiceIntentStartedRef.current = true;
+    const timer = window.setTimeout(() => {
+      startVoiceInput({
+        autoClassifyOnEnd: true,
+      });
+    }, 350);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [voiceIntent, isListening]);
 
   function handleVoiceButtonClick() {
     if (voiceControlMode === "hold") {

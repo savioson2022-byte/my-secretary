@@ -174,7 +174,7 @@ export default function AlarmModeOverlay() {
       }
     };
 
-    void startNativeAlarmPulse(1.25);
+    void startNativeAlarmPulse(0.95);
 
     const clockId = window.setInterval(() => setNow(new Date()), 1000);
     const pulseId = window.setInterval(() => {

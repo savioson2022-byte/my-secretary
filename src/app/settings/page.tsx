@@ -4,6 +4,7 @@ import CloudSyncStatusCard from "@/components/CloudSyncStatusCard";
 import LocalDataTransfer from "@/components/LocalDataTransfer";
 import NotificationSettingsCard from "@/components/NotificationSettingsCard";
 import SavedPlaceManager from "@/components/SavedPlaceManager";
+import ShortcutSetupCard from "@/components/ShortcutSetupCard";
 import UserStatusBadge from "@/components/UserStatusBadge";
 import Link from "next/link";
 
@@ -26,6 +27,7 @@ export default function SettingsPage() {
       <div className="space-y-5">
         <AccountManager />
         <CloudSyncStatusCard />
+        <ShortcutSetupCard />
 
         <section className="app-card p-5">
           <div className="flex items-start justify-between gap-4">

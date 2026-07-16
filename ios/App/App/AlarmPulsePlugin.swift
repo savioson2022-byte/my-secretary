@@ -15,6 +15,7 @@ public class AlarmPulsePlugin: CAPPlugin, CAPBridgedPlugin {
     private var audioEngine: AVAudioEngine?
     private var playerNode: AVAudioPlayerNode?
     private var feedbackGenerator: UINotificationFeedbackGenerator?
+    private var impactGenerator: UIImpactFeedbackGenerator?
 
     @objc func start(_ call: CAPPluginCall) {
         let interval = max(0.8, call.getDouble("interval") ?? 1.25)
@@ -40,12 +41,14 @@ public class AlarmPulsePlugin: CAPPlugin, CAPBridgedPlugin {
         try? AVAudioSession.sharedInstance().setCategory(
             .playback,
             mode: .default,
-            options: [.mixWithOthers]
+            options: []
         )
         try? AVAudioSession.sharedInstance().setActive(true)
 
         feedbackGenerator = UINotificationFeedbackGenerator()
         feedbackGenerator?.prepare()
+        impactGenerator = UIImpactFeedbackGenerator(style: .heavy)
+        impactGenerator?.prepare()
 
         pulse()
 
@@ -65,18 +68,21 @@ public class AlarmPulsePlugin: CAPPlugin, CAPBridgedPlugin {
         playerNode?.stop()
         audioEngine?.stop()
         feedbackGenerator = nil
+        impactGenerator = nil
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }
 
     private func pulse() {
         feedbackGenerator?.notificationOccurred(.warning)
         feedbackGenerator?.prepare()
+        impactGenerator?.impactOccurred(intensity: 1.0)
+        impactGenerator?.prepare()
         playTone()
     }
 
     private func playTone() {
         let sampleRate = 44_100.0
-        let duration = 0.32
+        let duration = 0.68
         let frameCount = AVAudioFrameCount(sampleRate * duration)
 
         guard
@@ -92,11 +98,12 @@ public class AlarmPulsePlugin: CAPPlugin, CAPBridgedPlugin {
         for frame in 0..<Int(frameCount) {
             let time = Double(frame) / sampleRate
             let attack = min(1.0, Double(frame) / 900.0)
-            let release = min(1.0, Double(Int(frameCount) - frame) / 1_800.0)
+            let release = min(1.0, Double(Int(frameCount) - frame) / 2_400.0)
             let envelope = attack * release
             let toneA = sin(2.0 * Double.pi * 880.0 * time)
-            let toneB = sin(2.0 * Double.pi * 660.0 * time)
-            channel[frame] = Float((toneA * 0.28 + toneB * 0.12) * envelope)
+            let toneB = sin(2.0 * Double.pi * 1_180.0 * time)
+            let toneC = sin(2.0 * Double.pi * 520.0 * time)
+            channel[frame] = Float((toneA * 0.46 + toneB * 0.26 + toneC * 0.12) * envelope)
         }
 
         let engine = audioEngine ?? AVAudioEngine()
@@ -105,6 +112,8 @@ public class AlarmPulsePlugin: CAPPlugin, CAPBridgedPlugin {
         if audioEngine == nil || playerNode == nil {
             engine.attach(node)
             engine.connect(node, to: engine.mainMixerNode, format: format)
+            engine.mainMixerNode.outputVolume = 1.0
+            node.volume = 1.0
             audioEngine = engine
             playerNode = node
         }
