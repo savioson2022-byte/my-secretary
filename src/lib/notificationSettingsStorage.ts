@@ -8,6 +8,12 @@ export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
   purchaseNotificationsEnabled: true,
   routineReminderEnabled: true,
   locationNotificationsEnabled: false,
+  persistentAlarmEnabled: true,
+  persistentAlarmPrepEnabled: true,
+  persistentAlarmTravelEnabled: true,
+  persistentAlarmScheduleStartEnabled: false,
+  persistentAlarmIntervalMinutes: 1,
+  persistentAlarmRepeatCount: 5,
   defaultPrepLeadMinutes: 30,
   travelBufferMinutes: 5,
   locationCheckWindowMinutes: 90,
@@ -33,6 +39,14 @@ function normalizeSettings(
       Number(value?.locationCheckWindowMinutes) > 0
         ? Number(value?.locationCheckWindowMinutes)
         : DEFAULT_NOTIFICATION_SETTINGS.locationCheckWindowMinutes,
+    persistentAlarmIntervalMinutes:
+      Number(value?.persistentAlarmIntervalMinutes) > 0
+        ? Math.min(10, Number(value?.persistentAlarmIntervalMinutes))
+        : DEFAULT_NOTIFICATION_SETTINGS.persistentAlarmIntervalMinutes,
+    persistentAlarmRepeatCount:
+      Number(value?.persistentAlarmRepeatCount) > 0
+        ? Math.min(10, Number(value?.persistentAlarmRepeatCount))
+        : DEFAULT_NOTIFICATION_SETTINGS.persistentAlarmRepeatCount,
   };
 }
 

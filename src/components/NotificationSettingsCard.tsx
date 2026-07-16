@@ -48,6 +48,34 @@ const TOGGLE_OPTIONS: Array<{
   },
 ];
 
+const PERSISTENT_ALARM_OPTIONS: Array<{
+  key: keyof Pick<
+    NotificationSettings,
+    | "persistentAlarmPrepEnabled"
+    | "persistentAlarmTravelEnabled"
+    | "persistentAlarmScheduleStartEnabled"
+  >;
+  title: string;
+  description: string;
+}> = [
+  {
+    key: "persistentAlarmPrepEnabled",
+    title: "준비 시작",
+    description: "일정 전 준비해야 하는 순간에 반복 알람을 울립니다.",
+  },
+  {
+    key: "persistentAlarmTravelEnabled",
+    title: "이동 시작",
+    description: "장소가 있는 일정의 출발 확인 시점에 반복 알람을 울립니다.",
+  },
+  {
+    key: "persistentAlarmScheduleStartEnabled",
+    title: "중요 일정 시작",
+    description: "일정 시작 시각에도 반복 알람을 울립니다.",
+  },
+];
+const PERSISTENT_ALARM_ACTION_TYPE_ID = "persistent-alarm-actions";
+
 export default function NotificationSettingsCard() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [settings, setSettings] = useState<NotificationSettings>(
@@ -121,6 +149,7 @@ export default function NotificationSettingsCard() {
       });
     }
 
+    window.dispatchEvent(new Event("my-assistant-notification-settings-updated"));
     setIsSaving(false);
     setMessage("알림 설정을 저장하고 예정 알림을 갱신했어.");
   }
@@ -158,6 +187,7 @@ export default function NotificationSettingsCard() {
               id: Date.now() % 2147483647,
               title: "나의 비서 테스트 알림",
               body: "알림이 정상으로 울리고 있어요.",
+              sound: "default",
               schedule: {
                 at: new Date(Date.now() + 5000),
               },
@@ -193,6 +223,79 @@ export default function NotificationSettingsCard() {
       });
     }, 5000);
     setMessage("5초 뒤 브라우저 테스트 알림을 예약했어.");
+  }
+
+  async function sendPersistentAlarmTest() {
+    setMessage(null);
+
+    try {
+      const { Capacitor } = await import("@capacitor/core");
+
+      if (!Capacitor.isNativePlatform()) {
+        setMessage("지속 알람 테스트는 아이폰 앱에서 확인할 수 있어.");
+        return;
+      }
+
+      const { LocalNotifications } = await import(
+        "@capacitor/local-notifications"
+      );
+      const permission = await LocalNotifications.requestPermissions();
+
+      if (permission.display !== "granted") {
+        setMessage("아이폰 알림 권한을 허용해야 지속 알람을 테스트할 수 있어.");
+        return;
+      }
+
+      await LocalNotifications.registerActionTypes({
+        types: [
+          {
+            id: PERSISTENT_ALARM_ACTION_TYPE_ID,
+            actions: [
+              {
+                id: "confirm",
+                title: "확인",
+                foreground: true,
+              },
+              {
+                id: "snooze",
+                title: "5분 미루기",
+              },
+              {
+                id: "mute_today",
+                title: "오늘 끄기",
+                destructive: true,
+              },
+            ],
+          },
+        ],
+      });
+
+      const now = Date.now();
+
+      await LocalNotifications.schedule({
+        notifications: [0, 1, 2].map((index) => ({
+          id: (now + index) % 2147483647,
+          title:
+            index === 0
+              ? "나의 비서 지속 알람 테스트"
+              : `나의 비서 지속 알람 테스트 (${index + 1}번째)`,
+          body: "확인하지 않으면 반복해서 울리는 알람 흐름을 확인합니다.",
+          sound: "default",
+          schedule: {
+            at: new Date(now + 5000 + index * 10000),
+          },
+          actionTypeId: PERSISTENT_ALARM_ACTION_TYPE_ID,
+          extra: {
+            url: "/settings",
+            originalEventId: `persistent-test-${now}`,
+            persistentAlarm: true,
+          },
+        })),
+      });
+      setMessage("5초 뒤부터 10초 간격으로 지속 알람 테스트를 3번 예약했어.");
+    } catch {
+      setMessage("지속 알람 테스트 예약에 실패했어.");
+    }
   }
 
   async function sendServerPushTest() {
@@ -279,6 +382,87 @@ export default function NotificationSettingsCard() {
         ))}
       </div>
 
+      <div className="mt-5 rounded-3xl bg-slate-950 p-4 text-white">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-black text-blue-200">지속 알람</p>
+            <h3 className="mt-1 text-base font-black">움직여야 할 때 반복해서 울리기</h3>
+            <p className="mt-2 text-xs font-bold leading-5 text-slate-300">
+              푸시는 상기용, 지속 알람은 준비와 이동처럼 바로 행동해야 하는
+              순간에 사용합니다.
+            </p>
+          </div>
+          <input
+            type="checkbox"
+            checked={settings.persistentAlarmEnabled}
+            onChange={(event) =>
+              updateSettings({ persistentAlarmEnabled: event.target.checked })
+            }
+            className="mt-1 h-5 w-5 shrink-0 accent-blue-400"
+          />
+        </div>
+
+        <div className="mt-4 grid gap-2">
+          {PERSISTENT_ALARM_OPTIONS.map((option) => (
+            <label
+              key={option.key}
+              className="flex items-center justify-between gap-4 rounded-2xl bg-white/10 p-3"
+            >
+              <span>
+                <span className="block text-sm font-black">{option.title}</span>
+                <span className="mt-1 block text-xs font-bold leading-5 text-slate-300">
+                  {option.description}
+                </span>
+              </span>
+              <input
+                type="checkbox"
+                checked={Boolean(settings[option.key])}
+                disabled={!settings.persistentAlarmEnabled}
+                onChange={(event) =>
+                  updateSettings({ [option.key]: event.target.checked })
+                }
+                className="h-5 w-5 shrink-0 accent-blue-400 disabled:opacity-40"
+              />
+            </label>
+          ))}
+        </div>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <label className="text-xs font-black text-slate-300">
+            반복 간격(분)
+            <input
+              type="number"
+              min="1"
+              max="10"
+              value={settings.persistentAlarmIntervalMinutes}
+              disabled={!settings.persistentAlarmEnabled}
+              onChange={(event) =>
+                updateSettings({
+                  persistentAlarmIntervalMinutes: Number(event.target.value),
+                })
+              }
+              className="mt-2 w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm font-semibold text-white outline-none focus:border-blue-300 disabled:opacity-40"
+            />
+          </label>
+          <label className="text-xs font-black text-slate-300">
+            반복 횟수
+            <input
+              type="number"
+              min="1"
+              max="10"
+              value={settings.persistentAlarmRepeatCount}
+              disabled={!settings.persistentAlarmEnabled}
+              onChange={(event) =>
+                updateSettings({
+                  persistentAlarmRepeatCount: Number(event.target.value),
+                })
+              }
+              className="mt-2 w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm font-semibold text-white outline-none focus:border-blue-300 disabled:opacity-40"
+            />
+          </label>
+        </div>
+      </div>
+
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
         <label className="text-xs font-black text-slate-500">
           준비 시작
@@ -327,13 +511,20 @@ export default function NotificationSettingsCard() {
         </label>
       </div>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
         <button
           type="button"
           onClick={sendTestNotification}
           className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white"
         >
-          이 기기 알림 테스트
+          로컬 알림 테스트
+        </button>
+        <button
+          type="button"
+          onClick={sendPersistentAlarmTest}
+          className="rounded-2xl bg-slate-800 px-4 py-3 text-sm font-black text-white"
+        >
+          지속 알람 테스트
         </button>
         <button
           type="button"

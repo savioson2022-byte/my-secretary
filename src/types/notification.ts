@@ -20,6 +20,12 @@ export type NotificationSettings = {
   purchaseNotificationsEnabled: boolean;
   routineReminderEnabled: boolean;
   locationNotificationsEnabled: boolean;
+  persistentAlarmEnabled: boolean;
+  persistentAlarmPrepEnabled: boolean;
+  persistentAlarmTravelEnabled: boolean;
+  persistentAlarmScheduleStartEnabled: boolean;
+  persistentAlarmIntervalMinutes: number;
+  persistentAlarmRepeatCount: number;
   defaultPrepLeadMinutes: number;
   travelBufferMinutes: number;
   locationCheckWindowMinutes: number;

@@ -15,9 +15,12 @@ const REMINDER_OFFSETS = [10, 0];
 const NOTIFIED_KEY = "my-assistant-notified-reminders";
 const DIGEST_NOTIFIED_KEY = "my-assistant-notified-unresolved-digests";
 const NATIVE_SCHEDULED_KEY = "my-assistant-native-notification-event-ids";
+const PERSISTENT_ALARM_MUTED_KEY = "my-assistant-persistent-alarm-muted-event-ids";
+const PERSISTENT_ALARM_ACTION_TYPE_ID = "persistent-alarm-actions";
 const PUSH_SYNC_DAYS = 14;
 const UNRESOLVED_DIGEST_HOURS = [8, 20];
 const LOCATION_DISTANCE_THRESHOLD_METERS = 300;
+const MAX_LOCAL_NOTIFICATIONS = 64;
 
 type PushScheduleEntry = {
   sourceType: "single" | "routine";
@@ -412,6 +415,228 @@ function saveStoredNativeNotificationIds(ids: number[]) {
   localStorage.setItem(NATIVE_SCHEDULED_KEY, JSON.stringify(ids.slice(0, 128)));
 }
 
+function getMutedPersistentAlarmIds() {
+  try {
+    return new Set<string>(
+      JSON.parse(localStorage.getItem(PERSISTENT_ALARM_MUTED_KEY) ?? "[]")
+    );
+  } catch {
+    return new Set<string>();
+  }
+}
+
+function saveMutedPersistentAlarmIds(ids: Set<string>) {
+  const todayText = toDateText(new Date());
+  const recentIds = Array.from(ids)
+    .filter((id) => id.endsWith(`:${todayText}`))
+    .slice(-100);
+
+  localStorage.setItem(PERSISTENT_ALARM_MUTED_KEY, JSON.stringify(recentIds));
+}
+
+function isPersistentAlarmEvent(
+  event: NotificationEvent,
+  settings = getNotificationSettings()
+) {
+  if (!settings.persistentAlarmEnabled) return false;
+
+  if (event.eventType === "prep_start") {
+    return settings.persistentAlarmPrepEnabled;
+  }
+
+  if (event.eventType === "travel_start") {
+    return settings.persistentAlarmTravelEnabled;
+  }
+
+  if (event.eventType === "schedule_start") {
+    return settings.persistentAlarmScheduleStartEnabled;
+  }
+
+  return false;
+}
+
+function getPersistentAlarmTitle(event: NotificationEvent, index: number) {
+  if (index === 0) return event.title;
+
+  return `${event.title} (${index + 1}번째 알림)`;
+}
+
+function buildPersistentAlarmNotifications({
+  event,
+  settings,
+  startsAt,
+}: {
+  event: NotificationEvent;
+  settings: ReturnType<typeof getNotificationSettings>;
+  startsAt: Date;
+}) {
+  const notifications = [];
+  const repeatCount = Math.max(1, settings.persistentAlarmRepeatCount);
+  const intervalMs =
+    Math.max(1, settings.persistentAlarmIntervalMinutes) * 60 * 1000;
+
+  for (let index = 0; index < repeatCount; index += 1) {
+    const scheduledAt = new Date(startsAt.getTime() + intervalMs * index);
+
+    if (scheduledAt.getTime() <= Date.now()) {
+      continue;
+    }
+
+    notifications.push({
+      id: getNumericNotificationId(`${event.id}:persistent:${index}`),
+      title: getPersistentAlarmTitle(event, index),
+      body:
+        index === 0
+          ? event.body
+          : "아직 확인되지 않았어요. 지금 시작할지 확인해주세요.",
+      sound: "default",
+      schedule: {
+        at: scheduledAt,
+      },
+      actionTypeId: PERSISTENT_ALARM_ACTION_TYPE_ID,
+      extra: {
+        url: event.url,
+        eventId: `${event.id}:persistent:${index}`,
+        originalEventId: event.id,
+        persistentAlarm: true,
+      },
+      threadIdentifier: `persistent-${event.id}`,
+    });
+  }
+
+  return notifications;
+}
+
+async function cancelPersistentAlarmGroup(originalEventId: string) {
+  try {
+    const { LocalNotifications } = await import(
+      "@capacitor/local-notifications"
+    );
+    const settings = getNotificationSettings();
+    const ids = Array.from(
+      { length: Math.max(1, settings.persistentAlarmRepeatCount) },
+      (_, index) => getNumericNotificationId(`${originalEventId}:persistent:${index}`)
+    );
+
+    await LocalNotifications.cancel({
+      notifications: ids.map((id) => ({ id })),
+    });
+  } catch {
+    // 웹에서는 Capacitor 로컬 알림을 사용할 수 없습니다.
+  }
+}
+
+async function snoozePersistentAlarm(notification: {
+  title: string;
+  body: string;
+  extra?: {
+    url?: string;
+    originalEventId?: string;
+  };
+}) {
+  const originalEventId = notification.extra?.originalEventId;
+
+  if (!originalEventId) return;
+
+  await cancelPersistentAlarmGroup(originalEventId);
+
+  try {
+    const { LocalNotifications } = await import(
+      "@capacitor/local-notifications"
+    );
+
+    await LocalNotifications.schedule({
+      notifications: [
+        {
+          id: getNumericNotificationId(`${originalEventId}:snooze:${Date.now()}`),
+          title: `${notification.title} · 5분 뒤 다시 알림`,
+          body: notification.body,
+          sound: "default",
+          schedule: {
+            at: new Date(Date.now() + 5 * 60 * 1000),
+          },
+          actionTypeId: PERSISTENT_ALARM_ACTION_TYPE_ID,
+          extra: {
+            url: notification.extra?.url ?? "/",
+            originalEventId,
+            persistentAlarm: true,
+          },
+        },
+      ],
+    });
+  } catch {
+    // 웹에서는 Capacitor 로컬 알림을 사용할 수 없습니다.
+  }
+}
+
+async function registerPersistentAlarmActions() {
+  if (!(await isNativeAppRuntime())) {
+    return null;
+  }
+
+  try {
+    const { LocalNotifications } = await import(
+      "@capacitor/local-notifications"
+    );
+
+    await LocalNotifications.registerActionTypes({
+      types: [
+        {
+          id: PERSISTENT_ALARM_ACTION_TYPE_ID,
+          actions: [
+            {
+              id: "confirm",
+              title: "확인",
+              foreground: true,
+            },
+            {
+              id: "snooze",
+              title: "5분 미루기",
+            },
+            {
+              id: "mute_today",
+              title: "오늘 끄기",
+              destructive: true,
+            },
+          ],
+        },
+      ],
+    });
+
+    return LocalNotifications.addListener(
+      "localNotificationActionPerformed",
+      async ({ actionId, notification }) => {
+        const originalEventId = notification.extra?.originalEventId as
+          | string
+          | undefined;
+
+        if (!originalEventId || !notification.extra?.persistentAlarm) {
+          return;
+        }
+
+        if (actionId === "snooze") {
+          await snoozePersistentAlarm(notification);
+          return;
+        }
+
+        if (actionId === "mute_today") {
+          const mutedIds = getMutedPersistentAlarmIds();
+          mutedIds.add(originalEventId);
+          saveMutedPersistentAlarmIds(mutedIds);
+        }
+
+        await cancelPersistentAlarmGroup(originalEventId);
+
+        if (actionId === "confirm" || actionId === "tap") {
+          window.location.href = notification.extra?.url ?? "/";
+        }
+      }
+    );
+  } catch {
+    return null;
+  }
+}
+
 async function scheduleNativeNotifications(events: NotificationEvent[]) {
   if (!(await isNativeAppRuntime())) {
     return;
@@ -436,21 +661,32 @@ async function scheduleNativeNotifications(events: NotificationEvent[]) {
     }
 
     const now = Date.now();
-    const notifications = events
-      .filter((event) => new Date(event.scheduledAt).getTime() > now)
-      .slice(0, 64)
-      .map((event) => ({
-        id: getNumericNotificationId(event.id),
-        title: event.title,
-        body: event.body,
-        schedule: {
-          at: new Date(event.scheduledAt),
-        },
-        extra: {
-          url: event.url,
-          eventId: event.id,
-        },
-      }));
+    const settings = getNotificationSettings();
+    const mutedIds = getMutedPersistentAlarmIds();
+    const notifications = [];
+
+    for (const event of events) {
+      if (notifications.length >= MAX_LOCAL_NOTIFICATIONS) break;
+      if (!isPersistentAlarmEvent(event, settings)) continue;
+      if (mutedIds.has(event.id)) continue;
+
+      const scheduledAt = new Date(event.scheduledAt);
+
+      if (scheduledAt.getTime() <= now) continue;
+
+      const alarmNotifications = buildPersistentAlarmNotifications({
+        event,
+        settings,
+        startsAt: scheduledAt,
+      });
+
+      notifications.push(
+        ...alarmNotifications.slice(
+          0,
+          MAX_LOCAL_NOTIFICATIONS - notifications.length
+        )
+      );
+    }
 
     if (notifications.length === 0) {
       saveStoredNativeNotificationIds([]);
@@ -494,10 +730,20 @@ export default function SmartReminderAgent() {
     setPermission(Notification.permission);
     const settings = getNotificationSettings();
     const events = buildNotificationEvents(settings);
+    let lastNativeScheduleSyncAt = 0;
 
     void checkDueNotificationEvents(events);
     checkUnresolvedDigest();
     void scheduleNativeNotifications(events);
+
+    const refreshScheduledNotifications = () => {
+      const nextSettings = getNotificationSettings();
+      const nextEvents = buildNotificationEvents(nextSettings);
+
+      lastNativeScheduleSyncAt = Date.now();
+      void scheduleNativeNotifications(nextEvents);
+      void syncNotificationEvents(undefined, nextEvents);
+    };
 
     const timer = window.setInterval(() => {
       const nextSettings = getNotificationSettings();
@@ -505,9 +751,23 @@ export default function SmartReminderAgent() {
 
       void checkDueNotificationEvents(nextEvents);
       checkUnresolvedDigest();
-    }, 30 * 1000);
 
-    return () => window.clearInterval(timer);
+      if (Date.now() - lastNativeScheduleSyncAt > 2 * 60 * 1000) {
+        refreshScheduledNotifications();
+      }
+    }, 30 * 1000);
+    window.addEventListener(
+      "my-assistant-notification-settings-updated",
+      refreshScheduledNotifications
+    );
+
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener(
+        "my-assistant-notification-settings-updated",
+        refreshScheduledNotifications
+      );
+    };
   }, [canUseNotification]);
 
   useEffect(() => {
@@ -519,8 +779,13 @@ export default function SmartReminderAgent() {
   useEffect(() => {
     if (!isMounted) return;
 
+    let actionHandle: { remove: () => Promise<void> } | null = null;
     let isStopped = false;
     let attemptCount = 0;
+
+    void registerPersistentAlarmActions().then((handle) => {
+      actionHandle = handle;
+    });
 
     const tryRegisterNativePushToken = () => {
       if (isStopped || attemptCount >= 6) return;
@@ -546,6 +811,7 @@ export default function SmartReminderAgent() {
       isStopped = true;
       window.clearInterval(retryTimer);
       subscription?.unsubscribe();
+      void actionHandle?.remove();
     };
   }, [isMounted, supabase]);
 

@@ -35,6 +35,7 @@ type NativePushTokenRecord = {
 type NotificationEventRecord = {
   id: string;
   user_id: string;
+  event_type: string;
   title: string;
   body: string;
   url: string;
@@ -182,19 +183,7 @@ export async function GET(request: NextRequest) {
   const todayText = getKoreanTodayText();
   const nowMinutes = getKoreanMinutesOfDay();
   const { nowIso, windowStartIso } = getDispatchWindow();
-  const { data: entries, error: entriesError } = await supabase
-    .from("notification_schedule_entries")
-    .select("*")
-    .eq("occurrence_date", todayText)
-    .eq("active", true)
-    .returns<ScheduleEntryRecord[]>();
-
-  if (entriesError) {
-    return NextResponse.json(
-      { ok: false, reason: entriesError.message },
-      { status: 500 }
-    );
-  }
+  const entries: ScheduleEntryRecord[] = [];
 
   let sentCount = 0;
   let skippedCount = 0;
@@ -203,6 +192,11 @@ export async function GET(request: NextRequest) {
     .from("notification_events")
     .select("*")
     .eq("active", true)
+    .in("event_type", [
+      "purchase_recommendation",
+      "routine_reminder",
+      "place_arrival_reminder",
+    ])
     .lte("scheduled_at", nowIso)
     .gte("scheduled_at", windowStartIso)
     .returns<NotificationEventRecord[]>();

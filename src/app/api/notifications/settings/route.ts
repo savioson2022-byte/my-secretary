@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { DEFAULT_NOTIFICATION_SETTINGS } from "@/lib/notificationSettingsStorage";
 import { createSupabaseUserServerClient } from "@/lib/supabase/server";
 import type { NotificationSettings } from "@/types/notification";
 
@@ -27,6 +28,7 @@ function getAccessToken(request: NextRequest) {
 
 function toClientSettings(record: SettingsRecord): NotificationSettings {
   return {
+    ...DEFAULT_NOTIFICATION_SETTINGS,
     scheduleNotificationsEnabled: record.schedule_notifications_enabled,
     travelNotificationsEnabled: record.travel_notifications_enabled,
     purchaseNotificationsEnabled: record.purchase_notifications_enabled,
