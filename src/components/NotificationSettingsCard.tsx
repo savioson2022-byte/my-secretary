@@ -214,7 +214,11 @@ export default function NotificationSettingsCard() {
     const result = (await response.json()) as {
       ok: boolean;
       sentCount?: number;
+      webSentCount?: number;
+      nativeSentCount?: number;
       failedCount?: number;
+      webFailedCount?: number;
+      nativeFailedCount?: number;
       webPushSubscriptionCount?: number;
       nativePushTokenCount?: number;
       apnsConfigured?: boolean;
@@ -230,9 +234,11 @@ export default function NotificationSettingsCard() {
     }
 
     setMessage(
-      `서버 푸시를 보냈어. ${result.sentCount ?? 1}곳으로 발송했어. 웹 푸시 ${
+      `서버 푸시를 보냈어. 전체 ${result.sentCount ?? 1}곳으로 발송했어. 웹 발송 ${
+        result.webSentCount ?? 0
+      }개, 아이폰 앱 발송 ${result.nativeSentCount ?? 0}개. 연결 상태는 웹 푸시 ${
         result.webPushSubscriptionCount ?? 0
-      }개, 아이폰 앱 토큰 ${result.nativePushTokenCount ?? 0}개를 확인했어.`
+      }개, 아이폰 앱 토큰 ${result.nativePushTokenCount ?? 0}개야.`
     );
   }
 

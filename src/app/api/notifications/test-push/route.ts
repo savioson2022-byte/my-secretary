@@ -56,64 +56,13 @@ export async function POST(request: Request) {
     .eq("enabled", true)
     .returns<NativePushTokenRecord[]>();
 
-  if (!subscriptions || subscriptions.length === 0) {
-    if (nativeTokens && nativeTokens.length > 0 && isApnsConfigured()) {
-      let nativeSentCount = 0;
-      let nativeFailedCount = 0;
-
-      for (const nativeToken of nativeTokens) {
-        try {
-          await sendApplePushNotification({
-            token: nativeToken.token,
-            title: "나의 비서 앱 푸시 테스트",
-            body: "아이폰 앱 푸시가 서버에서 정상으로 도착했어요.",
-            url: "/settings",
-            tag: `native-server-test-${Date.now()}`,
-          });
-          nativeSentCount += 1;
-        } catch {
-          nativeFailedCount += 1;
-          await context.supabase
-            .from("native_push_tokens")
-            .update({
-              enabled: false,
-              updated_at: new Date().toISOString(),
-            })
-            .eq("id", nativeToken.id)
-            .eq("user_id", context.auth.user.id);
-        }
-      }
-
-      return NextResponse.json({
-        ok: nativeSentCount > 0,
-        sentCount: nativeSentCount,
-        failedCount: nativeFailedCount,
-        webPushSubscriptionCount: 0,
-        nativePushTokenCount: nativeTokens.length,
-        apnsConfigured: true,
-        reason:
-          nativeSentCount > 0
-            ? null
-            : "아이폰 앱 푸시 발송에 실패했습니다. APNs 키와 앱 Bundle ID를 확인해야 합니다.",
-      });
-    }
-
-    return NextResponse.json({
-      ok: false,
-      webPushSubscriptionCount: 0,
-      nativePushTokenCount: nativeTokens?.length ?? 0,
-      apnsConfigured: isApnsConfigured(),
-      reason:
-        nativeTokens && nativeTokens.length > 0
-          ? "아이폰 앱 푸시 토큰은 연결됐지만, 실제 원격 푸시 발송에는 Apple APNs 발송키 설정이 추가로 필요합니다."
-          : "이 계정에 저장된 웹 푸시 연결이 없습니다. 앱에서는 아이폰 푸시 토큰 연결이 먼저 필요합니다.",
-    });
-  }
-
   let sentCount = 0;
   let failedCount = 0;
+  let nativeSentCount = 0;
+  let nativeFailedCount = 0;
+  let nativeFailureReason = "";
 
-  for (const subscription of subscriptions) {
+  for (const subscription of subscriptions ?? []) {
     try {
       await sendPushNotification({
         subscription: {
@@ -142,16 +91,49 @@ export async function POST(request: Request) {
     }
   }
 
+  if (nativeTokens && nativeTokens.length > 0 && isApnsConfigured()) {
+    for (const nativeToken of nativeTokens) {
+      try {
+        await sendApplePushNotification({
+          token: nativeToken.token,
+          title: "나의 비서 앱 푸시 테스트",
+          body: "아이폰 앱 푸시가 서버에서 정상으로 도착했어요.",
+          url: "/settings",
+          tag: `native-server-test-${Date.now()}`,
+        });
+        nativeSentCount += 1;
+      } catch (error) {
+        nativeFailedCount += 1;
+        nativeFailureReason =
+          error instanceof Error
+            ? error.message
+            : "아이폰 앱 푸시 발송에 실패했습니다.";
+      }
+    }
+  }
+
+  const totalSentCount = sentCount + nativeSentCount;
+  const webPushSubscriptionCount = subscriptions?.length ?? 0;
+  const nativePushTokenCount = nativeTokens?.length ?? 0;
+
   return NextResponse.json({
-    ok: sentCount > 0,
-    sentCount,
-    failedCount,
-    webPushSubscriptionCount: subscriptions.length,
-    nativePushTokenCount: nativeTokens?.length ?? 0,
+    ok: totalSentCount > 0,
+    sentCount: totalSentCount,
+    webSentCount: sentCount,
+    nativeSentCount,
+    failedCount: failedCount + nativeFailedCount,
+    webFailedCount: failedCount,
+    nativeFailedCount,
+    webPushSubscriptionCount,
+    nativePushTokenCount,
     apnsConfigured: isApnsConfigured(),
     reason:
-      sentCount > 0
+      totalSentCount > 0
         ? null
-        : "서버 푸시 발송에 실패했습니다. 푸시 환경값이나 기기 구독 상태를 확인해야 합니다.",
+        : nativePushTokenCount > 0 && nativeFailureReason
+        ? `아이폰 앱 푸시 발송에 실패했습니다. ${nativeFailureReason}`
+        : nativePushTokenCount > 0 && !isApnsConfigured()
+        ? "아이폰 앱 푸시 토큰은 연결됐지만, Apple APNs 발송키 설정이 필요합니다."
+        : "서버 푸시 발송에 실패했습니다. 아이폰 앱 토큰 또는 웹 푸시 연결 상태를 확인해야 합니다.",
   });
 }

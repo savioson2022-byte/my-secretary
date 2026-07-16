@@ -519,7 +519,34 @@ export default function SmartReminderAgent() {
   useEffect(() => {
     if (!isMounted) return;
 
-    void registerNativePushToken();
+    let isStopped = false;
+    let attemptCount = 0;
+
+    const tryRegisterNativePushToken = () => {
+      if (isStopped || attemptCount >= 6) return;
+
+      attemptCount += 1;
+      void registerNativePushToken();
+    };
+
+    tryRegisterNativePushToken();
+
+    const retryTimer = window.setInterval(() => {
+      tryRegisterNativePushToken();
+    }, 10 * 1000);
+    const {
+      data: { subscription },
+    } =
+      supabase?.auth.onAuthStateChange(() => {
+        attemptCount = 0;
+        tryRegisterNativePushToken();
+      }) ?? { data: { subscription: null } };
+
+    return () => {
+      isStopped = true;
+      window.clearInterval(retryTimer);
+      subscription?.unsubscribe();
+    };
   }, [isMounted, supabase]);
 
   async function requestPermission() {
