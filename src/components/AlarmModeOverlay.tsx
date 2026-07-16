@@ -1,6 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  startNativeAlarmPulse,
+  stopNativeAlarmPulse,
+} from "@/lib/nativeAlarmPulse";
 
 const ALARM_MODE_EVENT = "my-assistant-open-alarm-mode";
 const PERSISTENT_ALARM_MUTED_KEY = "my-assistant-persistent-alarm-muted-event-ids";
@@ -170,6 +174,8 @@ export default function AlarmModeOverlay() {
       }
     };
 
+    void startNativeAlarmPulse(1.25);
+
     const clockId = window.setInterval(() => setNow(new Date()), 1000);
     const pulseId = window.setInterval(() => {
       if ("vibrate" in navigator) {
@@ -184,6 +190,7 @@ export default function AlarmModeOverlay() {
     playAlarmPulse();
 
     return () => {
+      void stopNativeAlarmPulse();
       window.clearInterval(clockId);
       window.clearInterval(pulseId);
       if ("vibrate" in navigator) {
@@ -201,12 +208,14 @@ export default function AlarmModeOverlay() {
 
   const closeAndOpenTarget = () => {
     const targetUrl = alarm.url ?? "/";
+    void stopNativeAlarmPulse();
     void cancelAlarmNotifications(alarm.originalEventId);
     setAlarm(null);
     window.location.href = targetUrl;
   };
 
   const snooze = async () => {
+    await stopNativeAlarmPulse();
     await cancelAlarmNotifications(alarm.originalEventId);
     await scheduleSnoozeAlarm(alarm);
     setAlarm(null);
@@ -219,6 +228,7 @@ export default function AlarmModeOverlay() {
       saveMutedIds(mutedIds);
     }
 
+    void stopNativeAlarmPulse();
     void cancelAlarmNotifications(alarm.originalEventId);
     setAlarm(null);
   };
