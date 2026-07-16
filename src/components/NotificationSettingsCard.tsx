@@ -195,6 +195,39 @@ export default function NotificationSettingsCard() {
     setMessage("5초 뒤 브라우저 테스트 알림을 예약했어.");
   }
 
+  async function sendServerPushTest() {
+    setMessage(null);
+
+    const accessToken = await getAccessToken();
+
+    if (!accessToken) {
+      setMessage("앱 계정으로 로그인해야 서버 푸시를 테스트할 수 있어.");
+      return;
+    }
+
+    const response = await fetch("/api/notifications/test-push", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+    const result = (await response.json()) as {
+      ok: boolean;
+      sentCount?: number;
+      failedCount?: number;
+      reason?: string | null;
+    };
+
+    if (!result.ok) {
+      setMessage(result.reason ?? "서버 푸시 테스트에 실패했어.");
+      return;
+    }
+
+    setMessage(
+      `서버 푸시를 보냈어. 연결된 기기 ${result.sentCount ?? 1}곳으로 발송했어.`
+    );
+  }
+
   return (
     <section className="app-card p-5">
       <div>
@@ -280,13 +313,22 @@ export default function NotificationSettingsCard() {
         </label>
       </div>
 
-      <button
-        type="button"
-        onClick={sendTestNotification}
-        className="mt-4 w-full rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white"
-      >
-        5초 뒤 테스트 알림 보내기
-      </button>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <button
+          type="button"
+          onClick={sendTestNotification}
+          className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white"
+        >
+          이 기기 알림 테스트
+        </button>
+        <button
+          type="button"
+          onClick={sendServerPushTest}
+          className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white"
+        >
+          서버 푸시 테스트
+        </button>
+      </div>
 
       {message && (
         <p className="mt-4 rounded-2xl bg-blue-50 px-4 py-3 text-sm font-bold text-blue-700 ring-1 ring-blue-100">
