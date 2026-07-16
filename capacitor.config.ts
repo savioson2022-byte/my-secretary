@@ -11,6 +11,11 @@ const config: CapacitorConfig = {
   ios: {
     scheme: "MySecretary",
   },
+  plugins: {
+    PushNotifications: {
+      presentationOptions: ["badge", "sound", "alert"],
+    },
+  },
 };
 
 export default config;

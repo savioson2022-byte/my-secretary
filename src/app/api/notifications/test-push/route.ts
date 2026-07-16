@@ -9,6 +9,10 @@ type PushSubscriptionRecord = {
   auth: string;
 };
 
+type NativePushTokenRecord = {
+  id: string;
+};
+
 export async function POST(request: Request) {
   const context = await getAuthedSupabaseForRequest(request);
 
@@ -40,10 +44,22 @@ export async function POST(request: Request) {
     );
   }
 
+  const { data: nativeTokens } = await context.supabase
+    .from("native_push_tokens")
+    .select("id")
+    .eq("user_id", context.auth.user.id)
+    .eq("enabled", true)
+    .returns<NativePushTokenRecord[]>();
+
   if (!subscriptions || subscriptions.length === 0) {
     return NextResponse.json({
       ok: false,
-      reason: "이 기기에 저장된 서버 푸시 연결이 없습니다. 먼저 알림 권한을 켜주세요.",
+      webPushSubscriptionCount: 0,
+      nativePushTokenCount: nativeTokens?.length ?? 0,
+      reason:
+        nativeTokens && nativeTokens.length > 0
+          ? "아이폰 앱 푸시 토큰은 연결됐지만, 실제 원격 푸시 발송에는 Apple APNs 발송키 설정이 추가로 필요합니다."
+          : "이 계정에 저장된 웹 푸시 연결이 없습니다. 앱에서는 아이폰 푸시 토큰 연결이 먼저 필요합니다.",
     });
   }
 
@@ -83,6 +99,8 @@ export async function POST(request: Request) {
     ok: sentCount > 0,
     sentCount,
     failedCount,
+    webPushSubscriptionCount: subscriptions.length,
+    nativePushTokenCount: nativeTokens?.length ?? 0,
     reason:
       sentCount > 0
         ? null

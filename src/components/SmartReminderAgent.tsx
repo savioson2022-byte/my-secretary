@@ -516,6 +516,12 @@ export default function SmartReminderAgent() {
     enableServerPush();
   }, [canUseNotification, canUsePush, supabase]);
 
+  useEffect(() => {
+    if (!isMounted) return;
+
+    void registerNativePushToken();
+  }, [isMounted, supabase]);
+
   async function requestPermission() {
     if (!canUseNotification) {
       alert("이 브라우저에서는 알림 권한을 지원하지 않습니다.");
@@ -597,6 +603,62 @@ export default function SmartReminderAgent() {
       setMessage("서버 푸시 알림을 연결했습니다.");
     } catch {
       setMessage("서버 푸시 연결에 실패했습니다.");
+    }
+  }
+
+  async function registerNativePushToken() {
+    if (!(await isNativeAppRuntime())) {
+      return;
+    }
+
+    const accessToken = await getAccessToken();
+
+    if (!accessToken) {
+      return;
+    }
+
+    try {
+      const { PushNotifications } = await import(
+        "@capacitor/push-notifications"
+      );
+      const permission = await PushNotifications.requestPermissions();
+
+      if (permission.receive !== "granted") {
+        setMessage("아이폰 원격 푸시 권한을 허용해야 앱 푸시를 받을 수 있습니다.");
+        return;
+      }
+
+      await PushNotifications.removeAllListeners();
+      await PushNotifications.addListener("registration", async (token) => {
+        const response = await fetch("/api/push/native/register", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            token: token.value,
+            platform: "ios",
+            deviceName: "iPhone",
+          }),
+        });
+        const result = await response.json();
+
+        if (!result.ok) {
+          setMessage(
+            result.reason ?? "아이폰 푸시 토큰 저장에 실패했습니다."
+          );
+          return;
+        }
+
+        setMessage("아이폰 앱 푸시 토큰을 연결했습니다.");
+      });
+      await PushNotifications.addListener("registrationError", () => {
+        setMessage("아이폰 원격 푸시 등록에 실패했습니다.");
+      });
+      await PushNotifications.register();
+    } catch {
+      setMessage("아이폰 원격 푸시 준비 중 문제가 생겼습니다.");
     }
   }
 
