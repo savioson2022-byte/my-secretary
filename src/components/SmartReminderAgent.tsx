@@ -17,6 +17,7 @@ const DIGEST_NOTIFIED_KEY = "my-assistant-notified-unresolved-digests";
 const NATIVE_SCHEDULED_KEY = "my-assistant-native-notification-event-ids";
 const PERSISTENT_ALARM_MUTED_KEY = "my-assistant-persistent-alarm-muted-event-ids";
 const PERSISTENT_ALARM_ACTION_TYPE_ID = "persistent-alarm-actions";
+const ALARM_MODE_EVENT = "my-assistant-open-alarm-mode";
 const PUSH_SYNC_DAYS = 14;
 const UNRESOLVED_DIGEST_HOURS = [8, 20];
 const LOCATION_DISTANCE_THRESHOLD_METERS = 300;
@@ -115,6 +116,50 @@ function showReminder(title: string, body: string, url = "/") {
   }
 
   window.alert(`${title}\n${body}`);
+}
+
+function openAlarmMode(detail: {
+  title?: string;
+  body?: string;
+  url?: string;
+  originalEventId?: string;
+  eventType?: string;
+  sourceLabel?: string;
+}) {
+  window.dispatchEvent(
+    new CustomEvent(ALARM_MODE_EVENT, {
+      detail,
+    })
+  );
+}
+
+function openAlarmModeFromEvent(event: NotificationEvent) {
+  openAlarmMode({
+    title: event.title,
+    body: event.body,
+    url: event.url,
+    originalEventId: event.id,
+    eventType: event.eventType,
+    sourceLabel: event.sourceType,
+  });
+}
+
+function openAlarmModeFromNotification(notification: {
+  title: string;
+  body: string;
+  extra?: {
+    url?: string;
+    originalEventId?: string;
+    eventType?: string;
+  };
+}) {
+  openAlarmMode({
+    title: notification.title,
+    body: notification.body,
+    url: notification.extra?.url ?? "/",
+    originalEventId: notification.extra?.originalEventId,
+    eventType: notification.extra?.eventType,
+  });
 }
 
 function getNumericNotificationId(id: string) {
@@ -395,6 +440,11 @@ async function checkDueNotificationEvents(events: NotificationEvent[]) {
       continue;
     }
 
+    if (isPersistentAlarmEvent(event)) {
+      openAlarmModeFromEvent(event);
+      continue;
+    }
+
     showReminder(event.title, event.body, event.url);
   }
 
@@ -426,10 +476,7 @@ function getMutedPersistentAlarmIds() {
 }
 
 function saveMutedPersistentAlarmIds(ids: Set<string>) {
-  const todayText = toDateText(new Date());
-  const recentIds = Array.from(ids)
-    .filter((id) => id.endsWith(`:${todayText}`))
-    .slice(-100);
+  const recentIds = Array.from(ids).slice(-100);
 
   localStorage.setItem(PERSISTENT_ALARM_MUTED_KEY, JSON.stringify(recentIds));
 }
@@ -498,6 +545,7 @@ function buildPersistentAlarmNotifications({
         url: event.url,
         eventId: `${event.id}:persistent:${index}`,
         originalEventId: event.id,
+        eventType: event.eventType,
         persistentAlarm: true,
       },
       threadIdentifier: `persistent-${event.id}`,
@@ -532,6 +580,7 @@ async function snoozePersistentAlarm(notification: {
   extra?: {
     url?: string;
     originalEventId?: string;
+    eventType?: string;
   };
 }) {
   const originalEventId = notification.extra?.originalEventId;
@@ -559,6 +608,7 @@ async function snoozePersistentAlarm(notification: {
           extra: {
             url: notification.extra?.url ?? "/",
             originalEventId,
+            eventType: notification.extra?.eventType,
             persistentAlarm: true,
           },
         },
@@ -628,7 +678,7 @@ async function registerPersistentAlarmActions() {
         await cancelPersistentAlarmGroup(originalEventId);
 
         if (actionId === "confirm" || actionId === "tap") {
-          window.location.href = notification.extra?.url ?? "/";
+          openAlarmModeFromNotification(notification);
         }
       }
     );

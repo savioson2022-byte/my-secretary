@@ -75,6 +75,7 @@ const PERSISTENT_ALARM_OPTIONS: Array<{
   },
 ];
 const PERSISTENT_ALARM_ACTION_TYPE_ID = "persistent-alarm-actions";
+const ALARM_MODE_EVENT = "my-assistant-open-alarm-mode";
 
 export default function NotificationSettingsCard() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
@@ -271,6 +272,7 @@ export default function NotificationSettingsCard() {
       });
 
       const now = Date.now();
+      const originalEventId = `persistent-test-${now}`;
 
       await LocalNotifications.schedule({
         notifications: [0, 1, 2].map((index) => ({
@@ -287,12 +289,28 @@ export default function NotificationSettingsCard() {
           actionTypeId: PERSISTENT_ALARM_ACTION_TYPE_ID,
           extra: {
             url: "/settings",
-            originalEventId: `persistent-test-${now}`,
+            originalEventId,
+            eventType: "prep_start",
             persistentAlarm: true,
           },
         })),
       });
-      setMessage("5초 뒤부터 10초 간격으로 지속 알람 테스트를 3번 예약했어.");
+      window.setTimeout(() => {
+        window.dispatchEvent(
+          new CustomEvent(ALARM_MODE_EVENT, {
+            detail: {
+              title: "나의 비서 지속 알람 테스트",
+              body: "알림을 누르면 이런 전체 화면 알람으로 이어집니다.",
+              url: "/settings",
+              originalEventId,
+              eventType: "prep_start",
+            },
+          })
+        );
+      }, 5000);
+      setMessage(
+        "5초 뒤 전체 화면 알람과 10초 간격 반복 알림 테스트를 함께 예약했어."
+      );
     } catch {
       setMessage("지속 알람 테스트 예약에 실패했어.");
     }

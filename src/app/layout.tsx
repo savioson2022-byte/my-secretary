@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import AlarmModeOverlay from "@/components/AlarmModeOverlay";
 import CloudDataSyncBridge from "@/components/CloudDataSyncBridge";
 import PurchaseMailAutoSyncBridge from "@/components/PurchaseMailAutoSyncBridge";
 import SmartReminderAgent from "@/components/SmartReminderAgent";
@@ -62,6 +63,7 @@ export default function RootLayout({
         <CloudDataSyncBridge />
         <PurchaseMailAutoSyncBridge />
         <SmartReminderAgent />
+        <AlarmModeOverlay />
       </body>
     </html>
   );
