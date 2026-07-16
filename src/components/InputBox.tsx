@@ -200,7 +200,9 @@ export default function InputBox({
       setInterimTranscript("");
 
       if (event.error === "not-allowed" || event.error === "service-not-allowed") {
-        setVoiceMessage("마이크 권한이 필요합니다. 브라우저 권한을 허용해주세요.");
+        setVoiceMessage(
+          "마이크 권한이 필요합니다. iPhone 설정에서 나의 비서의 마이크와 음성 인식 권한을 허용해주세요."
+        );
         return;
       }
 
