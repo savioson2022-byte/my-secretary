@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 const ALARM_MODE_EVENT = "my-assistant-open-alarm-mode";
 const PERSISTENT_ALARM_MUTED_KEY = "my-assistant-persistent-alarm-muted-event-ids";
@@ -39,6 +39,29 @@ function getNumericNotificationId(id: string) {
   }
 
   return Math.max(1, hash % 2147483647);
+}
+
+async function cancelAlarmNotifications(originalEventId?: string) {
+  if (!originalEventId) return;
+
+  try {
+    const { Capacitor } = await import("@capacitor/core");
+
+    if (!Capacitor.isNativePlatform()) return;
+
+    const { LocalNotifications } = await import(
+      "@capacitor/local-notifications"
+    );
+    const ids = Array.from({ length: 10 }, (_, index) =>
+      getNumericNotificationId(`${originalEventId}:persistent:${index}`)
+    );
+
+    await LocalNotifications.cancel({
+      notifications: ids.map((id) => ({ id })),
+    });
+  } catch {
+    // 앱이 아닌 환경에서는 취소할 로컬 알림이 없습니다.
+  }
 }
 
 function getAlarmLabel(eventType?: string) {
@@ -90,6 +113,7 @@ async function scheduleSnoozeAlarm(alarm: AlarmModeDetail) {
 export default function AlarmModeOverlay() {
   const [alarm, setAlarm] = useState<AlarmModeDetail | null>(null);
   const [now, setNow] = useState(() => new Date());
+  const audioContextRef = useRef<AudioContext | null>(null);
   const alarmLabel = useMemo(() => getAlarmLabel(alarm?.eventType), [alarm]);
 
   useEffect(() => {
@@ -108,20 +132,60 @@ export default function AlarmModeOverlay() {
   useEffect(() => {
     if (!alarm) return;
 
-    const clockId = window.setInterval(() => setNow(new Date()), 1000);
-    const vibrationId = window.setInterval(() => {
-      if ("vibrate" in navigator) {
-        navigator.vibrate([450, 180, 450]);
+    const playAlarmPulse = () => {
+      try {
+        const AudioContextConstructor =
+          window.AudioContext ||
+          (window as typeof window & {
+            webkitAudioContext?: typeof AudioContext;
+          }).webkitAudioContext;
+
+        if (!AudioContextConstructor) return;
+
+        const context =
+          audioContextRef.current ?? new AudioContextConstructor();
+        audioContextRef.current = context;
+
+        if (context.state === "suspended") {
+          void context.resume();
+        }
+
+        const oscillator = context.createOscillator();
+        const gain = context.createGain();
+        const startsAt = context.currentTime;
+
+        oscillator.type = "sine";
+        oscillator.frequency.setValueAtTime(880, startsAt);
+        oscillator.frequency.exponentialRampToValueAtTime(620, startsAt + 0.34);
+        gain.gain.setValueAtTime(0.0001, startsAt);
+        gain.gain.exponentialRampToValueAtTime(0.18, startsAt + 0.03);
+        gain.gain.exponentialRampToValueAtTime(0.0001, startsAt + 0.42);
+
+        oscillator.connect(gain);
+        gain.connect(context.destination);
+        oscillator.start(startsAt);
+        oscillator.stop(startsAt + 0.44);
+      } catch {
+        // 일부 iOS 환경은 사용자 제스처 전까지 웹 오디오를 제한합니다.
       }
-    }, 2500);
+    };
+
+    const clockId = window.setInterval(() => setNow(new Date()), 1000);
+    const pulseId = window.setInterval(() => {
+      if ("vibrate" in navigator) {
+        navigator.vibrate([520, 160, 520]);
+      }
+      playAlarmPulse();
+    }, 1400);
 
     if ("vibrate" in navigator) {
-      navigator.vibrate([450, 180, 450]);
+      navigator.vibrate([520, 160, 520]);
     }
+    playAlarmPulse();
 
     return () => {
       window.clearInterval(clockId);
-      window.clearInterval(vibrationId);
+      window.clearInterval(pulseId);
       if ("vibrate" in navigator) {
         navigator.vibrate(0);
       }
@@ -137,11 +201,13 @@ export default function AlarmModeOverlay() {
 
   const closeAndOpenTarget = () => {
     const targetUrl = alarm.url ?? "/";
+    void cancelAlarmNotifications(alarm.originalEventId);
     setAlarm(null);
     window.location.href = targetUrl;
   };
 
   const snooze = async () => {
+    await cancelAlarmNotifications(alarm.originalEventId);
     await scheduleSnoozeAlarm(alarm);
     setAlarm(null);
   };
@@ -153,6 +219,7 @@ export default function AlarmModeOverlay() {
       saveMutedIds(mutedIds);
     }
 
+    void cancelAlarmNotifications(alarm.originalEventId);
     setAlarm(null);
   };
 
@@ -168,6 +235,7 @@ export default function AlarmModeOverlay() {
       aria-label="나의 비서 지속 알람"
     >
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(49,130,246,0.34),_transparent_42%),linear-gradient(180deg,_rgba(15,23,42,0),_rgba(15,23,42,0.88))]" />
+      <div className="pointer-events-none absolute left-1/2 top-1/2 h-64 w-64 -translate-x-1/2 -translate-y-1/2 rounded-full border border-blue-300/30 bg-blue-400/10 blur-sm animate-ping" />
       <div className="relative flex flex-1 flex-col px-6">
         <div className="flex items-center justify-between">
           <div>
@@ -193,8 +261,8 @@ export default function AlarmModeOverlay() {
             </p>
           ) : null}
           <p className="mt-8 rounded-3xl border border-white/10 bg-white/10 p-4 text-sm font-bold leading-relaxed text-slate-200">
-            앱을 닫지 않고 바로 처리할 수 있게 알람 화면을 고정했어요. 지금 시작하거나,
-            5분 뒤 다시 알림으로 미룰 수 있습니다.
+            버튼을 누를 때까지 소리와 진동을 반복합니다. 지금 시작하거나, 5분 뒤
+            다시 알림으로 미룰 수 있습니다.
           </p>
         </div>
 

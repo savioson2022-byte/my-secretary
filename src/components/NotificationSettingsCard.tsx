@@ -77,6 +77,16 @@ const PERSISTENT_ALARM_OPTIONS: Array<{
 const PERSISTENT_ALARM_ACTION_TYPE_ID = "persistent-alarm-actions";
 const ALARM_MODE_EVENT = "my-assistant-open-alarm-mode";
 
+function getNumericNotificationId(id: string) {
+  let hash = 0;
+
+  for (let index = 0; index < id.length; index += 1) {
+    hash = (hash * 31 + id.charCodeAt(index)) >>> 0;
+  }
+
+  return Math.max(1, hash % 2147483647);
+}
+
 export default function NotificationSettingsCard() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [settings, setSettings] = useState<NotificationSettings>(
@@ -275,25 +285,24 @@ export default function NotificationSettingsCard() {
       const originalEventId = `persistent-test-${now}`;
 
       await LocalNotifications.schedule({
-        notifications: [0, 1, 2].map((index) => ({
-          id: (now + index) % 2147483647,
-          title:
-            index === 0
-              ? "나의 비서 지속 알람 테스트"
-              : `나의 비서 지속 알람 테스트 (${index + 1}번째)`,
-          body: "확인하지 않으면 반복해서 울리는 알람 흐름을 확인합니다.",
-          sound: "default",
-          schedule: {
-            at: new Date(now + 5000 + index * 10000),
+        notifications: [
+          {
+            id: getNumericNotificationId(`${originalEventId}:persistent:0`),
+            title: "나의 비서 지속 알람 테스트",
+            body: "알림을 누르면 전체 화면에서 버튼을 누를 때까지 울립니다.",
+            sound: "default",
+            schedule: {
+              at: new Date(now + 5000),
+            },
+            actionTypeId: PERSISTENT_ALARM_ACTION_TYPE_ID,
+            extra: {
+              url: "/settings",
+              originalEventId,
+              eventType: "prep_start",
+              persistentAlarm: true,
+            },
           },
-          actionTypeId: PERSISTENT_ALARM_ACTION_TYPE_ID,
-          extra: {
-            url: "/settings",
-            originalEventId,
-            eventType: "prep_start",
-            persistentAlarm: true,
-          },
-        })),
+        ],
       });
       window.setTimeout(() => {
         window.dispatchEvent(
@@ -309,7 +318,7 @@ export default function NotificationSettingsCard() {
         );
       }, 5000);
       setMessage(
-        "5초 뒤 전체 화면 알람과 10초 간격 반복 알림 테스트를 함께 예약했어."
+        "5초 뒤 알림 1개와 전체 화면 지속 알람 테스트를 함께 예약했어."
       );
     } catch {
       setMessage("지속 알람 테스트 예약에 실패했어.");
@@ -407,7 +416,8 @@ export default function NotificationSettingsCard() {
             <h3 className="mt-1 text-base font-black">움직여야 할 때 반복해서 울리기</h3>
             <p className="mt-2 text-xs font-bold leading-5 text-slate-300">
               푸시는 상기용, 지속 알람은 준비와 이동처럼 바로 행동해야 하는
-              순간에 사용합니다.
+              순간에 사용합니다. 알림은 한 번만 보내고, 앱이 열리면 버튼을 누를
+              때까지 화면 안에서 계속 울립니다.
             </p>
           </div>
           <input
@@ -443,41 +453,6 @@ export default function NotificationSettingsCard() {
               />
             </label>
           ))}
-        </div>
-
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <label className="text-xs font-black text-slate-300">
-            반복 간격(분)
-            <input
-              type="number"
-              min="1"
-              max="10"
-              value={settings.persistentAlarmIntervalMinutes}
-              disabled={!settings.persistentAlarmEnabled}
-              onChange={(event) =>
-                updateSettings({
-                  persistentAlarmIntervalMinutes: Number(event.target.value),
-                })
-              }
-              className="mt-2 w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm font-semibold text-white outline-none focus:border-blue-300 disabled:opacity-40"
-            />
-          </label>
-          <label className="text-xs font-black text-slate-300">
-            반복 횟수
-            <input
-              type="number"
-              min="1"
-              max="10"
-              value={settings.persistentAlarmRepeatCount}
-              disabled={!settings.persistentAlarmEnabled}
-              onChange={(event) =>
-                updateSettings({
-                  persistentAlarmRepeatCount: Number(event.target.value),
-                })
-              }
-              className="mt-2 w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm font-semibold text-white outline-none focus:border-blue-300 disabled:opacity-40"
-            />
-          </label>
         </div>
       </div>
 

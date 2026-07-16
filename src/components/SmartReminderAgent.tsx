@@ -510,49 +510,35 @@ function getPersistentAlarmTitle(event: NotificationEvent, index: number) {
 
 function buildPersistentAlarmNotifications({
   event,
-  settings,
   startsAt,
 }: {
   event: NotificationEvent;
-  settings: ReturnType<typeof getNotificationSettings>;
   startsAt: Date;
 }) {
-  const notifications = [];
-  const repeatCount = Math.max(1, settings.persistentAlarmRepeatCount);
-  const intervalMs =
-    Math.max(1, settings.persistentAlarmIntervalMinutes) * 60 * 1000;
+  if (startsAt.getTime() <= Date.now()) {
+    return [];
+  }
 
-  for (let index = 0; index < repeatCount; index += 1) {
-    const scheduledAt = new Date(startsAt.getTime() + intervalMs * index);
-
-    if (scheduledAt.getTime() <= Date.now()) {
-      continue;
-    }
-
-    notifications.push({
-      id: getNumericNotificationId(`${event.id}:persistent:${index}`),
-      title: getPersistentAlarmTitle(event, index),
-      body:
-        index === 0
-          ? event.body
-          : "아직 확인되지 않았어요. 지금 시작할지 확인해주세요.",
+  return [
+    {
+      id: getNumericNotificationId(`${event.id}:persistent:0`),
+      title: getPersistentAlarmTitle(event, 0),
+      body: event.body,
       sound: "default",
       schedule: {
-        at: scheduledAt,
+        at: startsAt,
       },
       actionTypeId: PERSISTENT_ALARM_ACTION_TYPE_ID,
       extra: {
         url: event.url,
-        eventId: `${event.id}:persistent:${index}`,
+        eventId: `${event.id}:persistent:0`,
         originalEventId: event.id,
         eventType: event.eventType,
         persistentAlarm: true,
       },
       threadIdentifier: `persistent-${event.id}`,
-    });
-  }
-
-  return notifications;
+    },
+  ];
 }
 
 async function cancelPersistentAlarmGroup(originalEventId: string) {
@@ -560,9 +546,8 @@ async function cancelPersistentAlarmGroup(originalEventId: string) {
     const { LocalNotifications } = await import(
       "@capacitor/local-notifications"
     );
-    const settings = getNotificationSettings();
     const ids = Array.from(
-      { length: Math.max(1, settings.persistentAlarmRepeatCount) },
+      { length: 10 },
       (_, index) => getNumericNotificationId(`${originalEventId}:persistent:${index}`)
     );
 
@@ -726,7 +711,6 @@ async function scheduleNativeNotifications(events: NotificationEvent[]) {
 
       const alarmNotifications = buildPersistentAlarmNotifications({
         event,
-        settings,
         startsAt: scheduledAt,
       });
 
