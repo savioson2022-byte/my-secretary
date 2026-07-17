@@ -933,7 +933,7 @@ export default function AgentActionSuggestionView({
           <h2 className="font-black text-slate-900">위임 준비함</h2>
           {!compact && (
             <p className="mt-1 text-sm leading-6 text-slate-500">
-              실제 구매와 예약은 사용자 확인 후 실행하도록 준비합니다.
+              비서에게 맡긴 구매와 예약만 모아 최종 확인 전까지 준비합니다.
             </p>
           )}
         </div>

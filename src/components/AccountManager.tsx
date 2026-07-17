@@ -882,7 +882,7 @@ export default function AccountManager() {
           </p>
         </section>
 
-        <DeviceProfileCard profile={localProfile} onChange={setLocalProfile} />
+        <DeviceProfileCard profile={localProfile} />
       </div>
     );
   }
@@ -1244,14 +1244,10 @@ export default function AccountManager() {
             placeholder="이름 또는 별명"
             className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold outline-none focus:border-blue-400"
           />
-          <textarea
-            value={classificationPreference}
-            onChange={(event) =>
-              setClassificationPreference(event.target.value)
-            }
-            placeholder="사용자별 AI 분류 기준"
-            className="min-h-24 w-full resize-none rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold leading-6 outline-none focus:border-blue-400"
-          />
+          <div className="rounded-2xl bg-blue-50 px-4 py-3 text-xs font-bold leading-5 text-blue-700 ring-1 ring-blue-100">
+            AI 분류 기준은 결과에서 맞음 또는 수정 후 저장을 누르면 자동으로
+            학습됩니다. 긴 기준 문장을 따로 입력할 필요가 없습니다.
+          </div>
           <div className="rounded-3xl bg-slate-50 p-4 ring-1 ring-slate-100">
             <h3 className="text-sm font-black text-slate-900">
               앱 사용 방식

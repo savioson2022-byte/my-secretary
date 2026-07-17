@@ -5,8 +5,8 @@ import { usePathname } from "next/navigation";
 
 const LINKS = [
   {
-    href: "/",
-    label: "홈",
+    href: "/schedule/manage",
+    label: "일정관리",
   },
   {
     href: "/calendar/monthly",
@@ -27,7 +27,7 @@ export default function CalendarNavigation() {
 
   return (
     <nav className="app-card p-2">
-      <div className="grid gap-2 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
         {LINKS.map((link) => {
           const isActive = pathname === link.href;
 

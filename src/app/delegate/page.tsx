@@ -46,18 +46,21 @@ export default function DelegatePage() {
             위임
           </h1>
           <p className="mt-2 text-sm leading-6 text-slate-500">
-            구매, 예약, 재구매처럼 사용자의 확인이 필요한 일을 한곳에 모아
-            결제나 예약 직전까지 준비합니다.
+            위임 준비함은 구매와 예약처럼 비서에게 맡긴 일만 모아, 사용자의
+            최종 확인 전까지 준비하는 공간입니다.
+          </p>
+          <p className="mt-2 text-xs font-bold leading-5 text-slate-400">
+            홈의 오늘의 작업함은 일정, 기록, 위임을 함께 요약하고, 이 화면은
+            위임한 일만 자세히 보여줍니다.
           </p>
         </div>
         <UserStatusBadge />
       </header>
 
-      <section className="mb-5 grid gap-3 sm:grid-cols-3">
+      <section className="mb-5 grid gap-3 sm:grid-cols-2">
         {[
           ["확인할 일", `${delegateCount}개`, "오늘 바로 결정할 위임 요청"],
           ["구매 준비", "메일 기반", "이미 산 적 있는 상품 재구매"],
-          ["일정관리", "상세 입력", "정기/단기 일정 직접 편집"],
         ].map(([title, value, body]) => (
           <div
             key={title}
@@ -72,7 +75,7 @@ export default function DelegatePage() {
         ))}
       </section>
 
-      <section className="mb-5 grid gap-3 sm:grid-cols-2">
+      <section className="mb-5">
         <Link
           href="/purchase"
           className="rounded-3xl bg-emerald-50 p-5 ring-1 ring-emerald-100 transition hover:bg-white"
@@ -84,18 +87,6 @@ export default function DelegatePage() {
           <p className="mt-2 text-sm leading-6 text-slate-500">
             결제 정보는 저장하지 않고, 이미 산 상품을 다시 살 때만 빠르게
             열어줍니다.
-          </p>
-        </Link>
-        <Link
-          href="/schedule/manage"
-          className="rounded-3xl bg-blue-50 p-5 ring-1 ring-blue-100 transition hover:bg-white"
-        >
-          <p className="text-sm font-black text-blue-700">일정관리</p>
-          <h2 className="mt-2 text-lg font-black text-slate-950">
-            자세한 일정 입력은 여기서
-          </h2>
-          <p className="mt-2 text-sm leading-6 text-slate-500">
-            정기일정, 단기일정, 장소와 색인을 한 번에 정리합니다.
           </p>
         </Link>
       </section>

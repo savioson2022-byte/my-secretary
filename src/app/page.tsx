@@ -449,7 +449,7 @@ export default function Home() {
                     ? `${nextTodaySchedule.time} ${nextTodaySchedule.title}`
                     : todayItems.length > 0
                     ? "먼저 확인할 기록이 있어요"
-                    : "바로 기록해도 좋아요"}
+                    : "오늘 예정된 액션이 없어요"}
                 </h3>
                 <p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-slate-500">
                   {nextTodaySchedule
@@ -604,14 +604,11 @@ export default function Home() {
             <section className="app-card p-4">
               <div className="mb-3 flex items-center justify-between">
                 <div>
-                  <h3 className="font-black text-slate-900">모바일 작업함</h3>
+                  <h3 className="font-black text-slate-900">오늘의 작업함</h3>
                   <p className="mt-1 text-xs font-bold leading-5 text-slate-400">
-                    휴대폰에서는 보고, 말하고, 확정하는 일만 남깁니다.
+                    일정, 기록, 위임에서 오늘 확인할 핵심만 함께 보여줍니다.
                   </p>
                 </div>
-                <Link href="/schedule/manage" className="text-xs font-black text-slate-400">
-                  자세히
-                </Link>
               </div>
 
               <div className="grid gap-2">

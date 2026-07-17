@@ -1,5 +1,9 @@
-import { getScopedStorageKey } from "@/lib/authScopedStorage";
+import {
+  readLocalStorageArray,
+  writeLocalStorageArray,
+} from "@/lib/localStorageRepository";
 import { STORAGE_KEYS } from "@/lib/storageKeys";
+import type { AssistantItemWithoutId } from "@/types/assistant";
 import type {
   PersonalAiMemory,
   PersonalAiMemoryDomain,
@@ -92,24 +96,7 @@ export function getDefaultPersonalAiMemories(): PersonalAiMemory[] {
 }
 
 function readRawMemories(): PersonalAiMemory[] {
-  if (typeof window === "undefined") {
-    return [];
-  }
-
-  const rawValue = window.localStorage.getItem(
-    getScopedStorageKey(STORAGE_KEYS.personalAiMemory)
-  );
-
-  if (!rawValue) {
-    return [];
-  }
-
-  try {
-    const parsedValue = JSON.parse(rawValue);
-    return Array.isArray(parsedValue) ? parsedValue : [];
-  } catch {
-    return [];
-  }
+  return readLocalStorageArray<PersonalAiMemory>(STORAGE_KEYS.personalAiMemory);
 }
 
 function writeRawMemories(memories: PersonalAiMemory[]) {
@@ -117,10 +104,7 @@ function writeRawMemories(memories: PersonalAiMemory[]) {
     return;
   }
 
-  window.localStorage.setItem(
-    getScopedStorageKey(STORAGE_KEYS.personalAiMemory),
-    JSON.stringify(memories)
-  );
+  writeLocalStorageArray(STORAGE_KEYS.personalAiMemory, memories);
 }
 
 export function getPersonalAiMemories() {
@@ -148,6 +132,62 @@ export function savePersonalAiMemory(memory: PersonalAiMemory) {
 
   writeRawMemories(nextMemories);
   return nextMemory;
+}
+
+function createFeedbackId() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+export function saveClassificationFeedback({
+  original,
+  corrected,
+}: {
+  original: AssistantItemWithoutId;
+  corrected: AssistantItemWithoutId;
+}) {
+  const memories = readRawMemories();
+  const input = corrected.originalText.trim();
+  const key = input.toLocaleLowerCase();
+  const existing = memories.find(
+    (memory) =>
+      memory.domain === "classification" &&
+      memory.source === "feedback" &&
+      memory.examples.some((example) => example.toLocaleLowerCase() === key)
+  );
+  const correctedFields = [
+    original.processType !== corrected.processType
+      ? `처리 방식은 ${corrected.processType}`
+      : null,
+    original.category !== corrected.category ? `분야는 ${corrected.category}` : null,
+    original.actionType !== corrected.actionType
+      ? `행동 유형은 ${corrected.actionType}`
+      : null,
+  ].filter(Boolean);
+  const rule = correctedFields.length
+    ? `"${input}"과 비슷한 입력은 ${correctedFields.join(", ")}로 분류한다.`
+    : `"${input}"과 비슷한 입력은 ${corrected.processType}, ${corrected.category}, ${corrected.actionType} 분류를 우선한다.`;
+  const now = nowIso();
+  const memory: PersonalAiMemory = {
+    id: existing?.id ?? createFeedbackId(),
+    domain: "classification",
+    title: `분류 피드백: ${corrected.title}`,
+    summary: "사용자가 분류 결과를 확인하거나 직접 수정한 사례다.",
+    rules: [rule],
+    examples: [input],
+    confidence: correctedFields.length ? "high" : "medium",
+    source: "feedback",
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now,
+  };
+
+  writeRawMemories([
+    memory,
+    ...memories.filter((item) => item.id !== memory.id),
+  ].slice(0, 60));
+  return memory;
 }
 
 export function formatPersonalAiMemoryForPrompt({

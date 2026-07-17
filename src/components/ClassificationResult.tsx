@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import {
   ActionType,
   AssistantItemWithoutId,
@@ -10,6 +11,7 @@ import {
 } from "@/types/assistant";
 import ScheduleColorPicker from "@/components/ScheduleColorPicker";
 import { DEFAULT_SINGLE_SCHEDULE_COLOR } from "@/lib/scheduleColors";
+import { saveClassificationFeedback } from "@/lib/personalAiMemoryStorage";
 
 type ClassificationResultProps = {
   result: AssistantItemWithoutId;
@@ -121,6 +123,12 @@ export default function ClassificationResult({
   onChange,
   onSave,
 }: ClassificationResultProps) {
+  const originalResultRef = useRef(result);
+
+  useEffect(() => {
+    originalResultRef.current = result;
+  }, [result.originalText]);
+
   function updateResult(nextPartialResult: Partial<AssistantItemWithoutId>) {
     onChange({
       ...result,
@@ -161,6 +169,23 @@ export default function ClassificationResult({
         result.scheduleEndTime ??
         createDefaultEndTime(value, result.estimatedMinutes),
     });
+  }
+
+  function hasClassificationCorrection() {
+    const original = originalResultRef.current;
+    return (
+      original.processType !== result.processType ||
+      original.category !== result.category ||
+      original.actionType !== result.actionType
+    );
+  }
+
+  function handleSaveWithFeedback() {
+    saveClassificationFeedback({
+      original: originalResultRef.current,
+      corrected: result,
+    });
+    onSave();
   }
 
   return (
@@ -466,11 +491,14 @@ export default function ClassificationResult({
 
       <button
         type="button"
-        onClick={onSave}
+        onClick={handleSaveWithFeedback}
         className="mt-5 w-full rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white shadow-[0_14px_28px_rgba(49,130,246,0.22)] transition hover:bg-blue-500"
       >
-        수정한 내용으로 저장하기
+        {hasClassificationCorrection() ? "수정하고 저장하기" : "맞아요, 저장하기"}
       </button>
+      <p className="mt-2 text-center text-xs font-bold text-slate-400">
+        저장 한 번으로 Gemma가 다음 분류 기준을 배웁니다.
+      </p>
     </section>
   );
 }
