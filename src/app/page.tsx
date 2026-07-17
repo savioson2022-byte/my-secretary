@@ -368,8 +368,8 @@ export default function Home() {
   }
 
   return (
-    <main className="mx-auto min-h-screen max-w-7xl px-0 py-0 sm:px-5 sm:py-6 lg:grid lg:grid-cols-[0.8fr_430px_1fr] lg:items-center lg:gap-10 lg:px-10">
-      <section className="hidden self-center lg:block lg:pr-4">
+    <main className="mx-auto min-h-screen max-w-7xl px-0 py-0 sm:px-5 sm:py-6 lg:grid lg:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)] lg:items-start lg:gap-6 lg:px-10">
+      <section className="hidden">
         <p className="text-sm font-black text-blue-600">나를 위한 AI 비서</p>
         <div className="mt-4 flex items-center gap-4">
           <h1 className="text-5xl font-black tracking-tight text-slate-950 md:text-6xl">
@@ -415,8 +415,8 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="mx-auto min-h-screen w-full bg-white px-4 pb-0 pt-[max(1rem,env(safe-area-inset-top))] sm:phone-shell sm:min-h-0 sm:max-w-[430px] sm:overflow-hidden sm:p-4">
-        <div className="flex items-center justify-between px-1 pb-5 pt-1 text-xs font-black text-slate-900">
+      <section className="home-workspace mx-auto min-h-screen w-full bg-white px-4 pb-0 pt-[max(1rem,env(safe-area-inset-top))] sm:phone-shell sm:min-h-0 sm:max-w-[430px] sm:overflow-hidden sm:p-4 lg:max-w-none lg:overflow-visible lg:p-6">
+        <div className="flex items-center justify-between px-1 pb-5 pt-1 text-xs font-black text-slate-900 lg:hidden">
           <span>9:41</span>
         </div>
 
@@ -439,7 +439,7 @@ export default function Home() {
           </div>
         </header>
 
-        <div className="mt-6 space-y-4">
+        <div className="mt-6 space-y-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-4 lg:space-y-0">
           <section className="app-card p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -563,44 +563,45 @@ export default function Home() {
             )}
           </section>
 
-          <InputBox
-            value={inputText}
-            onChange={setInputText}
-            onClassify={handleClassify}
-            voiceIntent={voiceIntent}
-          />
+          <div className="space-y-4">
+            <InputBox
+              value={inputText}
+              onChange={setInputText}
+              onClassify={handleClassify}
+              voiceIntent={voiceIntent}
+            />
 
-          {isClassifying && (
+            {isClassifying && (
             <p className="app-card p-4 text-sm font-black text-slate-500">
               AI가 입력 내용을 분류하는 중입니다...
             </p>
-          )}
+            )}
 
-          {classificationSource === "ai" && (
+            {classificationSource === "ai" && (
             <p className="rounded-3xl bg-emerald-50 p-4 text-sm font-black text-emerald-700 ring-1 ring-emerald-100">
               AI API로 분류했습니다.
             </p>
-          )}
+            )}
 
-          {classificationSource === "gemma-on-device" && (
+            {classificationSource === "gemma-on-device" && (
             <p className="rounded-3xl bg-blue-50 p-4 text-sm font-black text-blue-700 ring-1 ring-blue-100">
               기기의 Gemma 전문가가 분류했습니다.
             </p>
-          )}
+            )}
 
-          {classificationSource === "fallback" && (
+            {classificationSource === "fallback" && (
             <p className="rounded-3xl bg-amber-50 p-4 text-sm font-black text-amber-700 ring-1 ring-amber-100">
               AI 분류를 사용할 수 없어 규칙 기반 분류를 사용했습니다.
             </p>
-          )}
+            )}
 
-          {classificationResult ? (
+            {classificationResult ? (
             <ClassificationResult
               result={classificationResult}
               onChange={setClassificationResult}
               onSave={handleSave}
             />
-          ) : (
+            ) : (
             <section className="app-card p-4">
               <div className="mb-3 flex items-center justify-between">
                 <div>
@@ -671,16 +672,19 @@ export default function Home() {
                 ))}
               </div>
             </section>
-          )}
+            )}
+          </div>
 
-          <AgentActionSuggestionView items={items} compact maxItems={2} />
-          <NotificationSummaryCard />
+          <div className="space-y-4 lg:col-span-2 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0">
+            <AgentActionSuggestionView items={items} compact maxItems={2} />
+            <NotificationSummaryCard />
+          </div>
         </div>
 
         <BottomNavigation />
       </section>
 
-      <section className="hidden self-center lg:block lg:pl-4">
+      <section className="hidden self-start lg:block">
         <section className="app-card p-5">
           <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <div>

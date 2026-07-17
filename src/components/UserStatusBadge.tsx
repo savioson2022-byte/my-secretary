@@ -35,8 +35,8 @@ export default function UserStatusBadge() {
     async function loadUser() {
       if (!supabase) return;
 
-      const { data } = await supabase.auth.getUser();
-      const nextUser = data.user;
+      const { data } = await supabase.auth.getSession();
+      const nextUser = data.session?.user ?? null;
       setUser(nextUser);
 
       if (!nextUser) return;
@@ -52,8 +52,11 @@ export default function UserStatusBadge() {
 
     loadUser();
 
-    const { data: listener } = supabase.auth.onAuthStateChange(() => {
-      loadUser();
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        void loadUser();
+      }
     });
 
     return () => {

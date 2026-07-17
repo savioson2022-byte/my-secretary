@@ -715,10 +715,10 @@ export default function PurchaseHistoryManager() {
   }
 
   return (
-    <section className="space-y-5 lg:grid lg:grid-cols-[minmax(0,1.08fr)_minmax(360px,0.92fr)] lg:items-start lg:gap-5 lg:space-y-0">
-      <section className="app-card p-5 lg:col-span-2">
-        <div className="flex items-start justify-between gap-3">
-          <div>
+    <section className="min-w-0 space-y-5 overflow-hidden lg:grid lg:grid-cols-[minmax(0,1.08fr)_minmax(360px,0.92fr)] lg:items-start lg:gap-5 lg:overflow-visible lg:space-y-0">
+      <section className="app-card min-w-0 overflow-hidden p-4 sm:p-5 lg:col-span-2">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
             <h2 className="text-lg font-black text-slate-900">
               쿠팡 메일 검색
             </h2>
@@ -733,7 +733,7 @@ export default function PurchaseHistoryManager() {
           </span>
         </div>
 
-        <div className="mt-4 grid gap-3 md:grid-cols-4">
+        <div className="mt-4 hidden gap-3 md:grid md:grid-cols-4">
           {[
             ["1", "메일 연결", "Gmail이나 네이버 메일을 한 번 연결합니다."],
             ["2", "쿠팡만 검색", "쿠팡 주문, 결제, 영수증 메일만 골라봅니다."],
@@ -756,12 +756,12 @@ export default function PurchaseHistoryManager() {
         </div>
 
         <div className="mt-4 grid gap-2 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.86fr)]">
-          <div className="rounded-3xl bg-slate-950 p-4 text-white">
-            <p className="text-xs font-black text-blue-200">기본 방식</p>
-            <h3 className="mt-1 text-lg font-black">
+          <div className="min-w-0 rounded-3xl bg-blue-50 p-4 ring-1 ring-blue-100">
+            <p className="text-xs font-black text-blue-600">메일 자동 검색</p>
+            <h3 className="mt-1 break-keep text-lg font-black text-slate-950">
               Gmail에서 “쿠팡” 메일만 찾아오기
             </h3>
-            <p className="mt-2 text-sm font-semibold leading-6 text-slate-300">
+            <p className="mt-2 break-keep text-sm font-semibold leading-6 text-slate-600">
               앱이 전체 메일을 보여주거나 저장하지 않고, Gmail 검색으로
               쿠팡/Coupang 주문 메일만 읽어 상품명과 가격 후보를 추출합니다.
             </p>
@@ -770,7 +770,7 @@ export default function PurchaseHistoryManager() {
                 type="button"
                 onClick={handleConnectGmail}
                 disabled={isMailAutomationBusy}
-                className="rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-950 disabled:bg-slate-300"
+                className="min-w-0 rounded-2xl bg-white px-3 py-3 text-sm font-black text-slate-950 ring-1 ring-blue-100 disabled:bg-slate-200"
               >
                 Gmail 연결
               </button>
@@ -778,7 +778,7 @@ export default function PurchaseHistoryManager() {
                 type="button"
                 onClick={() => handleSyncMailNow()}
                 disabled={isMailAutomationBusy}
-                className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white disabled:bg-slate-300"
+                className="min-w-0 rounded-2xl bg-blue-600 px-3 py-3 text-sm font-black text-white disabled:bg-slate-300"
               >
                 쿠팡 메일 검색
               </button>
@@ -926,10 +926,10 @@ export default function PurchaseHistoryManager() {
             mailConnections.map((connection) => (
               <div
                 key={connection.id}
-                className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-100"
+                className="min-w-0 overflow-hidden rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-100"
               >
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-black text-slate-900">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="min-w-0 break-all text-sm font-black text-slate-900 sm:break-normal">
                     {connection.provider === "gmail" ? "Gmail" : "네이버 메일"}
                     {connection.email ? ` · ${connection.email}` : ""}
                   </p>
@@ -959,7 +959,7 @@ export default function PurchaseHistoryManager() {
                     {formatMailConnectionError(connection.last_error)}
                   </p>
                 )}
-                <div className="mt-3 grid grid-cols-2 gap-2">
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
                   <button
                     type="button"
                     onClick={() => handleBackfillMailConnection(connection)}

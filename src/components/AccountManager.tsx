@@ -274,16 +274,9 @@ export default function AccountManager() {
 
       if (sessionUser) {
         setUser(sessionUser);
-        await ensureProfileAndDevice(sessionUser);
         setIsLoading(false);
+        void ensureProfileAndDevice(sessionUser);
         return;
-      }
-
-      const { data: userData } = await client.auth.getUser();
-
-      if (userData.user) {
-        setUser(userData.user);
-        await ensureProfileAndDevice(userData.user);
       }
 
       setIsLoading(false);
@@ -297,7 +290,8 @@ export default function AccountManager() {
 
         if (nextUser) {
           setUser(nextUser);
-          await ensureProfileAndDevice(nextUser);
+          setIsLoading(false);
+          void ensureProfileAndDevice(nextUser);
         } else {
           setUser(null);
           setDevices([]);
