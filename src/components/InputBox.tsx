@@ -33,6 +33,8 @@ type SpeechRecognitionInstance = {
   lang: string;
   onstart: (() => void) | null;
   onend: (() => void) | null;
+  onaudioend?: (() => void) | null;
+  onspeechend?: (() => void) | null;
   onerror:
     | ((event: {
         error: string;
@@ -77,6 +79,8 @@ function appendTranscript(currentText: string, transcript: string) {
 type VoiceControlMode = "hold" | "toggle";
 
 const VOICE_MODE_STORAGE_KEY = STORAGE_KEYS.voiceControlMode;
+const AUTO_VOICE_SILENCE_MS = 1700;
+const AUTO_VOICE_NO_SPEECH_MS = 6500;
 
 export default function InputBox({
   value,
@@ -91,6 +95,8 @@ export default function InputBox({
   const shouldClassifyOnEndRef = useRef(false);
   const pointerStartedVoiceRef = useRef(false);
   const voiceIntentStartedRef = useRef(false);
+  const autoStopOnSilenceRef = useRef(false);
+  const silenceTimerRef = useRef<number | null>(null);
   const [isListening, setIsListening] = useState(false);
   const [isSpeechSupported, setIsSpeechSupported] = useState(false);
   const [voiceMessage, setVoiceMessage] = useState<string | null>(null);
@@ -110,6 +116,7 @@ export default function InputBox({
     }
 
     return () => {
+      clearSilenceTimer();
       recognitionRef.current?.stop();
     };
   }, []);
@@ -131,14 +138,48 @@ export default function InputBox({
     window.localStorage.setItem(VOICE_MODE_STORAGE_KEY, nextMode);
   }
 
+  function clearSilenceTimer() {
+    if (silenceTimerRef.current === null) return;
+
+    window.clearTimeout(silenceTimerRef.current);
+    silenceTimerRef.current = null;
+  }
+
+  function scheduleSilenceStop(waitMs = AUTO_VOICE_SILENCE_MS) {
+    if (!autoStopOnSilenceRef.current) return;
+
+    clearSilenceTimer();
+    silenceTimerRef.current = window.setTimeout(() => {
+      const nextText = latestTextRef.current.trim();
+
+      if (!nextText) {
+        setVoiceMessage("음성이 감지되지 않았습니다. 다시 말해보세요.");
+        stopVoiceInput({
+          autoClassify: false,
+        });
+        return;
+      }
+
+      setVoiceMessage("말이 끝난 것 같아 자동으로 기록을 마칩니다.");
+      stopVoiceInput({
+        autoClassify: true,
+      });
+    }, waitMs);
+  }
+
   function stopVoiceInput({ autoClassify = true } = {}) {
+    clearSilenceTimer();
+    autoStopOnSilenceRef.current = false;
     shouldClassifyOnEndRef.current = autoClassify;
     recognitionRef.current?.stop();
     setIsListening(false);
     setInterimTranscript("");
   }
 
-  function startVoiceInput({ autoClassifyOnEnd = true } = {}) {
+  function startVoiceInput({
+    autoClassifyOnEnd = true,
+    autoStopOnSilence = false,
+  } = {}) {
     const SpeechRecognition = getSpeechRecognitionConstructor();
 
     if (!SpeechRecognition) {
@@ -162,17 +203,27 @@ export default function InputBox({
 
     baseTextRef.current = value;
     finalTranscriptRef.current = "";
+    autoStopOnSilenceRef.current = autoStopOnSilence;
     setInterimTranscript("");
-    setVoiceMessage("듣고 있어요. 떠오른 생각을 편하게 말해주세요.");
+    setVoiceMessage(
+      autoStopOnSilence
+        ? "듣고 있어요. 말이 끝나면 자동으로 기록을 마칩니다."
+        : "듣고 있어요. 떠오른 생각을 편하게 말해주세요."
+    );
 
     recognition.onstart = () => {
       setIsListening(true);
+      if (autoStopOnSilenceRef.current) {
+        scheduleSilenceStop(AUTO_VOICE_NO_SPEECH_MS);
+      }
     };
 
     recognition.onend = () => {
       const shouldClassify = shouldClassifyOnEndRef.current;
       const nextText = latestTextRef.current.trim();
 
+      clearSilenceTimer();
+      autoStopOnSilenceRef.current = false;
       setIsListening(false);
       setInterimTranscript("");
       setVoiceMessage((currentMessage) => {
@@ -195,6 +246,8 @@ export default function InputBox({
     };
 
     recognition.onerror = (event) => {
+      clearSilenceTimer();
+      autoStopOnSilenceRef.current = false;
       shouldClassifyOnEndRef.current = false;
       setIsListening(false);
       setInterimTranscript("");
@@ -212,6 +265,14 @@ export default function InputBox({
       }
 
       setVoiceMessage("음성 인식 중 문제가 생겼습니다. 다시 시도해주세요.");
+    };
+
+    recognition.onspeechend = () => {
+      scheduleSilenceStop(900);
+    };
+
+    recognition.onaudioend = () => {
+      scheduleSilenceStop(900);
     };
 
     recognition.onresult = (event) => {
@@ -244,6 +305,12 @@ export default function InputBox({
 
       latestTextRef.current = nextText;
       onChange(nextText);
+
+      if (autoStopOnSilenceRef.current) {
+        scheduleSilenceStop(
+          nextText.trim() ? AUTO_VOICE_SILENCE_MS : AUTO_VOICE_NO_SPEECH_MS
+        );
+      }
     };
 
     recognitionRef.current = recognition;
@@ -264,6 +331,7 @@ export default function InputBox({
     const timer = window.setTimeout(() => {
       startVoiceInput({
         autoClassifyOnEnd: true,
+        autoStopOnSilence: true,
       });
     }, 350);
 
