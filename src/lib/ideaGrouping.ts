@@ -1,6 +1,7 @@
 import type { AssistantItem } from "@/types/assistant";
 import { formatPersonalAiMemoryForPrompt } from "@/lib/personalAiMemoryStorage";
 import type { PersonalAiMemory } from "@/types/personalAi";
+import { runGemmaOnDevice } from "@/lib/local-ai/gemmaAdapter";
 
 export type IdeaGroupingResult = {
   ideaGroupId: string;
@@ -111,6 +112,22 @@ export async function groupIdeaWithAi({
   });
 
   try {
+    const localResult = await runGemmaOnDevice<
+      { text: string; existingIdeas: AssistantItem[] },
+      IdeaGroupingResult
+    >({
+      capability: "group_idea",
+      input: {
+        text,
+        existingIdeas: existingIdeas.filter(isIdeaRecord).slice(0, 40),
+      },
+      memories: personalAiMemories,
+    });
+
+    if (localResult.ok && localResult.output) {
+      return localResult.output;
+    }
+
     const response = await fetch("/api/ideas/group", {
       method: "POST",
       headers: {

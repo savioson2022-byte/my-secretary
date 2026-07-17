@@ -136,7 +136,7 @@ export default function Home() {
 
   const [isClassifying, setIsClassifying] = useState(false);
   const [classificationSource, setClassificationSource] = useState<
-    "ai" | "fallback" | null
+    "gemma-on-device" | "ai" | "fallback" | null
   >(null);
   const [voiceIntent, setVoiceIntent] = useState(false);
 
@@ -579,6 +579,12 @@ export default function Home() {
           {classificationSource === "ai" && (
             <p className="rounded-3xl bg-emerald-50 p-4 text-sm font-black text-emerald-700 ring-1 ring-emerald-100">
               AI API로 분류했습니다.
+            </p>
+          )}
+
+          {classificationSource === "gemma-on-device" && (
+            <p className="rounded-3xl bg-blue-50 p-4 text-sm font-black text-blue-700 ring-1 ring-blue-100">
+              기기의 Gemma 전문가가 분류했습니다.
             </p>
           )}
 

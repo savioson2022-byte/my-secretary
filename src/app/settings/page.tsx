@@ -1,6 +1,7 @@
 import AccountManager from "@/components/AccountManager";
 import BottomNavigation from "@/components/BottomNavigation";
 import CloudSyncStatusCard from "@/components/CloudSyncStatusCard";
+import GemmaOnDeviceSettingsCard from "@/components/GemmaOnDeviceSettingsCard";
 import LocalDataTransfer from "@/components/LocalDataTransfer";
 import NotificationSettingsCard from "@/components/NotificationSettingsCard";
 import SavedPlaceManager from "@/components/SavedPlaceManager";
@@ -27,6 +28,7 @@ export default function SettingsPage() {
       <div className="space-y-5">
         <AccountManager />
         <CloudSyncStatusCard />
+        <GemmaOnDeviceSettingsCard />
         <ShortcutSetupCard />
 
         <section className="app-card p-5">
