@@ -1,4 +1,6 @@
 import type { AssistantItem } from "@/types/assistant";
+import { formatPersonalAiMemoryForPrompt } from "@/lib/personalAiMemoryStorage";
+import type { PersonalAiMemory } from "@/types/personalAi";
 
 export type IdeaGroupingResult = {
   ideaGroupId: string;
@@ -96,11 +98,17 @@ export function fallbackGroupIdea({
 export async function groupIdeaWithAi({
   text,
   existingIdeas,
+  personalAiMemories = [],
 }: {
   text: string;
   existingIdeas: AssistantItem[];
+  personalAiMemories?: PersonalAiMemory[];
 }): Promise<IdeaGroupingResult> {
   const fallbackResult = fallbackGroupIdea({ text, existingIdeas });
+  const personalAiContext = formatPersonalAiMemoryForPrompt({
+    memories: personalAiMemories,
+    domains: ["idea"],
+  });
 
   try {
     const response = await fetch("/api/ideas/group", {
@@ -110,6 +118,7 @@ export async function groupIdeaWithAi({
       },
       body: JSON.stringify({
         text,
+        personalAiContext,
         existingIdeas: existingIdeas
           .filter(isIdeaRecord)
           .slice(0, 40)

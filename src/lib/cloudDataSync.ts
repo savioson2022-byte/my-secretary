@@ -9,6 +9,7 @@ import type {
 } from "@/types/calendar";
 import type { SuggestionFeedback } from "@/types/suggestionFeedback";
 import type { PurchaseHistoryItem } from "@/types/purchaseHistory";
+import type { PersonalAiMemory } from "@/types/personalAi";
 import type { DayOfWeek, RoutineSchedule } from "@/types/routine";
 import {
   getCloudSyncStatus,
@@ -27,6 +28,8 @@ type SyncDomain<TLocal extends SyncableItem, TRow extends { id: string }> = {
   key: string;
   table: string;
   optionalTable?: boolean;
+  allowNonUuidIds?: boolean;
+  upsertConflict?: string;
   optionalColumns?: string[];
   toRow: (
     item: TLocal,
@@ -678,6 +681,47 @@ const syncDomains: Array<SyncDomain<SyncableItem, { id: string }>> = [
     },
   },
   {
+    key: STORAGE_KEYS.personalAiMemory,
+    table: "personal_ai_memory",
+    optionalTable: true,
+    allowNonUuidIds: true,
+    upsertConflict: "user_id,id",
+    toRow(item, userId) {
+      const memory = item as PersonalAiMemory;
+
+      return {
+        id: memory.id,
+        user_id: userId,
+        domain: memory.domain,
+        title: memory.title,
+        summary: memory.summary,
+        rules: memory.rules,
+        examples: memory.examples,
+        confidence: memory.confidence,
+        source: memory.source,
+        created_at: memory.createdAt,
+        updated_at: memory.updatedAt,
+      };
+    },
+    fromRow(row) {
+      return {
+        id: asText(row.id),
+        domain: asText(row.domain, "classification") as PersonalAiMemory["domain"],
+        title: asText(row.title),
+        summary: asText(row.summary),
+        rules: asTextArray(row.rules),
+        examples: asTextArray(row.examples),
+        confidence: asText(
+          row.confidence,
+          "medium"
+        ) as PersonalAiMemory["confidence"],
+        source: asText(row.source, "system") as PersonalAiMemory["source"],
+        createdAt: asText(row.created_at),
+        updatedAt: asText(row.updated_at),
+      } as PersonalAiMemory;
+    },
+  },
+  {
     key: STORAGE_KEYS.travelTimeRules,
     table: "travel_time_rules",
     toRow(item, userId) {
@@ -725,7 +769,7 @@ async function syncDomainWithCloud({
   const knownRemoteIds = new Set(readKnownRemoteIds(domain.key));
   const remoteDeletedIds = deletedItemRecords
     .map((record) => record.id)
-    .filter(isUuid);
+    .filter((id) => domain.allowNonUuidIds || isUuid(id));
   const availableColumns = await getAvailableOptionalColumns({
     supabase,
     table: domain.table,
@@ -790,7 +834,7 @@ async function syncDomainWithCloud({
 
   if (mergedItems.length > 0) {
     const rows = mergedItems
-      .filter((item) => isUuid(item.id))
+      .filter((item) => domain.allowNonUuidIds || isUuid(item.id))
       .map((item) => domain.toRow(item, userId, availableColumns));
 
     if (rows.length === 0) {
@@ -800,7 +844,7 @@ async function syncDomainWithCloud({
 
     const { error: upsertError } = await supabase
       .from(domain.table)
-      .upsert(rows, { onConflict: "id" });
+      .upsert(rows, { onConflict: domain.upsertConflict ?? "id" });
 
     if (upsertError) {
       throw upsertError;
@@ -810,7 +854,9 @@ async function syncDomainWithCloud({
   writeLocalArraySilently(domain.key, mergedItems);
   writeKnownRemoteIds(
     domain.key,
-    mergedItems.filter((item) => isUuid(item.id)).map((item) => item.id)
+    mergedItems
+      .filter((item) => domain.allowNonUuidIds || isUuid(item.id))
+      .map((item) => item.id)
   );
 }
 

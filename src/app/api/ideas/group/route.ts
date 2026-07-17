@@ -31,6 +31,9 @@ const IDEA_GROUP_SCHEMA = {
 export async function POST(request: Request) {
   const body = await request.json();
   const text = String(body.text ?? "").trim();
+  const personalAiContext = String(body.personalAiContext ?? "")
+    .trim()
+    .slice(0, 3000);
   const existingIdeas = Array.isArray(body.existingIdeas)
     ? (body.existingIdeas as AssistantItem[])
     : [];
@@ -64,6 +67,7 @@ export async function POST(request: Request) {
           content: `
 너는 개인 비서 앱의 아이디어 정리 담당이다.
 새 아이디어가 기존 아이디어 주제와 이어지는지 판단해서 JSON으로만 답해라.
+${personalAiContext ? `\n${personalAiContext}\n` : ""}
 
 판단 기준:
 - 같은 제품/기능/프로젝트/소재를 다시 언급하면 기존 ideaGroupId를 사용한다.

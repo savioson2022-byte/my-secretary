@@ -13,6 +13,7 @@ import { RoutineSchedule } from "@/types/routine";
 import type { SuggestionFeedback } from "@/types/suggestionFeedback";
 import { UserProfile } from "@/types/userProfile";
 import { getScheduleBlocksForDate } from "@/lib/travelTime";
+import type { PersonalAiMemory } from "@/types/personalAi";
 
 export type TimeTaskSuggestion = {
   itemId: string;
@@ -416,6 +417,7 @@ export function suggestTimeTaskSchedule({
   savedPlaces = [],
   userProfile = null,
   suggestionFeedbacks = [],
+  personalAiMemories = [],
 }: {
   item: AssistantItem;
   routines: RoutineSchedule[];
@@ -423,6 +425,7 @@ export function suggestTimeTaskSchedule({
   savedPlaces?: SavedPlace[];
   userProfile?: UserProfile | null;
   suggestionFeedbacks?: SuggestionFeedback[];
+  personalAiMemories?: PersonalAiMemory[];
 }): TimeTaskSuggestion | null {
   if (item.status !== "미완료") {
     return null;
@@ -521,6 +524,9 @@ export function suggestTimeTaskSchedule({
         feedbackAdjustment.adjustment;
       const appliedRules = [
         allowedWindow.label,
+        personalAiMemories.some((memory) => memory.domain === "schedule")
+          ? "계정 공유 AI 메모리 반영 준비"
+          : null,
         context.targetPlace ? `선호/저장 장소: ${context.targetPlace.name}` : null,
         extraTaskBuffer > 0 ? `방문 후 샤워/정리 여유 ${extraTaskBuffer}분` : null,
         ...travelBuffers.labels,
@@ -564,6 +570,7 @@ export function suggestTimeTaskSchedules({
   savedPlaces = [],
   userProfile = null,
   suggestionFeedbacks = [],
+  personalAiMemories = [],
 }: {
   items: AssistantItem[];
   routines: RoutineSchedule[];
@@ -571,6 +578,7 @@ export function suggestTimeTaskSchedules({
   savedPlaces?: SavedPlace[];
   userProfile?: UserProfile | null;
   suggestionFeedbacks?: SuggestionFeedback[];
+  personalAiMemories?: PersonalAiMemory[];
 }): TimeTaskSuggestion[] {
   return items
     .map((item) =>
@@ -581,6 +589,7 @@ export function suggestTimeTaskSchedules({
         savedPlaces,
         userProfile,
         suggestionFeedbacks,
+        personalAiMemories,
       })
     )
     .filter((suggestion): suggestion is TimeTaskSuggestion => {

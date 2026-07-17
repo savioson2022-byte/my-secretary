@@ -6,6 +6,7 @@ export type StorageDomain =
   | "single-schedules"
   | "places"
   | "purchase-history"
+  | "personal-ai-memory"
   | "suggestion-feedback"
   | "travel-time-rules"
   | "travel-time-estimates"
@@ -78,6 +79,15 @@ export const STORAGE_CATALOG: StorageCatalogItem[] = [
     priority: "middle",
     userScoped: true,
     note: "이미 구매한 상품만 재구매 자동화 후보로 허용하기 위한 사용자별 안전 장치다.",
+  },
+  {
+    domain: "personal-ai-memory",
+    label: "개인 AI 메모리",
+    localStorageKey: STORAGE_KEYS.personalAiMemory,
+    supabaseTable: STORAGE_TO_SUPABASE_TABLE[STORAGE_KEYS.personalAiMemory],
+    priority: "middle",
+    userScoped: true,
+    note: "온디바이스 Gemma와 서버 AI가 공통으로 읽는 사용자별 분류, 추천, 구매, 알림 기준이다.",
   },
   {
     domain: "suggestion-feedback",

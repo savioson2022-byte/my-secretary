@@ -5,6 +5,7 @@ import { suggestTimeTaskSchedules } from "@/lib/taskScheduleSuggestion";
 import { getCloudDataSyncedEventName } from "@/lib/dataSyncEvents";
 import { getLocalDataUpdatedEventName } from "@/lib/localStorageRepository";
 import { getSavedPlaces } from "@/lib/placeStorage";
+import { getPersonalAiMemories } from "@/lib/personalAiMemoryStorage";
 import {
   getSingleSchedules,
   saveSingleSchedule,
@@ -24,6 +25,7 @@ import type {
   SuggestionFeedbackType,
 } from "@/types/suggestionFeedback";
 import { UserProfile } from "@/types/userProfile";
+import type { PersonalAiMemory } from "@/types/personalAi";
 
 type TimeTaskSuggestionViewProps = {
   items: AssistantItem[];
@@ -45,6 +47,9 @@ export default function TimeTaskSuggestionView({
   const [suggestionFeedbacks, setSuggestionFeedbacks] = useState<
     SuggestionFeedback[]
   >([]);
+  const [personalAiMemories, setPersonalAiMemories] = useState<
+    PersonalAiMemory[]
+  >([]);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
   const [editingSuggestionId, setEditingSuggestionId] = useState<string | null>(
     null
@@ -61,8 +66,9 @@ export default function TimeTaskSuggestionView({
     function refreshRecommendationContext() {
       setSavedPlaces(getSavedPlaces());
       setUserProfile(getUserProfile());
-      setSuggestionFeedbacks(getSuggestionFeedbacks());
-    }
+    setSuggestionFeedbacks(getSuggestionFeedbacks());
+    setPersonalAiMemories(getPersonalAiMemories());
+  }
 
     refreshRecommendationContext();
     window.addEventListener(
@@ -93,6 +99,7 @@ export default function TimeTaskSuggestionView({
     savedPlaces,
     userProfile,
     suggestionFeedbacks,
+    personalAiMemories,
   });
   const visibleSuggestions =
     typeof maxItems === "number" ? suggestions.slice(0, maxItems) : suggestions;

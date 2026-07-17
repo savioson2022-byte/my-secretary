@@ -27,6 +27,7 @@ import {
   getPurchaseHistories,
   updatePurchaseHistory,
 } from "@/lib/purchaseHistoryStorage";
+import { getPersonalAiMemories } from "@/lib/personalAiMemoryStorage";
 import { getRoutineSchedules } from "@/lib/routineStorage";
 import { createSingleScheduleFromItem } from "@/lib/singleScheduleFromItem";
 import {
@@ -278,6 +279,7 @@ export default function Home() {
         inputText: trimmedText,
         items,
         userProfile,
+        personalAiMemories: getPersonalAiMemories(),
       });
       const { result, source } = await aiClassifyInput(
         trimmedText,
@@ -304,9 +306,10 @@ export default function Home() {
     const now = new Date().toISOString();
     const ideaGrouping = shouldAttachToIdeaRecord(classificationResult)
       ? await groupIdeaWithAi({
-          text: classificationResult.originalText,
-          existingIdeas: items,
-        })
+        text: classificationResult.originalText,
+        existingIdeas: items,
+        personalAiMemories: getPersonalAiMemories(),
+      })
       : null;
 
     const newItem: AssistantItem = {

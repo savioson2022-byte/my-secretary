@@ -10,6 +10,7 @@ export const STORAGE_KEYS = {
   userProfile: "my-assistant-user-profile",
   notificationSettings: "my-assistant-notification-settings",
   voiceControlMode: "my-assistant-voice-control-mode",
+  personalAiMemory: "my-assistant-personal-ai-memory",
 } as const;
 
 export const LEGACY_STORAGE_KEYS = {
@@ -30,6 +31,7 @@ export const STORAGE_TO_SUPABASE_TABLE = {
   [STORAGE_KEYS.suggestionFeedback]: "suggestion_feedback",
   [STORAGE_KEYS.purchaseHistory]: "purchase_history",
   [STORAGE_KEYS.userProfile]: "profiles",
+  [STORAGE_KEYS.personalAiMemory]: "personal_ai_memory",
 } as const;
 
 export const USER_SCOPED_STORAGE_KEYS = [
@@ -42,5 +44,6 @@ export const USER_SCOPED_STORAGE_KEYS = [
   STORAGE_KEYS.suggestionFeedback,
   STORAGE_KEYS.purchaseHistory,
   STORAGE_KEYS.userProfile,
+  STORAGE_KEYS.personalAiMemory,
   STORAGE_KEYS.notificationSettings,
 ] as const;

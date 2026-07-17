@@ -1,4 +1,6 @@
 import type { AssistantItem } from "@/types/assistant";
+import { formatPersonalAiMemoryForPrompt } from "@/lib/personalAiMemoryStorage";
+import type { PersonalAiMemory } from "@/types/personalAi";
 import type { UserProfile } from "@/types/userProfile";
 
 const MAX_EXAMPLE_COUNT = 8;
@@ -56,12 +58,23 @@ export function buildClassificationContext({
   inputText,
   items,
   userProfile,
+  personalAiMemories = [],
 }: {
   inputText: string;
   items: AssistantItem[];
   userProfile: UserProfile | null;
+  personalAiMemories?: PersonalAiMemory[];
 }) {
   const contextParts: string[] = [];
+
+  const personalAiContext = formatPersonalAiMemoryForPrompt({
+    memories: personalAiMemories,
+    domains: ["classification", "schedule", "purchase"],
+  });
+
+  if (personalAiContext) {
+    contextParts.push(personalAiContext);
+  }
 
   if (userProfile?.classificationPreference.trim()) {
     contextParts.push(
