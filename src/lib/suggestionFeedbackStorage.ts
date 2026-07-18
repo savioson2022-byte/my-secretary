@@ -46,6 +46,16 @@ export function getSuggestionFeedbacks(): SuggestionFeedback[] {
   return suggestionFeedbackRepository.list();
 }
 
+export function deleteSuggestionFeedback(id: string) {
+  suggestionFeedbackRepository.delete(id);
+}
+
+export function clearSuggestionFeedbacks() {
+  getSuggestionFeedbacks().forEach((feedback) => {
+    suggestionFeedbackRepository.delete(feedback.id);
+  });
+}
+
 export function saveSuggestionFeedbackForSuggestion({
   suggestion,
   feedbackType,

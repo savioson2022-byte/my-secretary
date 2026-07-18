@@ -36,8 +36,8 @@ export default function BottomNavigation() {
 
   return (
     <>
-      <nav className="fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-[430px] border-t border-slate-100 bg-white/95 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2 shadow-[0_-14px_38px_rgba(15,23,42,0.08)] backdrop-blur md:rounded-t-[28px] md:border md:border-slate-100 lg:bottom-auto lg:left-5 lg:right-auto lg:top-1/2 lg:mx-0 lg:w-[88px] lg:-translate-y-1/2 lg:rounded-2xl lg:px-2 lg:py-3 lg:shadow-soft">
-        <div className="grid grid-cols-5 gap-1 lg:grid-cols-1">
+      <nav className="fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-[430px] border-t border-slate-100 bg-white/95 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2 shadow-[0_-14px_38px_rgba(15,23,42,0.08)] backdrop-blur md:bottom-auto md:left-5 md:right-auto md:top-1/2 md:mx-0 md:w-[88px] md:-translate-y-1/2 md:rounded-2xl md:border md:border-slate-100 md:px-2 md:py-3 md:shadow-soft">
+        <div className="grid grid-cols-5 gap-1 md:grid-cols-1">
           {LINKS.map((link) => {
             const isActive =
               pathname === link.href ||
@@ -77,7 +77,7 @@ export default function BottomNavigation() {
       </nav>
       <div
         aria-hidden="true"
-        className="h-[var(--app-bottom-nav-height)] lg:hidden"
+        className="h-[var(--app-bottom-nav-height)] md:hidden"
       />
     </>
   );

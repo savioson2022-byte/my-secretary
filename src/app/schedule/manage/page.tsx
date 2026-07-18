@@ -26,7 +26,7 @@ export default function ScheduleManagePage() {
   }, []);
 
   return (
-    <main className="app-page mx-auto max-w-3xl px-4">
+    <main className="app-page mx-auto max-w-6xl px-4 lg:pl-28">
       <header className="mb-5 flex items-start justify-between gap-4">
         <div>
           <p className="text-sm font-black text-blue-600">나의 비서</p>

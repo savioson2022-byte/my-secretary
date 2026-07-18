@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { useState } from "react";
 import type { SavedPlace } from "@/types/calendar";
 
 export type PlaceSearchResult = Pick<
@@ -33,9 +33,7 @@ export default function PlaceKeywordSearch({
   const [isSearching, setIsSearching] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
-  async function handleSearch(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
+  async function handleSearch() {
     const trimmedQuery = query.trim();
     if (!trimmedQuery) {
       setMessage("검색할 장소 이름을 입력해줘.");
@@ -80,21 +78,27 @@ export default function PlaceKeywordSearch({
 
   return (
     <div className="rounded-3xl bg-white p-3 ring-1 ring-slate-100">
-      <form onSubmit={handleSearch} className="flex gap-2">
+      <div className="flex gap-2">
         <input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key !== "Enter") return;
+            event.preventDefault();
+            void handleSearch();
+          }}
           placeholder="가게 이름 검색"
           className="min-w-0 flex-1 rounded-2xl border border-slate-200 px-3 py-2 text-sm font-semibold outline-none focus:border-blue-400"
         />
         <button
-          type="submit"
+          type="button"
+          onClick={() => void handleSearch()}
           disabled={isSearching}
           className="rounded-2xl bg-slate-950 px-3 py-2 text-xs font-black text-white disabled:bg-slate-300"
         >
           {isSearching ? "검색중" : "검색"}
         </button>
-      </form>
+      </div>
 
       {message && (
         <p className="mt-2 rounded-2xl bg-slate-50 p-3 text-xs font-bold leading-5 text-slate-500">

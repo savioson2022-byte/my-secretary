@@ -8,6 +8,7 @@ import PlaceKeywordSearch, {
 } from "@/components/PlaceKeywordSearch";
 import PostcodeAddressSearch from "@/components/PostcodeAddressSearch";
 import ScheduleColorPicker from "@/components/ScheduleColorPicker";
+import DesktopTimeRangeEditor from "@/components/DesktopTimeRangeEditor";
 import { getCloudDataSyncedEventName } from "@/lib/dataSyncEvents";
 import {
   getSavedPlaces,
@@ -1916,6 +1917,15 @@ function RoutineScheduleManager({
                       />
                     </div>
                   </div>
+                  <div className="mt-3">
+                    <DesktopTimeRangeEditor
+                      startTime={slot.startTime}
+                      endTime={slot.endTime}
+                      onChange={(nextValue) =>
+                        updateTimeSlot(slot.id, nextValue)
+                      }
+                    />
+                  </div>
                 </div>
               ))}
             </div>
@@ -2225,6 +2235,15 @@ function RoutineScheduleManager({
                                     })
                                   }
                                   className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-emerald-400"
+                                />
+                              </div>
+                              <div className="mt-3">
+                                <DesktopTimeRangeEditor
+                                  startTime={slot.startTime}
+                                  endTime={slot.endTime}
+                                  onChange={(nextValue) =>
+                                    updateEditRoutineTimeSlot(slot.id, nextValue)
+                                  }
                                 />
                               </div>
                             </div>

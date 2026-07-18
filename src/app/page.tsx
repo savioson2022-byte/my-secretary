@@ -368,7 +368,7 @@ export default function Home() {
   }
 
   return (
-    <main className="mx-auto min-h-screen max-w-7xl px-0 py-0 sm:px-5 sm:py-6 lg:grid lg:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)] lg:items-start lg:gap-6 lg:px-10">
+    <main className="mx-auto min-h-screen max-w-[1540px] px-0 py-0 sm:px-5 sm:py-6 md:px-6 md:pl-28 xl:grid xl:grid-cols-[minmax(0,1.45fr)_minmax(360px,0.55fr)] xl:items-start xl:gap-5 xl:px-8 xl:pl-32">
       <section className="hidden">
         <p className="text-sm font-black text-blue-600">나를 위한 AI 비서</p>
         <div className="mt-4 flex items-center gap-4">
@@ -415,19 +415,39 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="home-workspace mx-auto min-h-screen w-full bg-white px-4 pb-0 pt-[max(1rem,env(safe-area-inset-top))] sm:phone-shell sm:min-h-0 sm:max-w-[430px] sm:overflow-hidden sm:p-4 lg:max-w-none lg:overflow-visible lg:p-6">
-        <div className="flex items-center justify-between px-1 pb-5 pt-1 text-xs font-black text-slate-900 lg:hidden">
+      <section className="home-workspace mx-auto min-h-screen w-full bg-white px-4 pb-0 pt-[max(1rem,env(safe-area-inset-top))] sm:phone-shell sm:min-h-0 sm:max-w-[430px] sm:overflow-hidden sm:p-4 md:max-w-none md:overflow-visible md:bg-transparent md:p-0 md:shadow-none">
+        <div className="flex items-center justify-between px-1 pb-5 pt-1 text-xs font-black text-slate-900 md:hidden">
           <span>9:41</span>
         </div>
 
-        <header className="flex items-start justify-between">
+        <header className="flex items-start justify-between md:rounded-3xl md:bg-white md:px-6 md:py-5 md:shadow-soft md:ring-1 md:ring-slate-100">
           <div>
+            <p className="mb-1 hidden text-sm font-black text-blue-600 md:block">
+              나를 위한 AI 비서 · 나의 비서
+            </p>
             <p className="text-xs font-bold text-slate-400">
               안녕하세요, {userProfile?.displayName ?? "사용자"}님
             </p>
             <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-950">
               오늘도 잘 부탁해요!
             </h2>
+            <nav className="mt-4 hidden flex-wrap items-center gap-x-5 gap-y-2 md:flex" aria-label="주요 서비스">
+              {[
+                ["월간 캘린더", "/calendar/monthly"],
+                ["일정관리", "/schedule/manage"],
+                ["기록", "/records"],
+                ["위임", "/delegate"],
+                ["개인 AI", "/settings/ai"],
+              ].map(([label, href]) => (
+                <Link
+                  key={href}
+                  href={href}
+                  className="text-sm font-black text-slate-500 transition hover:text-blue-600"
+                >
+                  {label}
+                </Link>
+              ))}
+            </nav>
           </div>
           <div className="flex shrink-0 flex-col items-end gap-2">
             <UserStatusBadge />
@@ -439,8 +459,8 @@ export default function Home() {
           </div>
         </header>
 
-        <div className="mt-6 space-y-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-4 lg:space-y-0">
-          <section className="app-card p-4">
+        <div className="mt-5 space-y-4 md:grid md:grid-cols-12 md:items-start md:gap-5 md:space-y-0">
+          <section className="app-card p-4 md:order-2 md:col-span-4 md:p-5">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-xs font-black text-blue-600">오늘 액션</p>
@@ -563,7 +583,7 @@ export default function Home() {
             )}
           </section>
 
-          <div className="space-y-4">
+          <div className="space-y-4 md:order-1 md:col-span-8">
             <InputBox
               value={inputText}
               onChange={setInputText}
@@ -675,7 +695,7 @@ export default function Home() {
             )}
           </div>
 
-          <div className="space-y-4 lg:col-span-2 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0">
+          <div className="space-y-4 md:order-3 md:col-span-12 md:grid md:grid-cols-2 md:gap-5 md:space-y-0">
             <AgentActionSuggestionView items={items} compact maxItems={2} />
             <NotificationSummaryCard />
           </div>
@@ -684,7 +704,7 @@ export default function Home() {
         <BottomNavigation />
       </section>
 
-      <section className="hidden self-start lg:block">
+      <section className="hidden self-start md:mt-5 md:block xl:sticky xl:top-6 xl:mt-0">
         <section className="app-card p-5">
           <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
             <div>

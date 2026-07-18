@@ -1,6 +1,6 @@
 import {
+  createLocalStorageRepository,
   readLocalStorageArray,
-  writeLocalStorageArray,
 } from "@/lib/localStorageRepository";
 import { STORAGE_KEYS } from "@/lib/storageKeys";
 import type { AssistantItemWithoutId } from "@/types/assistant";
@@ -16,6 +16,9 @@ const DEFAULT_MEMORY_IDS: Record<PersonalAiMemoryDomain, string> = {
   purchase: "44444444-4444-4444-8444-444444444444",
   notification: "55555555-5555-4555-8555-555555555555",
 };
+
+const personalAiMemoryRepository =
+  createLocalStorageRepository<PersonalAiMemory>(STORAGE_KEYS.personalAiMemory);
 
 function nowIso() {
   return new Date().toISOString();
@@ -99,14 +102,6 @@ function readRawMemories(): PersonalAiMemory[] {
   return readLocalStorageArray<PersonalAiMemory>(STORAGE_KEYS.personalAiMemory);
 }
 
-function writeRawMemories(memories: PersonalAiMemory[]) {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  writeLocalStorageArray(STORAGE_KEYS.personalAiMemory, memories);
-}
-
 export function getPersonalAiMemories() {
   const customMemories = readRawMemories();
   const customIds = new Set(customMemories.map((memory) => memory.id));
@@ -125,13 +120,26 @@ export function savePersonalAiMemory(memory: PersonalAiMemory) {
     ...memory,
     updatedAt: nowIso(),
   };
-  const nextMemories = [
-    nextMemory,
-    ...memories.filter((item) => item.id !== memory.id),
-  ];
-
-  writeRawMemories(nextMemories);
+  if (memories.some((item) => item.id === memory.id)) {
+    personalAiMemoryRepository.update(nextMemory);
+  } else {
+    personalAiMemoryRepository.create(nextMemory);
+  }
   return nextMemory;
+}
+
+export function deletePersonalAiMemory(id: string) {
+  const memory = readRawMemories().find((item) => item.id === id);
+  if (!memory || memory.source === "system") return false;
+
+  personalAiMemoryRepository.delete(id);
+  return true;
+}
+
+export function clearPersonalAiFeedbackMemories() {
+  readRawMemories()
+    .filter((memory) => memory.source === "feedback")
+    .forEach((memory) => personalAiMemoryRepository.delete(memory.id));
 }
 
 function createFeedbackId() {
@@ -183,10 +191,16 @@ export function saveClassificationFeedback({
     updatedAt: now,
   };
 
-  writeRawMemories([
-    memory,
-    ...memories.filter((item) => item.id !== memory.id),
-  ].slice(0, 60));
+  if (existing) {
+    personalAiMemoryRepository.update(memory);
+  } else {
+    personalAiMemoryRepository.create(memory);
+  }
+
+  const overflowMemories = readRawMemories()
+    .filter((item) => item.source === "feedback")
+    .slice(60);
+  overflowMemories.forEach((item) => personalAiMemoryRepository.delete(item.id));
   return memory;
 }
 
