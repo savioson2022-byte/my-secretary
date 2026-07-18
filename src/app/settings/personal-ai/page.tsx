@@ -98,6 +98,8 @@ export default function PersonalAiHistoryPage() {
       <SettingsPageHeader
         title="개인 AI 학습 기록"
         description="Gemma와 추천 엔진이 다음 판단에 참고하는 내 기준을 확인하고 직접 관리합니다."
+        backHref="/settings/ai"
+        backLabel="개인 AI"
       />
 
       <section className="grid gap-3 sm:grid-cols-3">
