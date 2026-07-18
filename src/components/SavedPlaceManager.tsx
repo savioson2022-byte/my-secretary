@@ -248,55 +248,60 @@ function KoreanTimeSelect({
   return (
     <fieldset className="min-w-0">
       <legend className="text-sm font-black text-slate-700">{label}</legend>
-      <div className="mt-2 grid grid-cols-[1.15fr_0.85fr_0.85fr] gap-2">
-        <select
-          aria-label={`${label} 오전 오후`}
-          value={value ? period : ""}
-          onChange={(event) =>
-            commit(event.target.value || "오전", hour12, minute)
-          }
-          className="min-w-0 rounded-2xl border border-slate-200 bg-white px-2 py-3 text-sm font-black outline-none focus:border-blue-400"
-        >
-          <option value="" disabled>
-            오전/오후
-          </option>
-          <option value="오전">오전</option>
-          <option value="오후">오후</option>
-        </select>
-        <select
-          aria-label={`${label} 시`}
-          value={value ? hour12 : ""}
-          onChange={(event) =>
-            commit(period, Number(event.target.value || 9), minute)
-          }
-          className="min-w-0 rounded-2xl border border-slate-200 bg-white px-2 py-3 text-sm font-black outline-none focus:border-blue-400"
-        >
-          <option value="" disabled>
-            시
-          </option>
-          {Array.from({ length: 12 }, (_, index) => index + 1).map((hour) => (
-            <option key={hour} value={hour}>
-              {hour}시
-            </option>
+      <div className="mt-2 space-y-2">
+        <div className="grid grid-cols-2 gap-2 rounded-2xl bg-slate-100 p-1">
+          {(["오전", "오후"] as const).map((optionPeriod) => (
+            <button
+              key={optionPeriod}
+              type="button"
+              aria-pressed={value !== "" && period === optionPeriod}
+              onClick={() => commit(optionPeriod, hour12, minute)}
+              className={`min-h-10 rounded-xl px-3 text-sm font-black transition ${
+                value !== "" && period === optionPeriod
+                  ? "bg-white text-blue-600 shadow-sm"
+                  : "text-slate-500"
+              }`}
+            >
+              {optionPeriod}
+            </button>
           ))}
-        </select>
-        <select
-          aria-label={`${label} 분`}
-          value={value ? minute : ""}
-          onChange={(event) =>
-            commit(period, hour12, Number(event.target.value || 0))
-          }
-          className="min-w-0 rounded-2xl border border-slate-200 bg-white px-2 py-3 text-sm font-black outline-none focus:border-blue-400"
-        >
-          <option value="" disabled>
-            분
-          </option>
-          {minuteOptions.map((optionMinute) => (
-            <option key={optionMinute} value={optionMinute}>
-              {String(optionMinute).padStart(2, "0")}분
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <select
+            aria-label={`${label} 시`}
+            value={value ? hour12 : ""}
+            onChange={(event) =>
+              commit(period, Number(event.target.value || 9), minute)
+            }
+            className="min-w-0 rounded-2xl border border-slate-200 bg-white px-3 py-3 text-base font-black outline-none focus:border-blue-400"
+          >
+            <option value="" disabled>
+              시 선택
             </option>
-          ))}
-        </select>
+            {Array.from({ length: 12 }, (_, index) => index + 1).map((hour) => (
+              <option key={hour} value={hour}>
+                {hour}시
+              </option>
+            ))}
+          </select>
+          <select
+            aria-label={`${label} 분`}
+            value={value ? minute : ""}
+            onChange={(event) =>
+              commit(period, hour12, Number(event.target.value || 0))
+            }
+            className="min-w-0 rounded-2xl border border-slate-200 bg-white px-3 py-3 text-base font-black outline-none focus:border-blue-400"
+          >
+            <option value="" disabled>
+              분 선택
+            </option>
+            {minuteOptions.map((optionMinute) => (
+              <option key={optionMinute} value={optionMinute}>
+                {String(optionMinute).padStart(2, "0")}분
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
     </fieldset>
   );
