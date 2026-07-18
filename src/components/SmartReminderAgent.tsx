@@ -744,6 +744,8 @@ export default function SmartReminderAgent() {
   );
   const [message, setMessage] = useState<string | null>(null);
   const [isNativeRuntime, setIsNativeRuntime] = useState(false);
+  const [isIosDevice, setIsIosDevice] = useState(false);
+  const [isStandaloneWebApp, setIsStandaloneWebApp] = useState(false);
   const [isRequestingPermission, setIsRequestingPermission] = useState(false);
   const canUseNotification = useMemo(() => {
     return isMounted && "Notification" in window;
@@ -759,6 +761,13 @@ export default function SmartReminderAgent() {
   useEffect(() => {
     setIsMounted(true);
     void isNativeAppRuntime().then(setIsNativeRuntime);
+    setIsIosDevice(/iphone|ipad|ipod/i.test(window.navigator.userAgent));
+    setIsStandaloneWebApp(
+      window.matchMedia("(display-mode: standalone)").matches ||
+        Boolean(
+          (window.navigator as Navigator & { standalone?: boolean }).standalone
+        )
+    );
   }, []);
 
   useEffect(() => {
@@ -881,8 +890,19 @@ export default function SmartReminderAgent() {
         return;
       }
 
+      if (isIosDevice && !isStandaloneWebApp) {
+        setMessage(
+          "Safari를 여는 바로가기는 알림을 받을 수 없어요. Safari 공유 버튼에서 ‘홈 화면에 추가’로 설치한 뒤 그 아이콘에서 다시 눌러주세요."
+        );
+        return;
+      }
+
       if (!canUseNotification) {
-        setMessage("이 브라우저에서는 알림 권한을 지원하지 않습니다.");
+        setMessage(
+          isIosDevice
+            ? "iPhone을 iOS 16.4 이상으로 업데이트한 뒤 홈 화면 앱에서 다시 시도해주세요."
+            : "이 브라우저에서는 알림 권한을 지원하지 않습니다."
+        );
         return;
       }
 
@@ -891,6 +911,11 @@ export default function SmartReminderAgent() {
           "브라우저 주소창의 사이트 설정에서 알림을 허용한 뒤 다시 눌러주세요."
         );
         return;
+      }
+
+      if ("serviceWorker" in navigator) {
+        await navigator.serviceWorker.register("/sw.js");
+        await navigator.serviceWorker.ready;
       }
 
       const nextPermission = await Notification.requestPermission();
@@ -1075,7 +1100,12 @@ export default function SmartReminderAgent() {
     });
   }
 
-  if ((!canUseNotification && !isNativeRuntime) || permission === "granted") {
+  const canShowIosInstallHelp = isMounted && isIosDevice;
+
+  if (
+    (!canUseNotification && !isNativeRuntime && !canShowIosInstallHelp) ||
+    permission === "granted"
+  ) {
     return null;
   }
 
@@ -1105,7 +1135,11 @@ export default function SmartReminderAgent() {
           disabled={isRequestingPermission}
           className="shrink-0 rounded-2xl bg-white px-3 py-2 text-xs font-black text-slate-950 disabled:cursor-wait disabled:opacity-60"
         >
-          {isRequestingPermission ? "연결 중" : "켜기"}
+          {isRequestingPermission
+            ? "연결 중"
+            : isIosDevice && !isStandaloneWebApp && !isNativeRuntime
+              ? "설치 안내"
+              : "켜기"}
         </button>
       </div>
     </div>
