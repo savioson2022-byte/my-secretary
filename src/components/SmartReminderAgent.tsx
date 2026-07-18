@@ -739,14 +739,7 @@ async function scheduleNativeNotifications(events: NotificationEvent[]) {
 export default function SmartReminderAgent() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [isMounted, setIsMounted] = useState(false);
-  const [permission, setPermission] = useState<NotificationPermission | "none">(
-    "none"
-  );
-  const [message, setMessage] = useState<string | null>(null);
-  const [isNativeRuntime, setIsNativeRuntime] = useState(false);
-  const [isIosDevice, setIsIosDevice] = useState(false);
-  const [isStandaloneWebApp, setIsStandaloneWebApp] = useState(false);
-  const [isRequestingPermission, setIsRequestingPermission] = useState(false);
+  const [, setMessage] = useState<string | null>(null);
   const canUseNotification = useMemo(() => {
     return isMounted && "Notification" in window;
   }, [isMounted]);
@@ -760,20 +753,11 @@ export default function SmartReminderAgent() {
 
   useEffect(() => {
     setIsMounted(true);
-    void isNativeAppRuntime().then(setIsNativeRuntime);
-    setIsIosDevice(/iphone|ipad|ipod/i.test(window.navigator.userAgent));
-    setIsStandaloneWebApp(
-      window.matchMedia("(display-mode: standalone)").matches ||
-        Boolean(
-          (window.navigator as Navigator & { standalone?: boolean }).standalone
-        )
-    );
   }, []);
 
   useEffect(() => {
     if (!canUseNotification) return;
 
-    setPermission(Notification.permission);
     const settings = getNotificationSettings();
     const events = buildNotificationEvents(settings);
     let lastNativeScheduleSyncAt = 0;
@@ -860,83 +844,6 @@ export default function SmartReminderAgent() {
       void actionHandle?.remove();
     };
   }, [isMounted, supabase]);
-
-  async function requestPermission() {
-    if (isRequestingPermission) return;
-
-    setIsRequestingPermission(true);
-    setMessage(null);
-
-    try {
-      if (isNativeRuntime) {
-        const { LocalNotifications } = await import(
-          "@capacitor/local-notifications"
-        );
-        const nextPermission = await LocalNotifications.requestPermissions();
-
-        if (nextPermission.display !== "granted") {
-          setMessage(
-            "아이폰 설정 > 알림 > 나의 비서에서 알림 허용을 켜주세요."
-          );
-          return;
-        }
-
-        const events = buildNotificationEvents(getNotificationSettings());
-        await scheduleNativeNotifications(events);
-        await registerNativePushToken();
-        setPermission("granted");
-        setMessage("아이폰 일정 알림을 켰어요.");
-        window.setTimeout(() => setMessage(null), 1800);
-        return;
-      }
-
-      if (isIosDevice && !isStandaloneWebApp) {
-        setMessage(
-          "Safari를 여는 바로가기는 알림을 받을 수 없어요. Safari 공유 버튼에서 ‘홈 화면에 추가’로 설치한 뒤 그 아이콘에서 다시 눌러주세요."
-        );
-        return;
-      }
-
-      if (!canUseNotification) {
-        setMessage(
-          isIosDevice
-            ? "iPhone을 iOS 16.4 이상으로 업데이트한 뒤 홈 화면 앱에서 다시 시도해주세요."
-            : "이 브라우저에서는 알림 권한을 지원하지 않습니다."
-        );
-        return;
-      }
-
-      if (Notification.permission === "denied") {
-        setMessage(
-          "브라우저 주소창의 사이트 설정에서 알림을 허용한 뒤 다시 눌러주세요."
-        );
-        return;
-      }
-
-      if ("serviceWorker" in navigator) {
-        await navigator.serviceWorker.register("/sw.js");
-        await navigator.serviceWorker.ready;
-      }
-
-      const nextPermission = await Notification.requestPermission();
-      setPermission(nextPermission);
-
-      if (nextPermission !== "granted") {
-        setMessage("알림 권한을 허용해야 일정 알림을 켤 수 있습니다.");
-        return;
-      }
-
-      showReminder(
-        "나의 비서 알림이 켜졌어요",
-        "일정 시간이 되면 알려드릴게요."
-      );
-      await enableServerPush();
-    } catch {
-      setMessage("알림 권한을 여는 중 문제가 생겼습니다. 다시 시도해주세요.");
-    } finally {
-      setIsRequestingPermission(false);
-    }
-  }
 
   async function getAccessToken() {
     if (!supabase) return null;
@@ -1100,48 +1007,5 @@ export default function SmartReminderAgent() {
     });
   }
 
-  const canShowIosInstallHelp = isMounted && isIosDevice;
-
-  if (
-    (!canUseNotification && !isNativeRuntime && !canShowIosInstallHelp) ||
-    permission === "granted"
-  ) {
-    return null;
-  }
-
-  return (
-    <div className="fixed inset-x-3 bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-50 mx-auto max-w-[430px] rounded-3xl bg-slate-950 p-4 text-white shadow-[0_24px_70px_rgba(15,23,42,0.35)]">
-      <div className="flex items-center gap-3">
-        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/10">
-          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor" aria-hidden="true">
-            <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9ZM10 21h4" />
-          </svg>
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-black">일정 알림 켜기</p>
-          <p className="mt-1 text-xs font-semibold leading-5 text-white/68">
-            앱이 실행 중이면 바로 알려주고, 지원되는 기기는 서버 푸시도
-            연결합니다.
-          </p>
-          {message && (
-            <p className="mt-1 text-xs font-bold leading-5 text-white/80">
-              {message}
-            </p>
-          )}
-        </div>
-        <button
-          type="button"
-          onClick={requestPermission}
-          disabled={isRequestingPermission}
-          className="shrink-0 rounded-2xl bg-white px-3 py-2 text-xs font-black text-slate-950 disabled:cursor-wait disabled:opacity-60"
-        >
-          {isRequestingPermission
-            ? "연결 중"
-            : isIosDevice && !isStandaloneWebApp && !isNativeRuntime
-              ? "설치 안내"
-              : "켜기"}
-        </button>
-      </div>
-    </div>
-  );
+  return null;
 }
