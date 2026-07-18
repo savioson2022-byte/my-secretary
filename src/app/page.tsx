@@ -13,6 +13,11 @@ import UserStatusBadge from "@/components/UserStatusBadge";
 import { aiClassifyInput } from "@/lib/aiClassifyInput";
 import { classifyInput } from "@/lib/classifyInput";
 import { buildClassificationContext } from "@/lib/classificationContext";
+import {
+  clearCaptureDraft,
+  getCaptureDraft,
+  saveCaptureDraft,
+} from "@/lib/captureDraftStorage";
 import { getCloudDataSyncedEventName } from "@/lib/dataSyncEvents";
 import {
   groupIdeaWithAi,
@@ -139,6 +144,7 @@ export default function Home() {
     "gemma-on-device" | "ai" | "fallback" | null
   >(null);
   const [voiceIntent, setVoiceIntent] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
   useEffect(() => {
     function refreshLocalData() {
@@ -150,6 +156,7 @@ export default function Home() {
     }
 
     refreshLocalData();
+    setInputText((currentText) => currentText || getCaptureDraft());
 
     const searchParams = new URLSearchParams(window.location.search);
     setVoiceIntent(searchParams.get("voice") === "1");
@@ -269,8 +276,10 @@ export default function Home() {
 
     if (textOverride !== undefined) {
       setInputText(targetText);
+      saveCaptureDraft(targetText);
     }
 
+    setSaveMessage(null);
     setIsClassifying(true);
     setClassificationSource(null);
 
@@ -300,43 +309,116 @@ export default function Home() {
     }
   }
 
+  function handleInputTextChange(nextText: string) {
+    setInputText(nextText);
+    saveCaptureDraft(nextText);
+    setSaveMessage(null);
+  }
+
   async function handleSave() {
-    if (!classificationResult) return;
+    if (!classificationResult) return false;
 
-    const now = new Date().toISOString();
-    const ideaGrouping = shouldAttachToIdeaRecord(classificationResult)
-      ? await groupIdeaWithAi({
-        text: classificationResult.originalText,
-        existingIdeas: items,
-        personalAiMemories: getPersonalAiMemories(),
-      })
-      : null;
+    const result = classificationResult;
 
-    const newItem: AssistantItem = {
-      ...classificationResult,
-      ideaGroupId: ideaGrouping?.ideaGroupId ?? classificationResult.ideaGroupId,
-      ideaGroupTitle:
-        ideaGrouping?.ideaGroupTitle ?? classificationResult.ideaGroupTitle,
-      ideaSubcategory:
-        ideaGrouping?.ideaSubcategory ?? classificationResult.ideaSubcategory,
-      id: createId(),
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    saveItem(newItem);
-
-    const singleSchedule = createSingleScheduleFromItem(newItem);
-
-    if (singleSchedule) {
-      saveSingleSchedule(singleSchedule);
-      setSingleSchedules(getSingleSchedules());
+    if (!result.title.trim()) {
+      setSaveMessage("제목을 입력해야 저장할 수 있어요.");
+      return false;
     }
 
-    setItems(getItems());
-    setInputText("");
-    setClassificationResult(null);
-    setClassificationSource(null);
+    if (result.processType === "단기일정") {
+      if (!result.dueDate) {
+        setSaveMessage("단기일정의 날짜를 선택해주세요.");
+        return false;
+      }
+
+      if (!result.scheduleStartTime) {
+        setSaveMessage("단기일정의 시작 시간을 선택해주세요.");
+        return false;
+      }
+
+      if (!result.scheduleEndTime) {
+        setSaveMessage("단기일정의 종료 시간을 선택해주세요.");
+        return false;
+      }
+
+      if (
+        getTimeMinutes(result.scheduleEndTime) <=
+        getTimeMinutes(result.scheduleStartTime)
+      ) {
+        setSaveMessage("종료 시간은 시작 시간보다 늦어야 해요.");
+        return false;
+      }
+    }
+
+    setSaveMessage("저장하는 중이에요...");
+
+    try {
+      const now = new Date().toISOString();
+      let ideaGrouping: Awaited<ReturnType<typeof groupIdeaWithAi>> | null =
+        null;
+
+      if (shouldAttachToIdeaRecord(result)) {
+        try {
+          ideaGrouping = await groupIdeaWithAi({
+            text: result.originalText,
+            existingIdeas: items,
+            personalAiMemories: getPersonalAiMemories(),
+          });
+        } catch (error) {
+          console.error("아이디어 연결 실패, 기본 저장으로 계속:", error);
+        }
+      }
+
+      const newItem: AssistantItem = {
+        ...result,
+        ideaGroupId: ideaGrouping?.ideaGroupId ?? result.ideaGroupId,
+        ideaGroupTitle: ideaGrouping?.ideaGroupTitle ?? result.ideaGroupTitle,
+        ideaSubcategory: ideaGrouping?.ideaSubcategory ?? result.ideaSubcategory,
+        id: createId(),
+        createdAt: now,
+        updatedAt: now,
+      };
+      const singleSchedule = createSingleScheduleFromItem(newItem);
+
+      if (result.processType === "단기일정" && !singleSchedule) {
+        setSaveMessage("단기일정 정보를 확인하지 못했어요. 날짜와 시간을 다시 확인해주세요.");
+        return false;
+      }
+
+      saveItem(newItem);
+
+      if (singleSchedule) {
+        saveSingleSchedule(singleSchedule);
+      }
+
+      const savedItems = getItems();
+      const savedSchedules = getSingleSchedules();
+      const itemWasSaved = savedItems.some((item) => item.id === newItem.id);
+      const scheduleWasSaved = singleSchedule
+        ? savedSchedules.some((schedule) => schedule.id === singleSchedule.id)
+        : true;
+
+      if (!itemWasSaved || !scheduleWasSaved) {
+        throw new Error("저장 후 데이터를 다시 확인하지 못했습니다.");
+      }
+
+      setItems(savedItems);
+      setSingleSchedules(savedSchedules);
+      setInputText("");
+      clearCaptureDraft();
+      setClassificationResult(null);
+      setClassificationSource(null);
+      setSaveMessage(
+        singleSchedule
+          ? "단기일정과 캘린더에 저장했어요."
+          : "기록을 저장했어요."
+      );
+      return true;
+    } catch (error) {
+      console.error("기록 저장 실패:", error);
+      setSaveMessage("저장하지 못했어요. 잠시 후 다시 눌러주세요.");
+      return false;
+    }
   }
 
   function handleComplete(item: AssistantItem) {
@@ -586,10 +668,24 @@ export default function Home() {
           <div className="space-y-4 md:order-1 md:col-span-8">
             <InputBox
               value={inputText}
-              onChange={setInputText}
+              onChange={handleInputTextChange}
               onClassify={handleClassify}
               voiceIntent={voiceIntent}
             />
+
+            {saveMessage && (
+              <p
+                className={`rounded-2xl p-4 text-sm font-black ring-1 ${
+                  saveMessage.includes("저장했어요")
+                    ? "bg-emerald-50 text-emerald-700 ring-emerald-100"
+                    : saveMessage.includes("중이에요")
+                      ? "bg-blue-50 text-blue-700 ring-blue-100"
+                      : "bg-amber-50 text-amber-700 ring-amber-100"
+                }`}
+              >
+                {saveMessage}
+              </p>
+            )}
 
             {isClassifying && (
             <p className="app-card p-4 text-sm font-black text-slate-500">

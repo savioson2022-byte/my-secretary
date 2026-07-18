@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActionType,
   AssistantItemWithoutId,
@@ -16,7 +16,7 @@ import { saveClassificationFeedback } from "@/lib/personalAiMemoryStorage";
 type ClassificationResultProps = {
   result: AssistantItemWithoutId;
   onChange: (nextResult: AssistantItemWithoutId) => void;
-  onSave: () => void;
+  onSave: () => Promise<boolean>;
 };
 
 const CATEGORY_OPTIONS: Category[] = [
@@ -180,12 +180,29 @@ export default function ClassificationResult({
     );
   }
 
-  function handleSaveWithFeedback() {
-    saveClassificationFeedback({
-      original: originalResultRef.current,
-      corrected: result,
-    });
-    onSave();
+  const [isSaving, setIsSaving] = useState(false);
+
+  async function handleSaveWithFeedback() {
+    if (isSaving) return;
+
+    setIsSaving(true);
+
+    try {
+      const didSave = await onSave();
+
+      if (!didSave) return;
+
+      try {
+        saveClassificationFeedback({
+          original: originalResultRef.current,
+          corrected: result,
+        });
+      } catch (error) {
+        console.error("분류 피드백 저장 실패:", error);
+      }
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   return (
@@ -492,9 +509,14 @@ export default function ClassificationResult({
       <button
         type="button"
         onClick={handleSaveWithFeedback}
-        className="mt-5 w-full rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white shadow-[0_14px_28px_rgba(49,130,246,0.22)] transition hover:bg-blue-500"
+        disabled={isSaving}
+        className="mt-5 w-full rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white shadow-[0_14px_28px_rgba(49,130,246,0.22)] transition hover:bg-blue-500 disabled:cursor-wait disabled:opacity-60"
       >
-        {hasClassificationCorrection() ? "수정하고 저장하기" : "맞아요, 저장하기"}
+        {isSaving
+          ? "저장 중..."
+          : hasClassificationCorrection()
+            ? "수정하고 저장하기"
+            : "맞아요, 저장하기"}
       </button>
       <p className="mt-2 text-center text-xs font-bold text-slate-400">
         저장 한 번으로 Gemma가 다음 분류 기준을 배웁니다.

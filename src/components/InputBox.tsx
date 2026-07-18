@@ -92,7 +92,6 @@ export default function InputBox({
   const baseTextRef = useRef("");
   const finalTranscriptRef = useRef("");
   const latestTextRef = useRef(value);
-  const shouldClassifyOnEndRef = useRef(false);
   const pointerStartedVoiceRef = useRef(false);
   const voiceIntentStartedRef = useRef(false);
   const autoStopOnSilenceRef = useRef(false);
@@ -154,30 +153,24 @@ export default function InputBox({
 
       if (!nextText) {
         setVoiceMessage("음성이 감지되지 않았습니다. 다시 말해보세요.");
-        stopVoiceInput({
-          autoClassify: false,
-        });
+        stopVoiceInput();
         return;
       }
 
-      setVoiceMessage("말이 끝난 것 같아 자동으로 기록을 마칩니다.");
-      stopVoiceInput({
-        autoClassify: true,
-      });
+      setVoiceMessage("말이 끝난 것 같아 텍스트 초안으로 저장합니다.");
+      stopVoiceInput();
     }, waitMs);
   }
 
-  function stopVoiceInput({ autoClassify = true } = {}) {
+  function stopVoiceInput() {
     clearSilenceTimer();
     autoStopOnSilenceRef.current = false;
-    shouldClassifyOnEndRef.current = autoClassify;
     recognitionRef.current?.stop();
     setIsListening(false);
     setInterimTranscript("");
   }
 
   function startVoiceInput({
-    autoClassifyOnEnd = true,
     autoStopOnSilence = false,
   } = {}) {
     const SpeechRecognition = getSpeechRecognitionConstructor();
@@ -190,9 +183,7 @@ export default function InputBox({
     }
 
     if (isListening) {
-      stopVoiceInput({
-        autoClassify: autoClassifyOnEnd,
-      });
+      stopVoiceInput();
       return;
     }
 
@@ -219,9 +210,6 @@ export default function InputBox({
     };
 
     recognition.onend = () => {
-      const shouldClassify = shouldClassifyOnEndRef.current;
-      const nextText = latestTextRef.current.trim();
-
       clearSilenceTimer();
       autoStopOnSilenceRef.current = false;
       setIsListening(false);
@@ -231,24 +219,15 @@ export default function InputBox({
           return currentMessage;
         }
 
-        return finalTranscriptRef.current.trim()
-          ? "음성 기록이 끝나서 자동 분류를 시작합니다."
+        return latestTextRef.current.trim()
+          ? "음성 내용을 텍스트 초안으로 저장했어요. 확인 후 파란 버튼을 눌러주세요."
           : "음성 인식이 종료됐습니다.";
       });
-
-      shouldClassifyOnEndRef.current = false;
-
-      if (shouldClassify && nextText) {
-        window.setTimeout(() => {
-          onClassify(nextText);
-        }, 120);
-      }
     };
 
     recognition.onerror = (event) => {
       clearSilenceTimer();
       autoStopOnSilenceRef.current = false;
-      shouldClassifyOnEndRef.current = false;
       setIsListening(false);
       setInterimTranscript("");
 
@@ -330,7 +309,6 @@ export default function InputBox({
     voiceIntentStartedRef.current = true;
     const timer = window.setTimeout(() => {
       startVoiceInput({
-        autoClassifyOnEnd: true,
         autoStopOnSilence: true,
       });
     }, 350);
@@ -346,7 +324,7 @@ export default function InputBox({
     }
 
     startVoiceInput({
-      autoClassifyOnEnd: true,
+      autoStopOnSilence: false,
     });
   }
 
@@ -357,7 +335,7 @@ export default function InputBox({
 
     pointerStartedVoiceRef.current = true;
     startVoiceInput({
-      autoClassifyOnEnd: true,
+      autoStopOnSilence: false,
     });
   }
 
@@ -367,9 +345,7 @@ export default function InputBox({
     }
 
     pointerStartedVoiceRef.current = false;
-    stopVoiceInput({
-      autoClassify: true,
-    });
+    stopVoiceInput();
   }
 
   return (
@@ -498,7 +474,7 @@ export default function InputBox({
             <p className="mt-1 text-blue-500">인식 중: {interimTranscript}</p>
           )}
           {voiceControlMode === "hold" && isListening && (
-            <p className="mt-1 text-blue-500">손을 떼면 자동으로 분류합니다.</p>
+            <p className="mt-1 text-blue-500">손을 떼면 텍스트 초안으로 남깁니다.</p>
           )}
         </div>
       )}
