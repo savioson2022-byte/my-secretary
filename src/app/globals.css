@@ -26,6 +26,7 @@ body {
     radial-gradient(circle at 82% 8%, rgba(167, 139, 250, 0.12), transparent 24%),
     linear-gradient(135deg, #f8fbff 0%, #f4f7fb 48%, #ffffff 100%);
   color: var(--assistant-ink);
+  overflow-x: clip;
   overscroll-behavior-y: none;
 }
 
@@ -39,6 +40,8 @@ textarea {
 input,
 select,
 textarea {
+  min-width: 0;
+  max-width: 100%;
   font-size: 16px;
 }
 
@@ -106,4 +109,26 @@ textarea {
 
 .soft-divider {
   background: linear-gradient(90deg, transparent, rgba(148, 163, 184, 0.32), transparent);
+}
+
+@media (max-width: 639px) {
+  .app-page,
+  .phone-shell,
+  .app-card {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .app-card > *,
+  .app-card form,
+  .app-card form > *,
+  .app-card [class*="grid"] > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  button,
+  a {
+    max-width: 100%;
+  }
 }

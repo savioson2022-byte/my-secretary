@@ -206,7 +206,7 @@ export default function ClassificationResult({
   }
 
   return (
-    <section className="app-card p-4">
+    <section className="app-card min-w-0 overflow-hidden p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-black text-slate-900">분류 결과</h2>
@@ -240,8 +240,8 @@ export default function ClassificationResult({
           />
         </div>
 
-        <div className="grid gap-3 md:grid-cols-2">
-          <div>
+        <div className="grid min-w-0 gap-3 md:grid-cols-2">
+          <div className="min-w-0">
             <FieldLabel>분야</FieldLabel>
             <select
               value={result.category}
@@ -260,7 +260,7 @@ export default function ClassificationResult({
             </select>
           </div>
 
-          <div>
+          <div className="min-w-0">
             <FieldLabel>행동 유형</FieldLabel>
             <select
               value={result.actionType}
@@ -313,8 +313,8 @@ export default function ClassificationResult({
               <p className="text-sm font-black text-violet-700">
                 구매 위임 정보
               </p>
-              <div className="mt-3 grid gap-3 md:grid-cols-2">
-                <div>
+              <div className="mt-3 grid min-w-0 gap-3 md:grid-cols-2">
+                <div className="min-w-0">
                   <FieldLabel>상품명</FieldLabel>
                   <input
                     value={result.purchaseProductName ?? ""}
@@ -327,7 +327,7 @@ export default function ClassificationResult({
                     className="mt-2 w-full rounded-2xl border border-violet-100 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-violet-400"
                   />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <FieldLabel>구매처</FieldLabel>
                   <select
                     value={result.purchasePlatform ?? "coupang"}
@@ -360,8 +360,8 @@ export default function ClassificationResult({
           />
         )}
 
-        <div className="grid gap-3 md:grid-cols-3">
-          <div>
+        <div className="grid min-w-0 gap-3 md:grid-cols-3">
+          <div className="min-w-0">
             <FieldLabel>예상 시간</FieldLabel>
             <input
               type="number"
@@ -376,7 +376,7 @@ export default function ClassificationResult({
             <p className="mt-1 text-xs font-semibold text-slate-400">분 단위</p>
           </div>
 
-          <div>
+          <div className="min-w-0">
             <FieldLabel>중요도</FieldLabel>
             <select
               value={result.priority}
@@ -395,7 +395,7 @@ export default function ClassificationResult({
             </select>
           </div>
 
-          <div>
+          <div className="min-w-0">
             <FieldLabel>반복성</FieldLabel>
             <select
               value={result.repeatType}
@@ -415,8 +415,8 @@ export default function ClassificationResult({
           </div>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-2">
-          <div>
+        <div className="grid min-w-0 gap-3 md:grid-cols-2">
+          <div className="min-w-0">
             <FieldLabel>마감일 / 일정 날짜</FieldLabel>
             <input
               type="date"
@@ -430,7 +430,7 @@ export default function ClassificationResult({
             />
           </div>
 
-          <div>
+          <div className="min-w-0">
             <FieldLabel>알림일</FieldLabel>
             <input
               type="date"
@@ -453,8 +453,8 @@ export default function ClassificationResult({
               있습니다.
             </p>
 
-            <div className="mt-3 grid gap-3 md:grid-cols-2">
-              <div>
+            <div className="mt-3 grid min-w-0 gap-3 md:grid-cols-2">
+              <div className="min-w-0">
                 <FieldLabel>시작 시간</FieldLabel>
                 <input
                   type="time"
@@ -466,7 +466,7 @@ export default function ClassificationResult({
                 />
               </div>
 
-              <div>
+              <div className="min-w-0">
                 <FieldLabel>종료 시간</FieldLabel>
                 <input
                   type="time"
