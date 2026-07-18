@@ -743,6 +743,8 @@ export default function SmartReminderAgent() {
     "none"
   );
   const [message, setMessage] = useState<string | null>(null);
+  const [isNativeRuntime, setIsNativeRuntime] = useState(false);
+  const [isRequestingPermission, setIsRequestingPermission] = useState(false);
   const canUseNotification = useMemo(() => {
     return isMounted && "Notification" in window;
   }, [isMounted]);
@@ -756,6 +758,7 @@ export default function SmartReminderAgent() {
 
   useEffect(() => {
     setIsMounted(true);
+    void isNativeAppRuntime().then(setIsNativeRuntime);
   }, []);
 
   useEffect(() => {
@@ -850,17 +853,63 @@ export default function SmartReminderAgent() {
   }, [isMounted, supabase]);
 
   async function requestPermission() {
-    if (!canUseNotification) {
-      alert("이 브라우저에서는 알림 권한을 지원하지 않습니다.");
-      return;
-    }
+    if (isRequestingPermission) return;
 
-    const nextPermission = await Notification.requestPermission();
-    setPermission(nextPermission);
+    setIsRequestingPermission(true);
+    setMessage(null);
 
-    if (nextPermission === "granted") {
-      showReminder("나의 비서 알림이 켜졌어요", "일정 시간이 되면 알려드릴게요.");
+    try {
+      if (isNativeRuntime) {
+        const { LocalNotifications } = await import(
+          "@capacitor/local-notifications"
+        );
+        const nextPermission = await LocalNotifications.requestPermissions();
+
+        if (nextPermission.display !== "granted") {
+          setMessage(
+            "아이폰 설정 > 알림 > 나의 비서에서 알림 허용을 켜주세요."
+          );
+          return;
+        }
+
+        const events = buildNotificationEvents(getNotificationSettings());
+        await scheduleNativeNotifications(events);
+        await registerNativePushToken();
+        setPermission("granted");
+        setMessage("아이폰 일정 알림을 켰어요.");
+        window.setTimeout(() => setMessage(null), 1800);
+        return;
+      }
+
+      if (!canUseNotification) {
+        setMessage("이 브라우저에서는 알림 권한을 지원하지 않습니다.");
+        return;
+      }
+
+      if (Notification.permission === "denied") {
+        setMessage(
+          "브라우저 주소창의 사이트 설정에서 알림을 허용한 뒤 다시 눌러주세요."
+        );
+        return;
+      }
+
+      const nextPermission = await Notification.requestPermission();
+      setPermission(nextPermission);
+
+      if (nextPermission !== "granted") {
+        setMessage("알림 권한을 허용해야 일정 알림을 켤 수 있습니다.");
+        return;
+      }
+
+      showReminder(
+        "나의 비서 알림이 켜졌어요",
+        "일정 시간이 되면 알려드릴게요."
+      );
       await enableServerPush();
+    } catch {
+      setMessage("알림 권한을 여는 중 문제가 생겼습니다. 다시 시도해주세요.");
+    } finally {
+      setIsRequestingPermission(false);
     }
   }
 
@@ -1026,7 +1075,7 @@ export default function SmartReminderAgent() {
     });
   }
 
-  if (!canUseNotification || permission === "granted") {
+  if ((!canUseNotification && !isNativeRuntime) || permission === "granted") {
     return null;
   }
 
@@ -1053,9 +1102,10 @@ export default function SmartReminderAgent() {
         <button
           type="button"
           onClick={requestPermission}
-          className="shrink-0 rounded-2xl bg-white px-3 py-2 text-xs font-black text-slate-950"
+          disabled={isRequestingPermission}
+          className="shrink-0 rounded-2xl bg-white px-3 py-2 text-xs font-black text-slate-950 disabled:cursor-wait disabled:opacity-60"
         >
-          켜기
+          {isRequestingPermission ? "연결 중" : "켜기"}
         </button>
       </div>
     </div>
