@@ -315,7 +315,7 @@ export default function MonthlyCalendarView({
                 type="button"
                 key={dateText}
                 onClick={() => setSelectedDateText(dateText)}
-                className={`min-h-[104px] border-b border-r border-slate-100 p-1.5 text-left transition sm:min-h-[128px] ${
+                className={`min-h-[104px] border-b border-r border-slate-100 p-1.5 text-left transition sm:min-h-[128px] lg:min-h-[150px] lg:p-2.5 ${
                   isCurrentMonth ? "bg-white" : "bg-slate-50 text-slate-300"
                 } ${isSelected ? "shadow-[inset_0_0_0_2px_rgba(49,130,246,0.22)]" : ""}`}
               >
@@ -341,7 +341,7 @@ export default function MonthlyCalendarView({
                   {events.slice(0, 3).map((event) => (
                     <div
                       key={`${event.sourceType}-${event.id}`}
-                      className="truncate rounded-md border px-1.5 py-1 text-[10px] font-black"
+                      className="truncate rounded-md border px-1.5 py-1 text-[10px] font-black lg:px-2 lg:text-xs"
                       style={getSoftColorStyle(event.color)}
                     >
                       {event.startTime} {event.title}

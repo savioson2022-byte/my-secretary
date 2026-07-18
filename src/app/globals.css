@@ -66,6 +66,18 @@ textarea {
   }
 }
 
+@media (min-width: 1024px) {
+  .app-page {
+    width: calc(100% - 2rem);
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  .desktop-side-nav {
+    left: max(1.5rem, calc(50% - 720px + 1rem));
+  }
+}
+
 @media (min-width: 768px) {
   .home-workspace {
     border: 0;

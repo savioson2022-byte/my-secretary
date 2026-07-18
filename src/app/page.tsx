@@ -368,7 +368,7 @@ export default function Home() {
   }
 
   return (
-    <main className="mx-auto min-h-screen max-w-[1540px] px-0 py-0 sm:px-5 sm:py-6 md:px-6 md:pl-28 xl:grid xl:grid-cols-[minmax(0,1.45fr)_minmax(360px,0.55fr)] xl:items-start xl:gap-5 xl:px-8 xl:pl-32">
+    <main className="mx-auto min-h-screen max-w-[1440px] px-0 py-0 sm:px-5 sm:py-6 md:px-6 md:pl-[7.5rem] xl:grid xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.55fr)] xl:items-start xl:gap-5 xl:px-6 xl:pl-[7.5rem]">
       <section className="hidden">
         <p className="text-sm font-black text-blue-600">나를 위한 AI 비서</p>
         <div className="mt-4 flex items-center gap-4">

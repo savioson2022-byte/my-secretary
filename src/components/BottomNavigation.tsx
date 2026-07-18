@@ -36,7 +36,7 @@ export default function BottomNavigation() {
 
   return (
     <>
-      <nav className="fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-[430px] border-t border-slate-100 bg-white/95 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2 shadow-[0_-14px_38px_rgba(15,23,42,0.08)] backdrop-blur md:bottom-auto md:left-5 md:right-auto md:top-1/2 md:mx-0 md:w-[88px] md:-translate-y-1/2 md:rounded-2xl md:border md:border-slate-100 md:px-2 md:py-3 md:shadow-soft">
+      <nav className="desktop-side-nav fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-[430px] border-t border-slate-100 bg-white/95 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2 shadow-[0_-14px_38px_rgba(15,23,42,0.08)] backdrop-blur md:bottom-auto md:right-auto md:top-1/2 md:mx-0 md:w-[88px] md:-translate-y-1/2 md:rounded-2xl md:border md:border-slate-100 md:px-2 md:py-3 md:shadow-soft">
         <div className="grid grid-cols-5 gap-1 md:grid-cols-1">
           {LINKS.map((link) => {
             const isActive =

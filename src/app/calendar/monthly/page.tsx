@@ -47,12 +47,12 @@ export default function MonthlyCalendarPage() {
   }, []);
 
   return (
-    <main className="app-page mx-auto max-w-[720px] bg-white px-3 sm:bg-transparent sm:px-4">
-      <div className="min-h-screen bg-white pb-2 sm:phone-shell sm:min-h-0 sm:overflow-hidden sm:p-4">
-        <div className="flex items-center justify-between px-1 pb-5 pt-1 text-xs font-black text-slate-900">
+    <main className="app-page mx-auto max-w-[1280px] bg-white px-3 sm:bg-transparent sm:px-4 lg:px-6 lg:pl-[7.5rem]">
+      <div className="min-h-screen bg-white pb-2 sm:phone-shell sm:min-h-0 sm:overflow-hidden sm:p-4 md:rounded-none md:border-0 md:bg-transparent md:p-0 md:shadow-none md:backdrop-blur-none">
+        <div className="flex items-center justify-between px-1 pb-5 pt-1 text-xs font-black text-slate-900 md:hidden">
           <span>9:41</span>
         </div>
-        <header className="mb-4 flex items-start justify-between gap-4">
+        <header className="mb-4 flex items-start justify-between gap-4 md:rounded-3xl md:bg-white md:p-5 md:shadow-soft md:ring-1 md:ring-slate-100">
           <div>
             <p className="text-sm font-bold text-slate-500">캘린더</p>
             <h1 className="mt-1 text-3xl font-black tracking-tight text-slate-950">
