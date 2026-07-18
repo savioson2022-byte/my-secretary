@@ -219,6 +219,89 @@ function applyPlaceSearchResult(place: PlaceSearchResult): PlaceDraft {
   };
 }
 
+function KoreanTimeSelect({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const matchedTime = /^(\d{2}):(\d{2})$/.exec(value);
+  const hour24 = matchedTime ? Number(matchedTime[1]) : 9;
+  const minute = matchedTime ? Number(matchedTime[2]) : 0;
+  const period = hour24 < 12 ? "오전" : "오후";
+  const hour12 = hour24 % 12 || 12;
+  const minuteOptions = Array.from(
+    new Set([...Array.from({ length: 12 }, (_, index) => index * 5), minute])
+  ).sort((a, b) => a - b);
+
+  function commit(nextPeriod: string, nextHour12: number, nextMinute: number) {
+    const normalizedHour =
+      (nextHour12 % 12) + (nextPeriod === "오후" ? 12 : 0);
+    onChange(
+      `${String(normalizedHour).padStart(2, "0")}:${String(nextMinute).padStart(2, "0")}`
+    );
+  }
+
+  return (
+    <fieldset className="min-w-0">
+      <legend className="text-sm font-black text-slate-700">{label}</legend>
+      <div className="mt-2 grid grid-cols-[1.15fr_0.85fr_0.85fr] gap-2">
+        <select
+          aria-label={`${label} 오전 오후`}
+          value={value ? period : ""}
+          onChange={(event) =>
+            commit(event.target.value || "오전", hour12, minute)
+          }
+          className="min-w-0 rounded-2xl border border-slate-200 bg-white px-2 py-3 text-sm font-black outline-none focus:border-blue-400"
+        >
+          <option value="" disabled>
+            오전/오후
+          </option>
+          <option value="오전">오전</option>
+          <option value="오후">오후</option>
+        </select>
+        <select
+          aria-label={`${label} 시`}
+          value={value ? hour12 : ""}
+          onChange={(event) =>
+            commit(period, Number(event.target.value || 9), minute)
+          }
+          className="min-w-0 rounded-2xl border border-slate-200 bg-white px-2 py-3 text-sm font-black outline-none focus:border-blue-400"
+        >
+          <option value="" disabled>
+            시
+          </option>
+          {Array.from({ length: 12 }, (_, index) => index + 1).map((hour) => (
+            <option key={hour} value={hour}>
+              {hour}시
+            </option>
+          ))}
+        </select>
+        <select
+          aria-label={`${label} 분`}
+          value={value ? minute : ""}
+          onChange={(event) =>
+            commit(period, hour12, Number(event.target.value || 0))
+          }
+          className="min-w-0 rounded-2xl border border-slate-200 bg-white px-2 py-3 text-sm font-black outline-none focus:border-blue-400"
+        >
+          <option value="" disabled>
+            분
+          </option>
+          {minuteOptions.map((optionMinute) => (
+            <option key={optionMinute} value={optionMinute}>
+              {String(optionMinute).padStart(2, "0")}분
+            </option>
+          ))}
+        </select>
+      </div>
+    </fieldset>
+  );
+}
+
 export default function SavedPlaceManager() {
   const [places, setPlaces] = useState<SavedPlace[]>([]);
   const [draft, setDraft] = useState<PlaceDraft>(() => createEmptyDraft());
@@ -412,54 +495,38 @@ export default function SavedPlaceManager() {
               }
             />
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="text-sm font-black text-slate-700">
-                영업 시작
-                <input
-                  type="time"
-                  value={draft.businessHoursStart}
-                  onChange={(event) =>
-                    updateDraft({ businessHoursStart: event.target.value })
-                  }
-                  className="mt-2 w-full rounded-2xl border border-slate-200 px-3 py-3 text-sm font-black outline-none focus:border-blue-400"
-                />
-              </label>
-              <label className="text-sm font-black text-slate-700">
-                영업 종료
-                <input
-                  type="time"
-                  value={draft.businessHoursEnd}
-                  onChange={(event) =>
-                    updateDraft({ businessHoursEnd: event.target.value })
-                  }
-                  className="mt-2 w-full rounded-2xl border border-slate-200 px-3 py-3 text-sm font-black outline-none focus:border-blue-400"
-                />
-              </label>
+            <div className="grid gap-3 lg:grid-cols-2">
+              <KoreanTimeSelect
+                label="영업 시작"
+                value={draft.businessHoursStart}
+                onChange={(businessHoursStart) =>
+                  updateDraft({ businessHoursStart })
+                }
+              />
+              <KoreanTimeSelect
+                label="영업 종료"
+                value={draft.businessHoursEnd}
+                onChange={(businessHoursEnd) =>
+                  updateDraft({ businessHoursEnd })
+                }
+              />
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-3">
-              <label className="text-sm font-black text-slate-700">
-                선호 시작
-                <input
-                  type="time"
-                  value={draft.preferredVisitStartTime}
-                  onChange={(event) =>
-                    updateDraft({ preferredVisitStartTime: event.target.value })
-                  }
-                  className="mt-2 w-full rounded-2xl border border-slate-200 px-3 py-3 text-sm font-black outline-none focus:border-blue-400"
-                />
-              </label>
-              <label className="text-sm font-black text-slate-700">
-                선호 종료
-                <input
-                  type="time"
-                  value={draft.preferredVisitEndTime}
-                  onChange={(event) =>
-                    updateDraft({ preferredVisitEndTime: event.target.value })
-                  }
-                  className="mt-2 w-full rounded-2xl border border-slate-200 px-3 py-3 text-sm font-black outline-none focus:border-blue-400"
-                />
-              </label>
+            <div className="grid gap-3 lg:grid-cols-[1fr_1fr_180px]">
+              <KoreanTimeSelect
+                label="선호 시작"
+                value={draft.preferredVisitStartTime}
+                onChange={(preferredVisitStartTime) =>
+                  updateDraft({ preferredVisitStartTime })
+                }
+              />
+              <KoreanTimeSelect
+                label="선호 종료"
+                value={draft.preferredVisitEndTime}
+                onChange={(preferredVisitEndTime) =>
+                  updateDraft({ preferredVisitEndTime })
+                }
+              />
               <label className="text-sm font-black text-slate-700">
                 평균 체류
                 <input
