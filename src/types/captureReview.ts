@@ -12,6 +12,7 @@ export type CaptureReview = {
   source: "voice" | "text";
   status: CaptureReviewStatus;
   classification: AssistantItemWithoutId | null;
+  gemmaCandidate: AssistantItemWithoutId | null;
   classificationSource: "gemma-on-device" | "ai" | "fallback" | null;
   errorMessage: string | null;
   approvedItemId: string | null;

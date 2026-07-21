@@ -214,6 +214,7 @@ const syncDomains: Array<SyncDomain<SyncableItem, { id: string }>> = [
           row.classification && typeof row.classification === "object"
             ? (row.classification as AssistantItemWithoutId)
             : null,
+        gemmaCandidate: null,
         classificationSource:
           row.classification_source === "ai" ||
           row.classification_source === "gemma-on-device" ||

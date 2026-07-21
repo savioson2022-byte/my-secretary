@@ -18,6 +18,7 @@ type ClassificationResultProps = {
   result: AssistantItemWithoutId;
   onChange: (nextResult: AssistantItemWithoutId) => void;
   onSave: () => Promise<boolean>;
+  gemmaCandidate?: AssistantItemWithoutId | null;
 };
 
 const CATEGORY_OPTIONS: Category[] = [
@@ -124,6 +125,7 @@ export default function ClassificationResult({
   result,
   onChange,
   onSave,
+  gemmaCandidate = null,
 }: ClassificationResultProps) {
   const originalResultRef = useRef(result);
 
@@ -198,6 +200,7 @@ export default function ClassificationResult({
         saveClassificationFeedback({
           original: originalResultRef.current,
           corrected: result,
+          gemmaCandidate,
         });
       } catch (error) {
         console.error("분류 피드백 저장 실패:", error);

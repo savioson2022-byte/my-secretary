@@ -17,6 +17,9 @@ const DEFAULT_MEMORY_IDS: Record<PersonalAiMemoryDomain, string> = {
   notification: "55555555-5555-4555-8555-555555555555",
 };
 
+const GEMMA_EVALUATED_MARKER = "[gemma-evaluated]";
+const GEMMA_MATCHED_MARKER = "[gemma-matched]";
+
 const personalAiMemoryRepository =
   createLocalStorageRepository<PersonalAiMemory>(STORAGE_KEYS.personalAiMemory);
 
@@ -152,9 +155,11 @@ function createFeedbackId() {
 export function saveClassificationFeedback({
   original,
   corrected,
+  gemmaCandidate,
 }: {
   original: AssistantItemWithoutId;
   corrected: AssistantItemWithoutId;
+  gemmaCandidate?: AssistantItemWithoutId | null;
 }) {
   const memories = readRawMemories();
   const input = corrected.originalText.trim();
@@ -183,7 +188,16 @@ export function saveClassificationFeedback({
     domain: "classification",
     title: `분류 피드백: ${corrected.title}`,
     summary: "사용자가 분류 결과를 확인하거나 직접 수정한 사례다.",
-    rules: [rule],
+    rules: [
+      rule,
+      ...(gemmaCandidate ? [GEMMA_EVALUATED_MARKER] : []),
+      ...(gemmaCandidate &&
+      gemmaCandidate.processType === corrected.processType &&
+      gemmaCandidate.category === corrected.category &&
+      gemmaCandidate.actionType === corrected.actionType
+        ? [GEMMA_MATCHED_MARKER]
+        : []),
+    ],
     examples: [input],
     confidence: correctedFields.length ? "high" : "medium",
     source: "feedback",
@@ -202,6 +216,64 @@ export function saveClassificationFeedback({
     .slice(60);
   overflowMemories.forEach((item) => personalAiMemoryRepository.delete(item.id));
   return memory;
+}
+
+const GEMMA_MIN_EVALUATIONS = 15;
+const GEMMA_WARMUP_APPROVALS = 5;
+const GEMMA_RECENT_WINDOW = 10;
+const GEMMA_REQUIRED_RECENT_ACCURACY = 0.8;
+const GEMMA_REQUIRED_OVERALL_ACCURACY = 0.75;
+
+export type GemmaClassificationReadiness = {
+  ready: boolean;
+  shouldEvaluate: boolean;
+  approvalCount: number;
+  evaluatedCount: number;
+  requiredCount: number;
+  matchedCount: number;
+  overallAccuracy: number;
+  recentAccuracy: number;
+};
+
+export function getGemmaClassificationReadiness(): GemmaClassificationReadiness {
+  const classificationFeedback = readRawMemories()
+    .filter(
+      (memory) =>
+        memory.domain === "classification" &&
+        memory.source === "feedback"
+    )
+    .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+  const evaluations = classificationFeedback.filter(
+    (memory) => memory.rules.includes(GEMMA_EVALUATED_MARKER)
+  );
+  const matchedCount = evaluations.filter(
+    (memory) => memory.rules.includes(GEMMA_MATCHED_MARKER)
+  ).length;
+  const recent = evaluations.slice(0, GEMMA_RECENT_WINDOW);
+  const recentMatchedCount = recent.filter(
+    (memory) => memory.rules.includes(GEMMA_MATCHED_MARKER)
+  ).length;
+  const overallAccuracy = evaluations.length
+    ? matchedCount / evaluations.length
+    : 0;
+  const recentAccuracy = recent.length
+    ? recentMatchedCount / recent.length
+    : 0;
+
+  return {
+    ready:
+      evaluations.length >= GEMMA_MIN_EVALUATIONS &&
+      recent.length >= GEMMA_RECENT_WINDOW &&
+      recentAccuracy >= GEMMA_REQUIRED_RECENT_ACCURACY &&
+      overallAccuracy >= GEMMA_REQUIRED_OVERALL_ACCURACY,
+    shouldEvaluate: classificationFeedback.length >= GEMMA_WARMUP_APPROVALS,
+    approvalCount: classificationFeedback.length,
+    evaluatedCount: evaluations.length,
+    requiredCount: GEMMA_MIN_EVALUATIONS,
+    matchedCount,
+    overallAccuracy,
+    recentAccuracy,
+  };
 }
 
 export function formatPersonalAiMemoryForPrompt({
@@ -223,7 +295,13 @@ export function formatPersonalAiMemoryForPrompt({
   return [
     "계정 전체에서 공유되는 개인 AI 메모리입니다. 아이폰과 맥북 모두 같은 기준으로 동작해야 하므로 이 내용을 우선 참고하세요.",
     ...selectedMemories.map((memory) => {
-      const rules = memory.rules.map((rule) => `  - ${rule}`).join("\n");
+      const rules = memory.rules
+        .filter(
+          (rule) =>
+            rule !== GEMMA_EVALUATED_MARKER && rule !== GEMMA_MATCHED_MARKER
+        )
+        .map((rule) => `  - ${rule}`)
+        .join("\n");
       const examples =
         memory.examples.length > 0
           ? `\n  예시: ${memory.examples.slice(0, 3).join(" / ")}`

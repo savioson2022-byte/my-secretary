@@ -35,7 +35,10 @@ import {
   getPurchaseHistories,
   updatePurchaseHistory,
 } from "@/lib/purchaseHistoryStorage";
-import { getPersonalAiMemories } from "@/lib/personalAiMemoryStorage";
+import {
+  getGemmaClassificationReadiness,
+  getPersonalAiMemories,
+} from "@/lib/personalAiMemoryStorage";
 import { getRoutineSchedules } from "@/lib/routineStorage";
 import { createSingleScheduleFromItem } from "@/lib/singleScheduleFromItem";
 import {
@@ -133,6 +136,8 @@ function isRoutineActiveOnDate(routine: RoutineSchedule, dateText: string) {
 export default function Home() {
   const [inputText, setInputText] = useState("");
   const [classificationResult, setClassificationResult] =
+    useState<AssistantItemWithoutId | null>(null);
+  const [classificationGemmaCandidate, setClassificationGemmaCandidate] =
     useState<AssistantItemWithoutId | null>(null);
   const [items, setItems] = useState<AssistantItem[]>([]);
   const [routines, setRoutines] = useState<RoutineSchedule[]>([]);
@@ -272,6 +277,7 @@ export default function Home() {
   const filteredItems = useMemo(() => {
     return items.filter((item) => matchesFilter(item, selectedFilter));
   }, [items, selectedFilter]);
+  const gemmaReadiness = getGemmaClassificationReadiness();
 
   async function handleClassify(textOverride?: string) {
     const targetText = textOverride ?? inputText;
@@ -291,6 +297,7 @@ export default function Home() {
     setActiveCaptureReviewId(null);
     setIsClassifying(true);
     setClassificationSource(null);
+    setClassificationGemmaCandidate(null);
 
     try {
       const classificationContext = buildClassificationContext({
@@ -299,13 +306,14 @@ export default function Home() {
         userProfile,
         personalAiMemories: getPersonalAiMemories(),
       });
-      const { result, source } = await aiClassifyInput(
+      const { result, source, gemmaCandidate } = await aiClassifyInput(
         trimmedText,
         classificationContext
       );
 
       setClassificationResult(result);
       setClassificationSource(source);
+      setClassificationGemmaCandidate(gemmaCandidate);
     } catch (error) {
       console.error("AI 분류 실패, 규칙 기반 분류로 대체:", error);
 
@@ -313,6 +321,7 @@ export default function Home() {
 
       setClassificationResult(fallbackResult);
       setClassificationSource("fallback");
+      setClassificationGemmaCandidate(null);
     } finally {
       setIsClassifying(false);
     }
@@ -329,6 +338,7 @@ export default function Home() {
       source: "voice",
       status: "classifying",
       classification: null,
+      gemmaCandidate: null,
       classificationSource: null,
       errorMessage: null,
       approvedItemId: null,
@@ -352,11 +362,13 @@ export default function Home() {
       });
       let classification: AssistantItemWithoutId;
       let source: "gemma-on-device" | "ai" | "fallback";
+      let gemmaCandidate: AssistantItemWithoutId | null = null;
 
       try {
         const aiResult = await aiClassifyInput(trimmedText, classificationContext);
         classification = aiResult.result;
         source = aiResult.source;
+        gemmaCandidate = aiResult.gemmaCandidate;
       } catch (error) {
         console.error("음성 초안 AI 분류 실패, 규칙 기반 분류로 대체:", error);
         classification = classifyInput(trimmedText);
@@ -367,6 +379,7 @@ export default function Home() {
         ...review,
         status: "pending",
         classification,
+        gemmaCandidate,
         classificationSource: source,
         updatedAt: new Date().toISOString(),
       });
@@ -388,6 +401,7 @@ export default function Home() {
     setActiveCaptureReviewId(review.id);
     setClassificationResult(review.classification);
     setClassificationSource(review.classificationSource);
+    setClassificationGemmaCandidate(review.gemmaCandidate);
     setSaveMessage(null);
   }
 
@@ -492,6 +506,7 @@ export default function Home() {
       clearCaptureDraft();
       setClassificationResult(null);
       setClassificationSource(null);
+      setClassificationGemmaCandidate(null);
       let captureReviewWasApproved = false;
       if (activeCaptureReviewId) {
         const activeReview = getCaptureReviews().find(
@@ -894,7 +909,14 @@ export default function Home() {
 
             {classificationSource === "ai" && (
             <p className="rounded-3xl bg-emerald-50 p-4 text-sm font-black text-emerald-700 ring-1 ring-emerald-100">
-              AI API로 분류했습니다.
+              OpenAI가 먼저 분류했습니다.{" "}
+              {gemmaReadiness.shouldEvaluate
+                ? `Gemma 병행 평가 ${gemmaReadiness.evaluatedCount}/${gemmaReadiness.requiredCount}회${
+                    gemmaReadiness.evaluatedCount > 0
+                      ? ` · 누적 정확도 ${Math.round(gemmaReadiness.overallAccuracy * 100)}%`
+                      : ""
+                  }`
+                : `승인 사례 ${gemmaReadiness.approvalCount}/5회를 모으면 Gemma 병행 평가를 시작합니다.`}
             </p>
             )}
 
@@ -915,6 +937,7 @@ export default function Home() {
               result={classificationResult}
               onChange={setClassificationResult}
               onSave={handleSave}
+              gemmaCandidate={classificationGemmaCandidate}
             />
             ) : (
             <section className="app-card p-4">
