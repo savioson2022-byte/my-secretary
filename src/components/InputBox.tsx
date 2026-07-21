@@ -7,6 +7,7 @@ type InputBoxProps = {
   value: string;
   onChange: (value: string) => void;
   onClassify: (textOverride?: string) => void;
+  onVoiceCaptureComplete?: (text: string) => void;
   voiceIntent?: boolean;
 };
 
@@ -86,6 +87,7 @@ export default function InputBox({
   value,
   onChange,
   onClassify,
+  onVoiceCaptureComplete,
   voiceIntent = false,
 }: InputBoxProps) {
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
@@ -94,6 +96,7 @@ export default function InputBox({
   const latestTextRef = useRef(value);
   const pointerStartedVoiceRef = useRef(false);
   const voiceIntentStartedRef = useRef(false);
+  const voiceCaptureCompletedRef = useRef(false);
   const autoStopOnSilenceRef = useRef(false);
   const silenceTimerRef = useRef<number | null>(null);
   const [isListening, setIsListening] = useState(false);
@@ -193,6 +196,7 @@ export default function InputBox({
     recognition.lang = "ko-KR";
 
     baseTextRef.current = value;
+    voiceCaptureCompletedRef.current = false;
     finalTranscriptRef.current = "";
     autoStopOnSilenceRef.current = autoStopOnSilence;
     setInterimTranscript("");
@@ -214,13 +218,18 @@ export default function InputBox({
       autoStopOnSilenceRef.current = false;
       setIsListening(false);
       setInterimTranscript("");
+      const completedText = latestTextRef.current.trim();
+      if (completedText && !voiceCaptureCompletedRef.current) {
+        voiceCaptureCompletedRef.current = true;
+        onVoiceCaptureComplete?.(completedText);
+      }
       setVoiceMessage((currentMessage) => {
         if (currentMessage?.includes("마이크 권한")) {
           return currentMessage;
         }
 
-        return latestTextRef.current.trim()
-          ? "음성 내용을 텍스트 초안으로 저장했어요. 확인 후 파란 버튼을 눌러주세요."
+        return completedText
+          ? "음성 내용을 승인 전 보관함에 저장하고 분류하고 있어요."
           : "음성 인식이 종료됐습니다.";
       });
     };

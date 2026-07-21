@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { STORAGE_KEYS } from "@/lib/storageKeys";
-import type { AssistantItem } from "@/types/assistant";
+import type { AssistantItem, AssistantItemWithoutId } from "@/types/assistant";
 import type {
   SavedPlace,
   SingleSchedule,
@@ -11,6 +11,7 @@ import type { SuggestionFeedback } from "@/types/suggestionFeedback";
 import type { PurchaseHistoryItem } from "@/types/purchaseHistory";
 import type { PersonalAiMemory } from "@/types/personalAi";
 import type { DayOfWeek, RoutineSchedule } from "@/types/routine";
+import type { CaptureReview } from "@/types/captureReview";
 import {
   getCloudSyncStatus,
   type CloudSyncDomainResult,
@@ -179,6 +180,54 @@ function mergeByUpdatedAt<TItem extends SyncableItem>(
 }
 
 const syncDomains: Array<SyncDomain<SyncableItem, { id: string }>> = [
+  {
+    key: STORAGE_KEYS.captureReviews,
+    table: "capture_review_drafts",
+    optionalTable: true,
+    toRow(item, userId) {
+      const review = item as CaptureReview;
+      return {
+        id: review.id,
+        user_id: userId,
+        original_text: review.originalText,
+        source: review.source,
+        status: review.status,
+        classification: review.classification,
+        classification_source: review.classificationSource,
+        error_message: review.errorMessage,
+        approved_item_id: review.approvedItemId,
+        approved_at: review.approvedAt,
+        created_at: review.createdAt,
+        updated_at: review.updatedAt,
+      };
+    },
+    fromRow(row) {
+      return {
+        id: asText(row.id),
+        originalText: asText(row.original_text),
+        source: row.source === "text" ? "text" : "voice",
+        status:
+          row.status === "approved" || row.status === "failed" || row.status === "classifying"
+            ? row.status
+            : "pending",
+        classification:
+          row.classification && typeof row.classification === "object"
+            ? (row.classification as AssistantItemWithoutId)
+            : null,
+        classificationSource:
+          row.classification_source === "ai" ||
+          row.classification_source === "gemma-on-device" ||
+          row.classification_source === "fallback"
+            ? row.classification_source
+            : null,
+        errorMessage: asNullableText(row.error_message),
+        approvedItemId: asNullableText(row.approved_item_id),
+        approvedAt: asNullableText(row.approved_at),
+        createdAt: asText(row.created_at),
+        updatedAt: asText(row.updated_at),
+      } as CaptureReview;
+    },
+  },
   {
     key: STORAGE_KEYS.assistantItems,
     table: "assistant_items",

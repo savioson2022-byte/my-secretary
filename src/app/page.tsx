@@ -16,7 +16,10 @@ import { buildClassificationContext } from "@/lib/classificationContext";
 import {
   clearCaptureDraft,
   getCaptureDraft,
+  getCaptureReviews,
+  saveCaptureReview,
   saveCaptureDraft,
+  updateCaptureReview,
 } from "@/lib/captureDraftStorage";
 import { getCloudDataSyncedEventName } from "@/lib/dataSyncEvents";
 import {
@@ -50,6 +53,7 @@ import { SingleSchedule } from "@/types/calendar";
 import { DayOfWeek, RoutineSchedule } from "@/types/routine";
 import { UserProfile } from "@/types/userProfile";
 import { PurchaseHistoryItem } from "@/types/purchaseHistory";
+import type { CaptureReview } from "@/types/captureReview";
 
 function createId() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -145,6 +149,9 @@ export default function Home() {
   >(null);
   const [voiceIntent, setVoiceIntent] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [captureReviews, setCaptureReviews] = useState<CaptureReview[]>([]);
+  const [captureReviewTab, setCaptureReviewTab] = useState<"pending" | "approved">("pending");
+  const [activeCaptureReviewId, setActiveCaptureReviewId] = useState<string | null>(null);
 
   useEffect(() => {
     function refreshLocalData() {
@@ -153,6 +160,7 @@ export default function Home() {
       setSingleSchedules(getSingleSchedules());
       setPurchaseHistories(getPurchaseHistories());
       setUserProfile(getUserProfile());
+      setCaptureReviews(getCaptureReviews());
     }
 
     refreshLocalData();
@@ -280,6 +288,7 @@ export default function Home() {
     }
 
     setSaveMessage(null);
+    setActiveCaptureReviewId(null);
     setIsClassifying(true);
     setClassificationSource(null);
 
@@ -307,6 +316,79 @@ export default function Home() {
     } finally {
       setIsClassifying(false);
     }
+  }
+
+  async function handleVoiceCaptureComplete(text: string) {
+    const trimmedText = text.trim();
+    if (!trimmedText) return;
+
+    const now = new Date().toISOString();
+    const review: CaptureReview = {
+      id: createId(),
+      originalText: trimmedText,
+      source: "voice",
+      status: "classifying",
+      classification: null,
+      classificationSource: null,
+      errorMessage: null,
+      approvedItemId: null,
+      approvedAt: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    saveCaptureReview(review);
+    setCaptureReviews(getCaptureReviews());
+    setCaptureReviewTab("pending");
+    setInputText("");
+    clearCaptureDraft();
+
+    try {
+      const classificationContext = buildClassificationContext({
+        inputText: trimmedText,
+        items,
+        userProfile,
+        personalAiMemories: getPersonalAiMemories(),
+      });
+      let classification: AssistantItemWithoutId;
+      let source: "gemma-on-device" | "ai" | "fallback";
+
+      try {
+        const aiResult = await aiClassifyInput(trimmedText, classificationContext);
+        classification = aiResult.result;
+        source = aiResult.source;
+      } catch (error) {
+        console.error("음성 초안 AI 분류 실패, 규칙 기반 분류로 대체:", error);
+        classification = classifyInput(trimmedText);
+        source = "fallback";
+      }
+
+      updateCaptureReview({
+        ...review,
+        status: "pending",
+        classification,
+        classificationSource: source,
+        updatedAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error("음성 초안 분류 실패:", error);
+      updateCaptureReview({
+        ...review,
+        status: "failed",
+        errorMessage: "분류하지 못했어요. 다시 시도해주세요.",
+        updatedAt: new Date().toISOString(),
+      });
+    } finally {
+      setCaptureReviews(getCaptureReviews());
+    }
+  }
+
+  function openCaptureReview(review: CaptureReview) {
+    if (!review.classification || review.status !== "pending") return;
+    setActiveCaptureReviewId(review.id);
+    setClassificationResult(review.classification);
+    setClassificationSource(review.classificationSource);
+    setSaveMessage(null);
   }
 
   function handleInputTextChange(nextText: string) {
@@ -431,6 +513,24 @@ export default function Home() {
       clearCaptureDraft();
       setClassificationResult(null);
       setClassificationSource(null);
+      if (activeCaptureReviewId) {
+        const activeReview = getCaptureReviews().find(
+          (review) => review.id === activeCaptureReviewId
+        );
+        if (activeReview) {
+          updateCaptureReview({
+            ...activeReview,
+            status: "approved",
+            classification: result,
+            approvedItemId: newItem.id,
+            approvedAt: now,
+            updatedAt: now,
+          });
+          setCaptureReviews(getCaptureReviews());
+          setCaptureReviewTab("approved");
+        }
+        setActiveCaptureReviewId(null);
+      }
       setSaveMessage(
         singleSchedule
           ? "단기일정과 캘린더에 저장했어요."
@@ -693,8 +793,67 @@ export default function Home() {
               value={inputText}
               onChange={handleInputTextChange}
               onClassify={handleClassify}
+              onVoiceCaptureComplete={handleVoiceCaptureComplete}
               voiceIntent={voiceIntent}
             />
+
+            {captureReviews.length > 0 && (
+              <section className="app-card p-4 sm:p-5">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h3 className="font-black text-slate-900">음성 기록 검토함</h3>
+                    <p className="mt-1 text-xs font-bold leading-5 text-slate-400">
+                      AI가 먼저 정리하고, 승인한 기록만 실제 일정과 작업에 저장합니다.
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-4 grid grid-cols-2 gap-2 rounded-2xl bg-slate-100 p-1">
+                  {(["pending", "approved"] as const).map((tab) => {
+                    const count = captureReviews.filter((review) =>
+                      tab === "pending" ? review.status !== "approved" : review.status === "approved"
+                    ).length;
+                    return (
+                      <button key={tab} type="button" onClick={() => setCaptureReviewTab(tab)}
+                        className={`rounded-xl px-3 py-2 text-sm font-black ${captureReviewTab === tab ? "bg-white text-blue-700 shadow-sm" : "text-slate-500"}`}>
+                        {tab === "pending" ? "승인 전" : "승인 완료"} {count}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="mt-3 grid gap-2">
+                  {captureReviews
+                    .filter((review) => captureReviewTab === "pending" ? review.status !== "approved" : review.status === "approved")
+                    .map((review) => (
+                      <div key={review.id} className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-100">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="break-words text-sm font-black text-slate-900">
+                              {review.classification?.title || review.originalText}
+                            </p>
+                            <p className="mt-1 break-words text-xs font-bold text-slate-500">
+                              {review.classification
+                                ? `${review.classification.processType} · ${review.classification.category}`
+                                : review.status === "classifying" ? "AI가 분류하는 중..." : review.errorMessage}
+                            </p>
+                          </div>
+                          {review.status === "pending" && (
+                            <button type="button" onClick={() => openCaptureReview(review)}
+                              className="shrink-0 rounded-full bg-blue-600 px-3 py-2 text-xs font-black text-white">
+                              수정·승인
+                            </button>
+                          )}
+                          {review.status === "approved" && (
+                            <span className="shrink-0 rounded-full bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-700">승인됨</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  {captureReviews.filter((review) => captureReviewTab === "pending" ? review.status !== "approved" : review.status === "approved").length === 0 && (
+                    <p className="py-4 text-center text-sm font-bold text-slate-400">표시할 기록이 없습니다.</p>
+                  )}
+                </div>
+              </section>
+            )}
 
             {saveMessage && (
               <p
