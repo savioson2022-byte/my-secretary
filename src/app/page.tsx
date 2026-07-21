@@ -459,26 +459,8 @@ export default function Home() {
 
     try {
       const now = new Date().toISOString();
-      let ideaGrouping: Awaited<ReturnType<typeof groupIdeaWithAi>> | null =
-        null;
-
-      if (shouldAttachToIdeaRecord(result)) {
-        try {
-          ideaGrouping = await groupIdeaWithAi({
-            text: result.originalText,
-            existingIdeas: items,
-            personalAiMemories: getPersonalAiMemories(),
-          });
-        } catch (error) {
-          console.error("아이디어 연결 실패, 기본 저장으로 계속:", error);
-        }
-      }
-
       const newItem: AssistantItem = {
         ...result,
-        ideaGroupId: ideaGrouping?.ideaGroupId ?? result.ideaGroupId,
-        ideaGroupTitle: ideaGrouping?.ideaGroupTitle ?? result.ideaGroupTitle,
-        ideaSubcategory: ideaGrouping?.ideaSubcategory ?? result.ideaSubcategory,
         id: createId(),
         createdAt: now,
         updatedAt: now,
@@ -513,6 +495,7 @@ export default function Home() {
       clearCaptureDraft();
       setClassificationResult(null);
       setClassificationSource(null);
+      let captureReviewWasApproved = false;
       if (activeCaptureReviewId) {
         const activeReview = getCaptureReviews().find(
           (review) => review.id === activeCaptureReviewId
@@ -526,16 +509,53 @@ export default function Home() {
             approvedAt: now,
             updatedAt: now,
           });
-          setCaptureReviews(getCaptureReviews());
+          const savedReviews = getCaptureReviews();
+          captureReviewWasApproved = savedReviews.some(
+            (review) =>
+              review.id === activeCaptureReviewId &&
+              review.status === "approved" &&
+              review.approvedItemId === newItem.id
+          );
+          setCaptureReviews(savedReviews);
           setCaptureReviewTab("approved");
         }
         setActiveCaptureReviewId(null);
       }
       setSaveMessage(
-        singleSchedule
+        captureReviewWasApproved
+          ? singleSchedule
+            ? "승인하고 단기일정과 캘린더에 저장했어요."
+            : "승인하고 기록에 저장했어요."
+          : singleSchedule
           ? "단기일정과 캘린더에 저장했어요."
           : "기록을 저장했어요."
       );
+
+      if (shouldAttachToIdeaRecord(result)) {
+        void groupIdeaWithAi({
+          text: result.originalText,
+          existingIdeas: savedItems,
+          personalAiMemories: getPersonalAiMemories(),
+        })
+          .then((ideaGrouping) => {
+            const enrichedItem: AssistantItem = {
+              ...newItem,
+              ideaGroupId: ideaGrouping.ideaGroupId ?? newItem.ideaGroupId,
+              ideaGroupTitle:
+                ideaGrouping.ideaGroupTitle ?? newItem.ideaGroupTitle,
+              ideaSubcategory:
+                ideaGrouping.ideaSubcategory ?? newItem.ideaSubcategory,
+              updatedAt: new Date().toISOString(),
+            };
+
+            updateItem(enrichedItem);
+            setItems(getItems());
+          })
+          .catch((error) => {
+            console.error("아이디어 연결 실패, 기본 저장은 유지:", error);
+          });
+      }
+
       return true;
     } catch (error) {
       console.error("기록 저장 실패:", error);
