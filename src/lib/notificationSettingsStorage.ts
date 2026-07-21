@@ -14,6 +14,7 @@ export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
   repeatingNotificationsEnabled: true,
   dailySummaryEnabled: false,
   dailySummaryTime: "08:00",
+  defaultSnoozeMinutes: 10,
   travelNotificationsEnabled: true,
   purchaseNotificationsEnabled: true,
   routineReminderEnabled: true,
@@ -57,6 +58,10 @@ function normalizeSettings(
       Number(value?.persistentAlarmRepeatCount) > 0
         ? Math.min(10, Number(value?.persistentAlarmRepeatCount))
         : DEFAULT_NOTIFICATION_SETTINGS.persistentAlarmRepeatCount,
+    defaultSnoozeMinutes:
+      Number(value?.defaultSnoozeMinutes) > 0
+        ? Math.min(1440, Number(value?.defaultSnoozeMinutes))
+        : DEFAULT_NOTIFICATION_SETTINGS.defaultSnoozeMinutes,
   };
 }
 

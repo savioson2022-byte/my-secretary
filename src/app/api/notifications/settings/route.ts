@@ -4,7 +4,18 @@ import { createSupabaseUserServerClient } from "@/lib/supabase/server";
 import type { NotificationSettings } from "@/types/notification";
 
 type SettingsRecord = {
+  notifications_enabled: boolean;
+  push_enabled: boolean;
+  in_app_alarm_enabled: boolean;
+  sound_enabled: boolean;
   schedule_notifications_enabled: boolean;
+  time_task_notifications_enabled: boolean;
+  period_task_notifications_enabled: boolean;
+  ai_recommendations_enabled: boolean;
+  repeating_notifications_enabled: boolean;
+  daily_summary_enabled: boolean;
+  daily_summary_time: string;
+  default_snooze_minutes: number;
   travel_notifications_enabled: boolean;
   purchase_notifications_enabled: boolean;
   routine_reminder_enabled: boolean;
@@ -29,7 +40,18 @@ function getAccessToken(request: NextRequest) {
 function toClientSettings(record: SettingsRecord): NotificationSettings {
   return {
     ...DEFAULT_NOTIFICATION_SETTINGS,
+    notificationsEnabled: record.notifications_enabled,
+    pushEnabled: record.push_enabled,
+    inAppAlarmEnabled: record.in_app_alarm_enabled,
+    soundEnabled: record.sound_enabled,
     scheduleNotificationsEnabled: record.schedule_notifications_enabled,
+    timeTaskNotificationsEnabled: record.time_task_notifications_enabled,
+    periodTaskNotificationsEnabled: record.period_task_notifications_enabled,
+    aiRecommendationsEnabled: record.ai_recommendations_enabled,
+    repeatingNotificationsEnabled: record.repeating_notifications_enabled,
+    dailySummaryEnabled: record.daily_summary_enabled,
+    dailySummaryTime: record.daily_summary_time.slice(0, 5),
+    defaultSnoozeMinutes: record.default_snooze_minutes,
     travelNotificationsEnabled: record.travel_notifications_enabled,
     purchaseNotificationsEnabled: record.purchase_notifications_enabled,
     routineReminderEnabled: record.routine_reminder_enabled,
@@ -112,7 +134,18 @@ export async function PUT(request: NextRequest) {
   const now = new Date().toISOString();
   const payload = {
     user_id: context.user.id,
+    notifications_enabled: body.notificationsEnabled ?? true,
+    push_enabled: body.pushEnabled ?? true,
+    in_app_alarm_enabled: body.inAppAlarmEnabled ?? true,
+    sound_enabled: body.soundEnabled ?? true,
     schedule_notifications_enabled: body.scheduleNotificationsEnabled ?? true,
+    time_task_notifications_enabled: body.timeTaskNotificationsEnabled ?? true,
+    period_task_notifications_enabled: body.periodTaskNotificationsEnabled ?? true,
+    ai_recommendations_enabled: body.aiRecommendationsEnabled ?? true,
+    repeating_notifications_enabled: body.repeatingNotificationsEnabled ?? true,
+    daily_summary_enabled: body.dailySummaryEnabled ?? false,
+    daily_summary_time: body.dailySummaryTime ?? "08:00",
+    default_snooze_minutes: body.defaultSnoozeMinutes ?? 10,
     travel_notifications_enabled: body.travelNotificationsEnabled ?? true,
     purchase_notifications_enabled: body.purchaseNotificationsEnabled ?? true,
     routine_reminder_enabled: body.routineReminderEnabled ?? true,

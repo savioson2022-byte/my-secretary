@@ -48,6 +48,19 @@ export async function POST(request: NextRequest) {
   const events = (body.events ?? []).slice(0, 600);
   const now = new Date().toISOString();
 
+  const { error: deactivateError } = await supabase
+    .from("notification_events")
+    .update({ active: false, updated_at: now })
+    .eq("user_id", userData.user.id)
+    .gte("scheduled_at", now);
+
+  if (deactivateError) {
+    return NextResponse.json(
+      { ok: false, reason: deactivateError.message },
+      { status: 500 }
+    );
+  }
+
   if (events.length === 0) {
     return NextResponse.json({ ok: true, count: 0 });
   }
@@ -69,6 +82,15 @@ export async function POST(request: NextRequest) {
       latitude: event.latitude ?? null,
       longitude: event.longitude ?? null,
       requires_location_check: event.requiresLocationCheck,
+      rule_id: event.ruleId ?? null,
+      notification_type: event.notificationType ?? "time_based",
+      priority: event.priority ?? "normal",
+      delivery_channels: event.deliveryChannels ?? ["in_app", "web_push"],
+      sound_enabled: event.soundEnabled ?? true,
+      sound_key: event.soundKey ?? "default",
+      require_interaction: event.requireInteraction ?? false,
+      expires_at: event.expiresAt ?? null,
+      payload: event.payload ?? {},
       active: true,
       synced_at: now,
       updated_at: now,

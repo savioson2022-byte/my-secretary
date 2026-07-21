@@ -40,6 +40,8 @@ type NotificationEventRecord = {
   body: string;
   url: string;
   scheduled_at: string;
+  delivery_channels: string[];
+  sound_enabled: boolean;
 };
 
 function getKoreanTodayText() {
@@ -106,6 +108,10 @@ async function sendNativePushesForEvent({
     return 0;
   }
 
+  if (!event.delivery_channels.includes("native_push")) {
+    return 0;
+  }
+
   const { data: nativeTokens, error } = await supabase
     .from("native_push_tokens")
     .select("*")
@@ -138,6 +144,7 @@ async function sendNativePushesForEvent({
         body: event.body,
         url: event.url,
         tag: event.id,
+        soundEnabled: event.sound_enabled,
       });
 
       await supabase.from("native_notification_event_deliveries").insert({
@@ -192,16 +199,12 @@ export async function GET(request: NextRequest) {
     .from("notification_events")
     .select("*")
     .eq("active", true)
-    .in("event_type", [
-      "purchase_recommendation",
-      "routine_reminder",
-      "place_arrival_reminder",
-    ])
     .lte("scheduled_at", nowIso)
     .gte("scheduled_at", windowStartIso)
     .returns<NotificationEventRecord[]>();
 
   for (const event of notificationEvents ?? []) {
+    const webPushEnabled = event.delivery_channels.includes("web_push");
     const { data: subscriptions } = await supabase
       .from("push_subscriptions")
       .select("*")
@@ -210,6 +213,7 @@ export async function GET(request: NextRequest) {
       .returns<PushSubscriptionRecord[]>();
 
     for (const subscription of subscriptions ?? []) {
+      if (!webPushEnabled) break;
       const { data: existingDelivery } = await supabase
         .from("notification_event_deliveries")
         .select("id")
@@ -234,6 +238,7 @@ export async function GET(request: NextRequest) {
           body: event.body,
           url: event.url,
           tag: event.id,
+          silent: !event.sound_enabled,
         });
 
         await supabase.from("notification_event_deliveries").insert({

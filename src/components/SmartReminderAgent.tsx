@@ -348,6 +348,16 @@ function getUnresolvedActionItems() {
 }
 
 function checkUnresolvedDigest() {
+  const notificationSettings = getNotificationSettings();
+
+  if (
+    !notificationSettings.notificationsEnabled ||
+    !notificationSettings.inAppAlarmEnabled ||
+    !notificationSettings.aiRecommendationsEnabled
+  ) {
+    return;
+  }
+
   const profile = getUserProfile();
 
   if (profile?.unresolvedDigestEnabled === false) return;
@@ -419,6 +429,10 @@ async function shouldShowLocationEvent(event: NotificationEvent) {
 }
 
 async function checkDueNotificationEvents(events: NotificationEvent[]) {
+  const settings = getNotificationSettings();
+
+  if (!settings.notificationsEnabled || !settings.inAppAlarmEnabled) return;
+
   const now = Date.now();
   const notifiedIds = getNotifiedIds();
   const dueEvents = events.filter((event) => {
@@ -427,7 +441,8 @@ async function checkDueNotificationEvents(events: NotificationEvent[]) {
     return (
       scheduledAt <= now &&
       scheduledAt > now - 60 * 1000 &&
-      !notifiedIds.has(event.id)
+      !notifiedIds.has(event.id) &&
+      (event.deliveryChannels?.includes("in_app") ?? true)
     );
   });
 
@@ -678,6 +693,12 @@ async function scheduleNativeNotifications(events: NotificationEvent[]) {
   }
 
   try {
+    const settings = getNotificationSettings();
+
+    if (!settings.notificationsEnabled || !settings.inAppAlarmEnabled) {
+      return;
+    }
+
     const { LocalNotifications } = await import(
       "@capacitor/local-notifications"
     );
@@ -696,30 +717,45 @@ async function scheduleNativeNotifications(events: NotificationEvent[]) {
     }
 
     const now = Date.now();
-    const settings = getNotificationSettings();
     const mutedIds = getMutedPersistentAlarmIds();
     const notifications = [];
 
     for (const event of events) {
       if (notifications.length >= MAX_LOCAL_NOTIFICATIONS) break;
-      if (!isPersistentAlarmEvent(event, settings)) continue;
+      if (!(event.deliveryChannels?.includes("in_app") ?? true)) continue;
       if (mutedIds.has(event.id)) continue;
 
       const scheduledAt = new Date(event.scheduledAt);
 
       if (scheduledAt.getTime() <= now) continue;
 
-      const alarmNotifications = buildPersistentAlarmNotifications({
-        event,
-        startsAt: scheduledAt,
-      });
+      if (isPersistentAlarmEvent(event, settings)) {
+        const alarmNotifications = buildPersistentAlarmNotifications({
+          event,
+          startsAt: scheduledAt,
+        });
 
-      notifications.push(
-        ...alarmNotifications.slice(
-          0,
-          MAX_LOCAL_NOTIFICATIONS - notifications.length
-        )
-      );
+        notifications.push(
+          ...alarmNotifications.slice(
+            0,
+            MAX_LOCAL_NOTIFICATIONS - notifications.length
+          )
+        );
+        continue;
+      }
+
+      notifications.push({
+        id: getNumericNotificationId(event.id),
+        title: event.title,
+        body: event.body,
+        sound: event.soundEnabled === false ? undefined : "default",
+        schedule: { at: scheduledAt },
+        extra: {
+          url: event.url,
+          originalEventId: event.id,
+          eventType: event.eventType,
+        },
+      });
     }
 
     if (notifications.length === 0) {
@@ -759,6 +795,7 @@ export default function SmartReminderAgent() {
     if (!canUseNotification) return;
 
     const settings = getNotificationSettings();
+
     const events = buildNotificationEvents(settings);
     let lastNativeScheduleSyncAt = 0;
 
@@ -773,6 +810,9 @@ export default function SmartReminderAgent() {
       lastNativeScheduleSyncAt = Date.now();
       void scheduleNativeNotifications(nextEvents);
       void syncNotificationEvents(undefined, nextEvents);
+      if (nextSettings.notificationsEnabled && nextSettings.pushEnabled) {
+        void enableServerPush();
+      }
     };
 
     const timer = window.setInterval(() => {
@@ -854,6 +894,12 @@ export default function SmartReminderAgent() {
   }
 
   async function enableServerPush() {
+    const settings = getNotificationSettings();
+
+    if (!settings.notificationsEnabled || !settings.pushEnabled) {
+      return;
+    }
+
     if (!canUsePush) {
       setMessage("이 브라우저는 서버 푸시를 지원하지 않습니다.");
       return;

@@ -35,7 +35,10 @@ export function saveSingleSchedule(schedule: SingleSchedule) {
   const alreadyExists = schedules.some((savedSchedule) => {
     return (
       savedSchedule.sourceItemId &&
-      savedSchedule.sourceItemId === schedule.sourceItemId
+      savedSchedule.sourceItemId === schedule.sourceItemId &&
+      savedSchedule.date === schedule.date &&
+      savedSchedule.startTime === schedule.startTime &&
+      savedSchedule.endTime === schedule.endTime
     );
   });
 

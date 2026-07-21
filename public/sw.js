@@ -22,6 +22,7 @@ self.addEventListener("push", (event) => {
       icon: "/icons/icon-192.png",
       badge: "/icons/icon-192.png",
       tag: data.tag || data.title,
+      silent: Boolean(data.silent),
       data: {
         url: data.url || "/",
       },

@@ -98,6 +98,7 @@ export type NotificationSettings = {
   repeatingNotificationsEnabled: boolean;
   dailySummaryEnabled: boolean;
   dailySummaryTime: string;
+  defaultSnoozeMinutes: number;
   travelNotificationsEnabled: boolean;
   purchaseNotificationsEnabled: boolean;
   routineReminderEnabled: boolean;

@@ -1,8 +1,15 @@
-import { addDays, getDayOfWeekFromDateText, toDateOnlyString } from "@/lib/availability";
+import {
+  addDays,
+  calculateFreeTimeBlocksForDate,
+  getDayOfWeekFromDateText,
+  toDateOnlyString,
+} from "@/lib/availability";
 import { getSavedPlaces } from "@/lib/placeStorage";
 import { getPurchaseHistories } from "@/lib/purchaseHistoryStorage";
 import { getRoutineSchedules } from "@/lib/routineStorage";
 import { getSingleSchedules } from "@/lib/singleScheduleStorage";
+import { getItems } from "@/lib/storage";
+import type { AssistantItem } from "@/types/assistant";
 import type { SavedPlace, SingleSchedule } from "@/types/calendar";
 import type {
   NotificationEvent,
@@ -13,6 +20,23 @@ import type { PurchaseHistoryItem } from "@/types/purchaseHistory";
 import type { RoutineSchedule } from "@/types/routine";
 
 const SYNC_WINDOW_DAYS = 14;
+
+function getDeliveryChannels(settings: NotificationSettings) {
+  return [
+    ...(settings.inAppAlarmEnabled ? (["in_app"] as const) : []),
+    ...(settings.pushEnabled
+      ? (["web_push", "native_push"] as const)
+      : []),
+  ];
+}
+
+function getEventDeliveryOptions(settings: NotificationSettings) {
+  return {
+    deliveryChannels: getDeliveryChannels(settings),
+    soundEnabled: settings.soundEnabled,
+    soundKey: settings.soundEnabled ? "default" : "silent",
+  };
+}
 
 function toDateTimeIso(dateText: string, timeText: string) {
   return new Date(`${dateText}T${timeText}:00`).toISOString();
@@ -125,6 +149,8 @@ function createScheduleEvents({
     placeName: schedule.placeName,
     placeAddress: schedule.placeAddress,
     url,
+    notificationType: "time_based" as const,
+    ...getEventDeliveryOptions(settings),
   };
 
   if (settings.scheduleNotificationsEnabled) {
@@ -200,7 +226,11 @@ function createScheduleEvents({
     );
   }
 
-  if (sourceType === "routine" && settings.routineReminderEnabled) {
+  if (
+    sourceType === "routine" &&
+    settings.repeatingNotificationsEnabled &&
+    settings.routineReminderEnabled
+  ) {
     events.push(
       withPlaceCoordinates(
         {
@@ -257,15 +287,90 @@ function createPurchaseEvent({
     url: "/purchase",
     placeName: "",
     requiresLocationCheck: false,
+    notificationType: "time_based",
+    ...getEventDeliveryOptions(settings),
+  };
+}
+
+function getRemainingGoalAmount(item: AssistantItem) {
+  if (!item.goalTotalAmount) return null;
+
+  return Math.max(0, item.goalTotalAmount - (item.goalCompletedAmount ?? 0));
+}
+
+function getInclusiveDayCount(startDate: string, endDate: string) {
+  const start = new Date(`${startDate}T00:00:00`);
+  const end = new Date(`${endDate}T00:00:00`);
+
+  return Math.max(1, Math.floor((end.getTime() - start.getTime()) / 86_400_000) + 1);
+}
+
+function createTimeTaskEvent({
+  item,
+  dateText,
+  settings,
+}: {
+  item: AssistantItem;
+  dateText: string;
+  settings: NotificationSettings;
+}): NotificationEvent | null {
+  const isPeriodTask = Boolean(item.goalStartDate && item.dueDate);
+
+  if (
+    (isPeriodTask && !settings.periodTaskNotificationsEnabled) ||
+    (!isPeriodTask && !settings.timeTaskNotificationsEnabled)
+  ) {
+    return null;
+  }
+
+  if (item.goalStartDate && dateText < item.goalStartDate) return null;
+  if (item.dueDate && dateText > item.dueDate) return null;
+
+  const remainingAmount = getRemainingGoalAmount(item);
+  const remainingDays = item.dueDate
+    ? getInclusiveDayCount(dateText, item.dueDate)
+    : null;
+  const todayAmount =
+    remainingAmount !== null && remainingDays
+      ? Math.ceil(remainingAmount / remainingDays)
+      : null;
+  const unit = item.goalUnit ?? "";
+  const body = todayAmount
+    ? `오늘 ${todayAmount}${unit} 진행하면 마감까지 맞출 수 있어요. 남은 분량 ${remainingAmount}${unit}.`
+    : item.estimatedMinutes
+      ? `오늘 ${item.estimatedMinutes}분 분량을 확인해 보세요.`
+      : "오늘 진행할 분량을 확인해 보세요.";
+  const eventType = isPeriodTask ? "period_task" : "time_task";
+
+  return {
+    id: createEventId({ eventType, sourceId: item.id, occurrenceDate: dateText }),
+    eventType,
+    sourceType: "assistant_item",
+    sourceId: item.id,
+    occurrenceDate: dateText,
+    scheduledAt: toDateTimeIso(dateText, settings.dailySummaryTime || "08:00"),
+    title: isPeriodTask ? `오늘 ${item.title} 목표예요` : `오늘 ${item.title} 시간을 잡아볼까요?`,
+    body,
+    url: "/calendar/weekly",
+    placeName: "",
+    requiresLocationCheck: false,
+    notificationType: isPeriodTask ? "period_task" : "time_task",
+    ...getEventDeliveryOptions(settings),
   };
 }
 
 export function buildNotificationEvents(settings: NotificationSettings) {
+  if (!settings.notificationsEnabled) return [];
+
   const today = new Date();
   const savedPlaces = getSavedPlaces();
   const routines = getRoutineSchedules();
   const singleSchedules = getSingleSchedules();
   const purchaseHistories = getPurchaseHistories();
+  const items = getItems();
+  const activeTimeTasks = items.filter(
+    (item) => item.status === "미완료" && item.processType === "시간작업"
+  );
   const events: NotificationEvent[] = [];
 
   for (let dayOffset = 0; dayOffset < SYNC_WINDOW_DAYS; dayOffset += 1) {
@@ -306,6 +411,74 @@ export function buildNotificationEvents(settings: NotificationSettings) {
           })
         );
       });
+
+    activeTimeTasks.forEach((item) => {
+      const event = createTimeTaskEvent({ item, dateText, settings });
+
+      if (event) events.push(event);
+    });
+
+    if (settings.dailySummaryEnabled) {
+      const scheduleCount =
+        singleSchedules.filter((schedule) => schedule.date === dateText).length +
+        routines.filter(
+          (routine) =>
+            routine.dayOfWeek === dayOfWeek && isRoutineActiveOnDate(routine, dateText)
+        ).length;
+
+      events.push({
+        id: createEventId({
+          eventType: "daily_summary",
+          sourceId: "daily-summary",
+          occurrenceDate: dateText,
+        }),
+        eventType: "daily_summary",
+        sourceType: "ai",
+        sourceId: "daily-summary",
+        occurrenceDate: dateText,
+        scheduledAt: toDateTimeIso(dateText, settings.dailySummaryTime || "08:00"),
+        title: `${dateText} 오늘의 비서 요약`,
+        body: `일정 ${scheduleCount}개·남은 시간작업 ${activeTimeTasks.length}개가 있어요.`,
+        url: "/",
+        placeName: "",
+        requiresLocationCheck: false,
+        notificationType: "daily_summary",
+        ...getEventDeliveryOptions(settings),
+      });
+    }
+
+    if (settings.aiRecommendationsEnabled && activeTimeTasks.length > 0) {
+      const freeMinutes = calculateFreeTimeBlocksForDate({
+        date: dateText,
+        routines,
+        singleSchedules,
+      }).reduce((total, block) => total + block.minutes, 0);
+      const recommendedItem = activeTimeTasks.find(
+        (item) => !item.dueDate || item.dueDate >= dateText
+      );
+
+      if (recommendedItem && freeMinutes >= 30) {
+        events.push({
+          id: createEventId({
+            eventType: "ai_recommendation",
+            sourceId: recommendedItem.id,
+            occurrenceDate: dateText,
+          }),
+          eventType: "ai_recommendation",
+          sourceType: "ai",
+          sourceId: recommendedItem.id,
+          occurrenceDate: dateText,
+          scheduledAt: toDateTimeIso(dateText, settings.dailySummaryTime || "08:00"),
+          title: `오늘 ${Math.floor(freeMinutes / 60)}시간 ${freeMinutes % 60}분 비어 있어요`,
+          body: `${recommendedItem.title}을(를) 진행하기 좋은 날이에요.`,
+          url: "/calendar/weekly",
+          placeName: "",
+          requiresLocationCheck: false,
+          notificationType: "ai_recommendation",
+          ...getEventDeliveryOptions(settings),
+        });
+      }
+    }
   }
 
   purchaseHistories.forEach((history) => {

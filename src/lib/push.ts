@@ -40,12 +40,14 @@ export async function sendPushNotification({
   body,
   url = "/",
   tag,
+  silent = false,
 }: {
   subscription: PushSubscriptionPayload;
   title: string;
   body: string;
   url?: string;
   tag?: string;
+  silent?: boolean;
 }) {
   if (!configureWebPush()) {
     throw new Error("Web Push 환경변수가 설정되지 않았습니다.");
@@ -58,6 +60,7 @@ export async function sendPushNotification({
       body,
       url,
       tag,
+      silent,
     })
   );
 }

@@ -5,6 +5,7 @@ import {
   startNativeAlarmPulse,
   stopNativeAlarmPulse,
 } from "@/lib/nativeAlarmPulse";
+import { getNotificationSettings } from "@/lib/notificationSettingsStorage";
 
 const ALARM_MODE_EVENT = "my-assistant-open-alarm-mode";
 const PERSISTENT_ALARM_MUTED_KEY = "my-assistant-persistent-alarm-muted-event-ids";
@@ -79,6 +80,7 @@ function getAlarmLabel(eventType?: string) {
 async function scheduleSnoozeAlarm(alarm: AlarmModeDetail) {
   const originalEventId =
     alarm.originalEventId ?? `overlay-alarm-${Date.now().toString()}`;
+  const snoozeMinutes = getNotificationSettings().defaultSnoozeMinutes;
 
   try {
     const { Capacitor } = await import("@capacitor/core");
@@ -93,11 +95,11 @@ async function scheduleSnoozeAlarm(alarm: AlarmModeDetail) {
       notifications: [
         {
           id: getNumericNotificationId(`${originalEventId}:overlay-snooze:${Date.now()}`),
-          title: `${alarm.title ?? "나의 비서 알람"} · 5분 뒤 다시 알림`,
+          title: `${alarm.title ?? "나의 비서 알람"} · ${snoozeMinutes}분 뒤 다시 알림`,
           body: alarm.body ?? "다시 확인할 시간이 되었어요.",
           sound: "default",
           schedule: {
-            at: new Date(Date.now() + 5 * 60 * 1000),
+            at: new Date(Date.now() + snoozeMinutes * 60 * 1000),
           },
           actionTypeId: PERSISTENT_ALARM_ACTION_TYPE_ID,
           extra: {
@@ -119,6 +121,7 @@ export default function AlarmModeOverlay() {
   const [now, setNow] = useState(() => new Date());
   const audioContextRef = useRef<AudioContext | null>(null);
   const alarmLabel = useMemo(() => getAlarmLabel(alarm?.eventType), [alarm]);
+  const snoozeMinutes = getNotificationSettings().defaultSnoozeMinutes;
 
   useEffect(() => {
     const handleOpenAlarmMode = (event: Event) => {
@@ -135,6 +138,7 @@ export default function AlarmModeOverlay() {
 
   useEffect(() => {
     if (!alarm) return;
+    const soundEnabled = getNotificationSettings().soundEnabled;
 
     const playAlarmPulse = () => {
       try {
@@ -174,20 +178,22 @@ export default function AlarmModeOverlay() {
       }
     };
 
-    void startNativeAlarmPulse(0.95);
+    if (soundEnabled) {
+      void startNativeAlarmPulse(0.95);
+    }
 
     const clockId = window.setInterval(() => setNow(new Date()), 1000);
     const pulseId = window.setInterval(() => {
       if ("vibrate" in navigator) {
         navigator.vibrate([520, 160, 520]);
       }
-      playAlarmPulse();
+      if (soundEnabled) playAlarmPulse();
     }, 1400);
 
     if ("vibrate" in navigator) {
       navigator.vibrate([520, 160, 520]);
     }
-    playAlarmPulse();
+    if (soundEnabled) playAlarmPulse();
 
     return () => {
       void stopNativeAlarmPulse();
@@ -271,7 +277,7 @@ export default function AlarmModeOverlay() {
             </p>
           ) : null}
           <p className="mt-8 rounded-3xl border border-white/10 bg-white/10 p-4 text-sm font-bold leading-relaxed text-slate-200">
-            버튼을 누를 때까지 소리와 진동을 반복합니다. 지금 시작하거나, 5분 뒤
+            버튼을 누를 때까지 소리와 진동을 반복합니다. 지금 시작하거나, {snoozeMinutes}분 뒤
             다시 알림으로 미룰 수 있습니다.
           </p>
         </div>
@@ -290,7 +296,7 @@ export default function AlarmModeOverlay() {
               onClick={snooze}
               className="h-14 rounded-[24px] border border-white/15 bg-white/10 text-base font-black text-white"
             >
-              5분 미루기
+              {snoozeMinutes}분 미루기
             </button>
             <button
               type="button"

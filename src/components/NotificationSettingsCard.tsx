@@ -13,6 +13,11 @@ const TOGGLE_OPTIONS: Array<{
   key: keyof Pick<
     NotificationSettings,
     | "scheduleNotificationsEnabled"
+    | "timeTaskNotificationsEnabled"
+    | "periodTaskNotificationsEnabled"
+    | "aiRecommendationsEnabled"
+    | "repeatingNotificationsEnabled"
+    | "dailySummaryEnabled"
     | "travelNotificationsEnabled"
     | "purchaseNotificationsEnabled"
     | "routineReminderEnabled"
@@ -25,6 +30,31 @@ const TOGGLE_OPTIONS: Array<{
     key: "scheduleNotificationsEnabled",
     title: "일정 시작/준비 알림",
     description: "정기일정과 단기일정 시작 전후에 알립니다.",
+  },
+  {
+    key: "timeTaskNotificationsEnabled",
+    title: "시간작업 알림",
+    description: "오늘 배치된 작업과 남은 작업을 알립니다.",
+  },
+  {
+    key: "periodTaskNotificationsEnabled",
+    title: "기간형 작업 알림",
+    description: "마감까지 남은 분량과 오늘 할 분량을 계산합니다.",
+  },
+  {
+    key: "aiRecommendationsEnabled",
+    title: "AI 추천 알림",
+    description: "빈 시간에 할 수 있는 작업을 비서가 추천합니다.",
+  },
+  {
+    key: "repeatingNotificationsEnabled",
+    title: "반복 알림",
+    description: "매일·매주·매월 반복 일정을 알립니다.",
+  },
+  {
+    key: "dailySummaryEnabled",
+    title: "오늘 요약",
+    description: "설정한 시간에 오늘 일정과 작업을 요약합니다.",
   },
   {
     key: "travelNotificationsEnabled",
@@ -383,7 +413,51 @@ export default function NotificationSettingsCard() {
         </p>
       </div>
 
-      <div className="mt-4 grid gap-3">
+      <div className="mt-5 rounded-3xl bg-blue-600 p-4 text-white">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-base font-black">알림 전체</p>
+            <p className="mt-1 text-xs font-bold text-blue-100">
+              끄면 푸시와 앱 내부 알람을 모두 멈춥니다.
+            </p>
+          </div>
+          <input
+            type="checkbox"
+            checked={settings.notificationsEnabled}
+            onChange={(event) =>
+              updateSettings({ notificationsEnabled: event.target.checked })
+            }
+            className="h-6 w-6 shrink-0 accent-white"
+          />
+        </div>
+        <div className="mt-4 grid grid-cols-3 gap-2">
+          {([
+            ["pushEnabled", "푸시"],
+            ["inAppAlarmEnabled", "앱 알람"],
+            ["soundEnabled", "소리"],
+          ] as const).map(([key, label]) => (
+            <label
+              key={key}
+              className="flex items-center justify-center gap-2 rounded-2xl bg-white/15 px-2 py-3 text-xs font-black"
+            >
+              <input
+                type="checkbox"
+                checked={settings[key]}
+                disabled={!settings.notificationsEnabled}
+                onChange={(event) => updateSettings({ [key]: event.target.checked })}
+                className="h-4 w-4 accent-white disabled:opacity-40"
+              />
+              {label}
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <div
+        className={`mt-4 grid gap-3 ${
+          settings.notificationsEnabled ? "" : "pointer-events-none opacity-45"
+        }`}
+      >
         {TOGGLE_OPTIONS.map((option) => (
           <label
             key={option.key}
@@ -498,6 +572,34 @@ export default function NotificationSettingsCard() {
               updateSettings({
                 locationCheckWindowMinutes: Number(event.target.value),
               })
+            }
+            className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-blue-400"
+          />
+        </label>
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        <label className="text-xs font-black text-slate-500">
+          오늘 요약 시간
+          <input
+            type="time"
+            value={settings.dailySummaryTime}
+            disabled={!settings.dailySummaryEnabled}
+            onChange={(event) =>
+              updateSettings({ dailySummaryTime: event.target.value })
+            }
+            className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-blue-400 disabled:opacity-50"
+          />
+        </label>
+        <label className="text-xs font-black text-slate-500">
+          기본 다시 알림(분)
+          <input
+            type="number"
+            min="1"
+            max="1440"
+            value={settings.defaultSnoozeMinutes}
+            onChange={(event) =>
+              updateSettings({ defaultSnoozeMinutes: Number(event.target.value) })
             }
             className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-blue-400"
           />
