@@ -121,7 +121,9 @@ function getRoutineTop(startTime: string) {
 
 function getRoutineHeight(startTime: string, endTime: string) {
   const startMinutes = timeToMinutes(startTime);
-  const endMinutes = timeToMinutes(endTime);
+  const rawEndMinutes = timeToMinutes(endTime);
+  const endMinutes =
+    rawEndMinutes < startMinutes ? rawEndMinutes + 24 * 60 : rawEndMinutes;
 
   return ((endMinutes - startMinutes) / 60) * HOUR_HEIGHT;
 }
@@ -139,7 +141,9 @@ function getScheduleHeight(
   hourHeight: number
 ) {
   const startMinutes = timeToMinutes(startTime);
-  const endMinutes = timeToMinutes(endTime);
+  const rawEndMinutes = timeToMinutes(endTime);
+  const endMinutes =
+    rawEndMinutes < startMinutes ? rawEndMinutes + 24 * 60 : rawEndMinutes;
 
   return ((endMinutes - startMinutes) / 60) * hourHeight;
 }
@@ -1126,7 +1130,11 @@ function RoutineScheduleManager({
       ...selectedMobileItems.map((item) => timeToMinutes(item.startTime))
     );
     const lastEndMinutes = Math.max(
-      ...selectedMobileItems.map((item) => timeToMinutes(item.endTime))
+      ...selectedMobileItems.map((item) => {
+        const startMinutes = timeToMinutes(item.startTime);
+        const endMinutes = timeToMinutes(item.endTime);
+        return endMinutes < startMinutes ? endMinutes + 24 * 60 : endMinutes;
+      })
     );
     const startHour = clamp(
       Math.floor(firstStartMinutes / 60) - 1,
@@ -1417,7 +1425,11 @@ function RoutineScheduleManager({
                       const rangeMinutes =
                         rangeEndMinutes - rangeStartMinutes || 1;
                       const itemStartMinutes = timeToMinutes(item.startTime);
-                      const itemEndMinutes = timeToMinutes(item.endTime);
+                      const rawItemEndMinutes = timeToMinutes(item.endTime);
+                      const itemEndMinutes =
+                        rawItemEndMinutes < itemStartMinutes
+                          ? rawItemEndMinutes + 24 * 60
+                          : rawItemEndMinutes;
                       const left =
                         ((itemStartMinutes - rangeStartMinutes) /
                           rangeMinutes) *

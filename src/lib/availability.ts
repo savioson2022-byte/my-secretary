@@ -29,6 +29,16 @@ const DAY_END_MINUTES = 24 * 60;
 
 const DAYS: DayOfWeek[] = ["일", "월", "화", "수", "목", "금", "토"];
 
+function addDaysToDateText(dateText: string, amount: number) {
+  const date = new Date(`${dateText}T00:00:00`);
+  date.setDate(date.getDate() + amount);
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export function timeToMinutes(time: string): number {
   const [hourText, minuteText] = time.split(":");
 
@@ -223,12 +233,28 @@ export function calculateFreeTimeBlocksForDate({
     .filter((schedule) => schedule.date === date)
     .map((schedule) => ({
       startMinutes: timeToMinutes(schedule.startTime),
+      endMinutes:
+        timeToMinutes(schedule.endTime) < timeToMinutes(schedule.startTime)
+          ? DAY_END_MINUTES
+          : timeToMinutes(schedule.endTime),
+    }));
+
+  const previousDate = addDaysToDateText(date, -1);
+  const overnightContinuationBlocks = singleSchedules
+    .filter((schedule) => schedule.date === previousDate)
+    .filter(
+      (schedule) =>
+        timeToMinutes(schedule.endTime) < timeToMinutes(schedule.startTime)
+    )
+    .map((schedule) => ({
+      startMinutes: DAY_START_MINUTES,
       endMinutes: timeToMinutes(schedule.endTime),
     }));
 
   return calculateFreeTimeFromBusyBlocks([
     ...routineBusyBlocks,
     ...singleScheduleBusyBlocks,
+    ...overnightContinuationBlocks,
   ]);
 }
 

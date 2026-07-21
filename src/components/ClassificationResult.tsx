@@ -12,6 +12,7 @@ import {
 import ScheduleColorPicker from "@/components/ScheduleColorPicker";
 import { DEFAULT_SINGLE_SCHEDULE_COLOR } from "@/lib/scheduleColors";
 import { saveClassificationFeedback } from "@/lib/personalAiMemoryStorage";
+import { isOvernightTimeRange } from "@/lib/scheduleTime";
 
 type ClassificationResultProps = {
   result: AssistantItemWithoutId;
@@ -554,6 +555,17 @@ export default function ClassificationResult({
                 />
               </div>
             </div>
+
+            {result.scheduleStartTime &&
+              result.scheduleEndTime &&
+              isOvernightTimeRange(
+                result.scheduleStartTime,
+                result.scheduleEndTime
+              ) && (
+                <p className="mt-3 rounded-xl bg-white p-3 text-sm font-black text-blue-700 ring-1 ring-blue-100">
+                  자정을 넘기는 일정입니다. 종료 시간은 다음 날 {result.scheduleEndTime}로 저장됩니다.
+                </p>
+              )}
 
             {!result.dueDate && (
               <p className="mt-3 rounded-xl bg-white p-3 text-sm font-bold text-amber-700 ring-1 ring-amber-100">

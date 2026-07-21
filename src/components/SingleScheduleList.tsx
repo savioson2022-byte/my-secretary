@@ -19,6 +19,7 @@ import { updateSingleSchedule } from "@/lib/singleScheduleStorage";
 import { getUserProfile } from "@/lib/userProfileStorage";
 import { SavedPlace, SingleSchedule, TravelMode } from "@/types/calendar";
 import { useMemo, useState } from "react";
+import { isOvernightTimeRange } from "@/lib/scheduleTime";
 
 type SingleScheduleListProps = {
   schedules: SingleSchedule[];
@@ -235,8 +236,8 @@ export default function SingleScheduleList({
       return;
     }
 
-    if (editStartTime >= editEndTime) {
-      alert("종료 시간은 시작 시간보다 늦어야 해.");
+    if (editStartTime === editEndTime) {
+      alert("시작 시간과 종료 시간은 서로 달라야 해.");
       return;
     }
 
@@ -480,6 +481,10 @@ export default function SingleScheduleList({
                       <p className="mt-1 text-sm font-semibold text-slate-600">
                         {schedule.date} {schedule.startTime} ~{" "}
                         {schedule.endTime}
+                        {isOvernightTimeRange(
+                          schedule.startTime,
+                          schedule.endTime
+                        ) && " (다음 날)"}
                       </p>
 
                       <p className="mt-1 text-sm text-slate-500">

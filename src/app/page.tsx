@@ -423,11 +423,8 @@ export default function Home() {
         return false;
       }
 
-      if (
-        getTimeMinutes(result.scheduleEndTime) <=
-        getTimeMinutes(result.scheduleStartTime)
-      ) {
-        setSaveMessage("종료 시간은 시작 시간보다 늦어야 해요.");
+      if (result.scheduleEndTime === result.scheduleStartTime) {
+        setSaveMessage("시작 시간과 종료 시간은 서로 달라야 해요.");
         return false;
       }
     }
