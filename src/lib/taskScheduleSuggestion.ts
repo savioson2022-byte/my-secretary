@@ -139,8 +139,21 @@ function inferTaskContext({
     : isBeautyReservation
       ? "salon"
       : null;
+  const explicitlySelectedPlace =
+    item.placePreference === "specific"
+      ? savedPlaces.find(
+          (place) =>
+            place.id === item.placeId ||
+            normalizeSearchText(place.name) ===
+              normalizeSearchText(item.placeName ?? "")
+        ) ?? null
+      : null;
+  const allowsAnyPlace = item.placePreference === "anywhere";
   const targetPlace =
-    savedPlaces.find((place) => {
+    explicitlySelectedPlace ??
+    (allowsAnyPlace
+      ? null
+      : savedPlaces.find((place) => {
       if (preferredPlaceType && getPlaceType(place) === preferredPlaceType) {
         return true;
       }
@@ -154,7 +167,7 @@ function inferTaskContext({
             .filter((token) => token.length >= 2)
             .some((token) => text.includes(token)))
       );
-    }) ?? null;
+        }) ?? null);
 
   return {
     isWorkout,

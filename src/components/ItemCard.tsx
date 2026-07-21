@@ -76,6 +76,10 @@ export default function ItemCard({ item, onComplete, onDelete }: ItemCardProps) 
         {item.ideaGroupTitle && <Badge>묶음 {item.ideaGroupTitle}</Badge>}
         {item.ideaSubcategory && <Badge>{item.ideaSubcategory}</Badge>}
         {scheduleText && <Badge>시간 {scheduleText}</Badge>}
+        {item.placePreference === "specific" && item.placeName && (
+          <Badge>장소 {item.placeName}</Badge>
+        )}
+        {item.placePreference === "anywhere" && <Badge>장소 상관없음</Badge>}
         {item.dueDate && <Badge>마감 {item.dueDate}</Badge>}
         {item.reminderDate && <Badge>알림 {item.reminderDate}</Badge>}
       </div>

@@ -121,7 +121,16 @@ export function createSingleScheduleFromItem(
     date: item.dueDate,
     startTime,
     endTime,
-    placeName: "",
+    placeName:
+      item.placePreference === "specific" ? item.placeName?.trim() ?? "" : "",
+    placeAddress:
+      item.placePreference === "specific"
+        ? item.placeAddress?.trim() || undefined
+        : undefined,
+    placePostalCode:
+      item.placePreference === "specific"
+        ? item.placePostalCode?.trim() || undefined
+        : undefined,
     memo: item.originalText,
     color: item.color,
     sourceItemId: item.id,

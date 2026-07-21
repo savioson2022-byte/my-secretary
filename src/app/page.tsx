@@ -421,6 +421,16 @@ export default function Home() {
       return false;
     }
 
+    if (
+      (result.processType === "단기일정" ||
+        result.processType === "시간작업") &&
+      result.placePreference === "specific" &&
+      (!result.placeId || !result.placeName?.trim())
+    ) {
+      setSaveMessage("사용할 등록 장소를 선택해주세요.");
+      return false;
+    }
+
     if (result.processType === "단기일정") {
       if (!result.dueDate) {
         setSaveMessage("단기일정의 날짜를 선택해주세요.");

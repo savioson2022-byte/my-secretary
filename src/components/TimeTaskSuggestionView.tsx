@@ -162,6 +162,9 @@ export default function TimeTaskSuggestionView({
     const placeName = isEditing
       ? draftSuggestion.placeName.trim()
       : suggestion.placeName ?? "";
+    const selectedPlace = savedPlaces.find(
+      (place) => place.name.trim() === placeName
+    );
 
     if (!title || !date || !startTime || !endTime) {
       setFeedbackMessage("확정하려면 제목, 날짜, 시작/종료 시간이 필요해요.");
@@ -177,6 +180,9 @@ export default function TimeTaskSuggestionView({
       startTime,
       endTime,
       placeName,
+      placeAddress: selectedPlace?.address,
+      placePostalCode: selectedPlace?.postalCode,
+      travelMode: selectedPlace ? userProfile?.preferredTravelMode : undefined,
       memo: suggestion.reason,
       color: sourceItem?.color,
       sourceItemId: suggestion.itemId,

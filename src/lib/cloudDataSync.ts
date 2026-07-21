@@ -244,6 +244,11 @@ const syncDomains: Array<SyncDomain<SyncableItem, { id: string }>> = [
       "goal_completed_amount",
       "goal_unit",
       "goal_session_minutes",
+      "place_preference",
+      "place_id",
+      "place_name",
+      "place_address",
+      "place_postal_code",
     ],
     toRow(item, userId, availableColumns) {
       const assistantItem = item as AssistantItem;
@@ -319,6 +324,25 @@ const syncDomains: Array<SyncDomain<SyncableItem, { id: string }>> = [
       if (availableColumns.has("goal_session_minutes")) {
         Object.assign(row, { goal_session_minutes: assistantItem.goalSessionMinutes ?? null });
       }
+      if (availableColumns.has("place_preference")) {
+        Object.assign(row, {
+          place_preference: assistantItem.placePreference ?? "anywhere",
+        });
+      }
+      if (availableColumns.has("place_id")) {
+        Object.assign(row, { place_id: assistantItem.placeId ?? null });
+      }
+      if (availableColumns.has("place_name")) {
+        Object.assign(row, { place_name: assistantItem.placeName ?? null });
+      }
+      if (availableColumns.has("place_address")) {
+        Object.assign(row, { place_address: assistantItem.placeAddress ?? null });
+      }
+      if (availableColumns.has("place_postal_code")) {
+        Object.assign(row, {
+          place_postal_code: assistantItem.placePostalCode ?? null,
+        });
+      }
 
       return row;
     },
@@ -339,6 +363,12 @@ const syncDomains: Array<SyncDomain<SyncableItem, { id: string }>> = [
         goalCompletedAmount: asNullableNumber(row.goal_completed_amount),
         goalUnit: asNullableText(row.goal_unit),
         goalSessionMinutes: asNullableNumber(row.goal_session_minutes),
+        placePreference:
+          row.place_preference === "specific" ? "specific" : "anywhere",
+        placeId: asNullableText(row.place_id),
+        placeName: asNullableText(row.place_name),
+        placeAddress: asNullableText(row.place_address),
+        placePostalCode: asNullableText(row.place_postal_code),
         dueDate: asNullableText(row.due_date),
         reminderDate: asNullableText(row.reminder_date),
         scheduleStartTime: row.schedule_start_time

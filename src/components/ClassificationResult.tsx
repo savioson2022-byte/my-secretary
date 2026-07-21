@@ -13,6 +13,8 @@ import ScheduleColorPicker from "@/components/ScheduleColorPicker";
 import { DEFAULT_SINGLE_SCHEDULE_COLOR } from "@/lib/scheduleColors";
 import { saveClassificationFeedback } from "@/lib/personalAiMemoryStorage";
 import { isOvernightTimeRange } from "@/lib/scheduleTime";
+import { getSavedPlaces } from "@/lib/placeStorage";
+import type { SavedPlace } from "@/types/calendar";
 
 type ClassificationResultProps = {
   result: AssistantItemWithoutId;
@@ -128,10 +130,52 @@ export default function ClassificationResult({
   gemmaCandidate = null,
 }: ClassificationResultProps) {
   const originalResultRef = useRef(result);
+  const [savedPlaces] = useState<SavedPlace[]>(() =>
+    typeof window === "undefined" ? [] : getSavedPlaces()
+  );
 
   useEffect(() => {
     originalResultRef.current = result;
   }, [result.originalText]);
+
+  useEffect(() => {
+    if (
+      (result.processType !== "단기일정" &&
+        result.processType !== "시간작업") ||
+      result.placePreference
+    ) {
+      return;
+    }
+
+    const inputText = `${result.originalText} ${result.title}`.toLowerCase();
+    const matchedPlace =
+      savedPlaces.find((place) =>
+        inputText.includes(place.name.trim().toLowerCase())
+      ) ??
+      (result.actionType === "운동" || /헬스|운동|피트니스/.test(inputText)
+        ? savedPlaces.find((place) => place.placeType === "gym")
+        : undefined);
+
+    onChange({
+      ...result,
+      placePreference: matchedPlace ? "specific" : "anywhere",
+      placeId: matchedPlace?.id ?? null,
+      placeName: matchedPlace?.name ?? null,
+      placeAddress: matchedPlace?.address ?? null,
+      placePostalCode: matchedPlace?.postalCode ?? null,
+    });
+  }, [onChange, result, savedPlaces]);
+
+  function selectPlace(placeId: string) {
+    const place = savedPlaces.find((item) => item.id === placeId);
+    updateResult({
+      placePreference: "specific",
+      placeId: place?.id ?? null,
+      placeName: place?.name ?? null,
+      placeAddress: place?.address ?? null,
+      placePostalCode: place?.postalCode ?? null,
+    });
+  }
 
   function updateResult(nextPartialResult: Partial<AssistantItemWithoutId>) {
     onChange({
@@ -355,6 +399,65 @@ export default function ClassificationResult({
               </p>
             </div>
           )}
+
+        {(result.processType === "단기일정" ||
+          result.processType === "시간작업") && (
+          <div className="rounded-2xl bg-emerald-50 p-4 ring-1 ring-emerald-100">
+            <FieldLabel>작업 장소</FieldLabel>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() =>
+                  updateResult({
+                    placePreference: "anywhere",
+                    placeId: null,
+                    placeName: null,
+                    placeAddress: null,
+                    placePostalCode: null,
+                  })
+                }
+                className={`rounded-2xl px-3 py-3 text-sm font-black ring-1 ${
+                  (result.placePreference ?? "anywhere") === "anywhere"
+                    ? "bg-emerald-600 text-white ring-emerald-600"
+                    : "bg-white text-slate-600 ring-emerald-200"
+                }`}
+              >
+                장소 상관없음
+              </button>
+              <button
+                type="button"
+                onClick={() => selectPlace(result.placeId ?? savedPlaces[0]?.id ?? "")}
+                disabled={savedPlaces.length === 0}
+                className={`rounded-2xl px-3 py-3 text-sm font-black ring-1 disabled:opacity-50 ${
+                  result.placePreference === "specific"
+                    ? "bg-emerald-600 text-white ring-emerald-600"
+                    : "bg-white text-slate-600 ring-emerald-200"
+                }`}
+              >
+                등록 장소 지정
+              </button>
+            </div>
+            {result.placePreference === "specific" && (
+              <select
+                value={result.placeId ?? ""}
+                onChange={(event) => selectPlace(event.target.value)}
+                className="mt-3 w-full rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-sm font-semibold outline-none focus:border-emerald-400"
+              >
+                <option value="">장소를 선택해주세요</option>
+                {savedPlaces.map((place) => (
+                  <option key={place.id} value={place.id}>
+                    {place.name} · {place.address}
+                  </option>
+                ))}
+              </select>
+            )}
+            <p className="mt-2 text-xs font-bold leading-5 text-emerald-700">
+              {result.placePreference === "specific"
+                ? "앞뒤 일정과 이동 여유를 확인해 가능한 시간만 추천합니다."
+                : "집, 학교, 카페 등 집중할 수 있는 어느 공간에서나 배치할 수 있습니다."}
+            </p>
+          </div>
+        )}
 
         {result.processType === "단기일정" && (
           <ScheduleColorPicker

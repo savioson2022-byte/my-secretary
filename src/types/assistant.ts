@@ -61,6 +61,13 @@ export type AssistantItemWithoutId = {
   /** 한 번에 배치할 권장 작업 시간 */
   goalSessionMinutes?: number | null;
 
+  /** 작업 장소 제약. anywhere이면 이동시간을 고려하지 않는다. */
+  placePreference?: "anywhere" | "specific";
+  placeId?: string | null;
+  placeName?: string | null;
+  placeAddress?: string | null;
+  placePostalCode?: string | null;
+
   /**
    * 시간작업의 마감일 또는 단기일정의 날짜
    * 예: "2026-06-25"

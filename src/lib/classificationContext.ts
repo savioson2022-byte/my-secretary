@@ -63,6 +63,12 @@ function formatExample(item: AssistantItem) {
     fields.push(`시작: ${item.scheduleStartTime}`);
   }
 
+  if (item.placePreference === "specific" && item.placeName) {
+    fields.push(`장소: ${item.placeName}`);
+  } else if (item.placePreference === "anywhere") {
+    fields.push("장소: 상관없음");
+  }
+
   return `- ${fields.join(" / ")}`;
 }
 
