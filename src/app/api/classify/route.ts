@@ -45,6 +45,7 @@ const CLASSIFICATION_SCHEMA = {
       enum: [
         "즉시처리",
         "단기일정",
+        "시간작업",
         "메모",
       ],
     },
@@ -62,6 +63,25 @@ const CLASSIFICATION_SCHEMA = {
     },
     estimatedMinutes: {
       type: ["number", "null"],
+    },
+    goalStartDate: {
+      type: ["string", "null"],
+      description: "기간형 시간작업 시작일. YYYY-MM-DD 또는 null",
+    },
+    goalTotalAmount: {
+      type: ["number", "null"],
+      description: "전체 분량 숫자. 예: 300쪽이면 300",
+    },
+    goalCompletedAmount: {
+      type: ["number", "null"],
+    },
+    goalUnit: {
+      type: ["string", "null"],
+      description: "분량 단위. 예: 쪽, 문제, 강",
+    },
+    goalSessionMinutes: {
+      type: ["number", "null"],
+      description: "한 번에 배치할 권장 시간(분)",
     },
     dueDate: {
       type: ["string", "null"],
@@ -99,6 +119,11 @@ const CLASSIFICATION_SCHEMA = {
     "repeatType",
     "status",
     "estimatedMinutes",
+    "goalStartDate",
+    "goalTotalAmount",
+    "goalCompletedAmount",
+    "goalUnit",
+    "goalSessionMinutes",
     "dueDate",
     "reminderDate",
     "scheduleStartTime",
@@ -171,6 +196,17 @@ function normalizeResult(
       typeof result.estimatedMinutes === "number"
         ? result.estimatedMinutes
         : null,
+    goalStartDate:
+      result.processType === "시간작업" ? result.goalStartDate ?? getTodayTextInKorea() : null,
+    goalTotalAmount:
+      result.processType === "시간작업" && typeof result.goalTotalAmount === "number"
+        ? result.goalTotalAmount
+        : null,
+    goalCompletedAmount:
+      result.processType === "시간작업" ? result.goalCompletedAmount ?? 0 : null,
+    goalUnit: result.processType === "시간작업" ? result.goalUnit ?? null : null,
+    goalSessionMinutes:
+      result.processType === "시간작업" ? result.goalSessionMinutes ?? 60 : null,
     dueDate: result.dueDate || null,
     reminderDate: result.reminderDate || null,
     scheduleStartTime,
@@ -250,8 +286,20 @@ ${userContext ? `\n사용자별 분류 기준:\n${userContext}\n` : ""}
 3. 메모
 - 아직 확정 일정도 즉시처리도 아닌 모든 기록
 - 예: 시험범위는 52쪽부터 65쪽, 나의 비서에 애플워치 입력 기능 넣기, 기하 문제 풀어야 함, 방 청소해야 함
-- 아이디어와 시간작업성 기록도 우선 메모로 저장한다.
+- 아이디어와 단순 기록은 메모로 저장한다.
 - scheduleStartTime과 scheduleEndTime은 null
+
+4. 시간작업
+- 며칠 또는 특정 기간 안에 전체 작업량을 나눠 수행해야 하는 목표
+- 예: 앞으로 3일 동안 300쪽 책 다 읽기, 이번 주 안에 수학 문제 100개 풀기
+- processType은 "시간작업", actionType은 보통 "공부"
+- goalStartDate는 시작일, dueDate는 마감일
+- 명시된 전체 분량 숫자는 goalTotalAmount, 단위는 goalUnit에 넣기
+- 전체 분량이 불명확하면 goalTotalAmount와 goalUnit은 null로 두어 사용자가 확인하게 하기
+- estimatedMinutes는 전체 작업에 걸릴 예상 시간. 독서는 1쪽당 약 2분을 기본 추정하되 사용자가 수정할 수 있다.
+- goalSessionMinutes는 한 번에 집중할 시간이며 기본 60
+- goalCompletedAmount는 0
+- scheduleStartTime과 scheduleEndTime은 null. 실제 시간은 추천기가 빈 시간에 나눠 배치한다.
 
 정기일정은 사용자가 일정관리에서 직접 관리하므로 자동 분류하지 마라. 반복 표현이 있어도 메모로 둬라.
 

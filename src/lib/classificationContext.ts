@@ -43,6 +43,18 @@ function formatExample(item: AssistantItem) {
     fields.push(`예상시간: ${item.estimatedMinutes}분`);
   }
 
+  if (item.processType === "시간작업") {
+    if (item.goalStartDate || item.dueDate) {
+      fields.push(`목표기간: ${item.goalStartDate ?? "미정"}~${item.dueDate ?? "미정"}`);
+    }
+    if (item.goalTotalAmount && item.goalUnit) {
+      fields.push(`목표분량: ${item.goalTotalAmount}${item.goalUnit}`);
+    }
+    if (item.goalSessionMinutes) {
+      fields.push(`회당작업: ${item.goalSessionMinutes}분`);
+    }
+  }
+
   if (item.dueDate) {
     fields.push(`날짜: ${item.dueDate}`);
   }

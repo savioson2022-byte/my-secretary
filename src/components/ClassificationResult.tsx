@@ -45,6 +45,7 @@ const ACTION_TYPE_OPTIONS: ActionType[] = [
 const PROCESS_TYPE_OPTIONS: ProcessType[] = [
   "즉시처리",
   "단기일정",
+  "시간작업",
   "메모",
 ];
 
@@ -301,9 +302,8 @@ export default function ClassificationResult({
             )}
           </select>
           <p className="mt-2 text-xs font-semibold leading-5 text-slate-400">
-            앱 사용성을 위해 분류는 단기일정, 메모, 즉시처리로 단순화했습니다.
-            메모는 아이디어 기록에도 자동으로 이어서 저장되고, 정기일정은
-            일정관리에서 직접 관리합니다.
+            분류는 단기일정, 기간을 나눠 쓰는 시간작업, 메모, 즉시처리로
+            정리됩니다. 정기일정은 일정관리에서 직접 관리합니다.
           </p>
         </div>
 
@@ -360,8 +360,82 @@ export default function ClassificationResult({
           />
         )}
 
-        <div className="grid min-w-0 gap-3 md:grid-cols-3">
-          <div className="min-w-0">
+        {result.processType === "시간작업" && (
+          <div className="rounded-2xl bg-indigo-50 p-4 ring-1 ring-indigo-100">
+            <p className="text-sm font-black text-indigo-950">기간형 작업 계획</p>
+            <p className="mt-1 text-sm leading-6 text-indigo-800">
+              전체 분량과 총 예상 시간을 기준으로, 시작일부터 마감일까지의 빈
+              시간에 여러 번 나눠 배치합니다.
+            </p>
+
+            <div className="mt-3 grid min-w-0 gap-3 sm:grid-cols-2">
+              <div className="min-w-0">
+                <FieldLabel>시작일</FieldLabel>
+                <input
+                  type="date"
+                  value={result.goalStartDate ?? ""}
+                  onChange={(event) => updateResult({ goalStartDate: event.target.value || null })}
+                  className="mt-2 w-full rounded-2xl border border-indigo-200 bg-white px-4 py-3 font-semibold outline-none focus:border-indigo-400"
+                />
+              </div>
+              <div className="min-w-0">
+                <FieldLabel>마감일</FieldLabel>
+                <input
+                  type="date"
+                  value={result.dueDate ?? ""}
+                  onChange={(event) => updateResult({ dueDate: event.target.value || null })}
+                  className="mt-2 w-full rounded-2xl border border-indigo-200 bg-white px-4 py-3 font-semibold outline-none focus:border-indigo-400"
+                />
+              </div>
+              <div className="min-w-0">
+                <FieldLabel>전체 분량</FieldLabel>
+                <input
+                  type="number"
+                  min={0}
+                  step="any"
+                  value={result.goalTotalAmount ?? ""}
+                  onChange={(event) => updateResult({ goalTotalAmount: event.target.value ? Number(event.target.value) : null })}
+                  placeholder="예: 300"
+                  className="mt-2 w-full rounded-2xl border border-indigo-200 bg-white px-4 py-3 font-semibold outline-none focus:border-indigo-400"
+                />
+              </div>
+              <div className="min-w-0">
+                <FieldLabel>분량 단위</FieldLabel>
+                <input
+                  value={result.goalUnit ?? ""}
+                  onChange={(event) => updateResult({ goalUnit: event.target.value || null })}
+                  placeholder="예: 쪽, 문제, 강"
+                  className="mt-2 w-full rounded-2xl border border-indigo-200 bg-white px-4 py-3 font-semibold outline-none focus:border-indigo-400"
+                />
+              </div>
+              <div className="min-w-0">
+                <FieldLabel>총 예상 시간</FieldLabel>
+                <input
+                  type="number"
+                  min={1}
+                  value={result.estimatedMinutes ?? ""}
+                  onChange={(event) => handleEstimatedMinutesChange(event.target.value)}
+                  placeholder="분 단위"
+                  className="mt-2 w-full rounded-2xl border border-indigo-200 bg-white px-4 py-3 font-semibold outline-none focus:border-indigo-400"
+                />
+              </div>
+              <div className="min-w-0">
+                <FieldLabel>한 번에 할 시간</FieldLabel>
+                <input
+                  type="number"
+                  min={10}
+                  step={10}
+                  value={result.goalSessionMinutes ?? 60}
+                  onChange={(event) => updateResult({ goalSessionMinutes: event.target.value ? Number(event.target.value) : null })}
+                  className="mt-2 w-full rounded-2xl border border-indigo-200 bg-white px-4 py-3 font-semibold outline-none focus:border-indigo-400"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className={`grid min-w-0 gap-3 ${result.processType === "시간작업" ? "md:grid-cols-2" : "md:grid-cols-3"}`}>
+          {result.processType !== "시간작업" && <div className="min-w-0">
             <FieldLabel>예상 시간</FieldLabel>
             <input
               type="number"
@@ -374,7 +448,7 @@ export default function ClassificationResult({
               className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none focus:border-blue-400"
             />
             <p className="mt-1 text-xs font-semibold text-slate-400">분 단위</p>
-          </div>
+          </div>}
 
           <div className="min-w-0">
             <FieldLabel>중요도</FieldLabel>
@@ -415,7 +489,7 @@ export default function ClassificationResult({
           </div>
         </div>
 
-        <div className="grid min-w-0 gap-3 md:grid-cols-2">
+        {result.processType !== "시간작업" && <div className="grid min-w-0 gap-3 md:grid-cols-2">
           <div className="min-w-0">
             <FieldLabel>마감일 / 일정 날짜</FieldLabel>
             <input
@@ -443,7 +517,7 @@ export default function ClassificationResult({
               className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold outline-none focus:border-blue-400"
             />
           </div>
-        </div>
+        </div>}
 
         {result.processType === "단기일정" && (
           <div className="rounded-2xl bg-sky-50 p-4 ring-1 ring-sky-100">
@@ -499,8 +573,8 @@ export default function ClassificationResult({
           <div className="rounded-2xl bg-amber-50 p-4 text-sm leading-6 text-amber-800 ring-1 ring-amber-100">
             <p className="font-black">시간작업 추천 안내</p>
             <p className="mt-1">
-              시간작업은 저장 후 캘린더의 빈 시간에 배치 추천됩니다. 추천을
-              받으려면 예상 시간을 입력해두는 것이 좋습니다.
+              저장하면 시작일과 마감일 사이의 빈 시간에 여러 세션으로 나눠
+              추천합니다. 이미 확정한 세션은 다시 추천하지 않습니다.
             </p>
           </div>
         )}

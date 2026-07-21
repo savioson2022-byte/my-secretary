@@ -14,6 +14,25 @@ function detectDate(text: string) {
   return null;
 }
 
+function detectGoalPeriod(text: string) {
+  const match = text.match(/(?:앞으로\s*)?(\d+)\s*일\s*(?:동안|안에|내에)/);
+  if (!match) return null;
+
+  const days = Math.max(1, Number(match[1]));
+  return {
+    startDate: getDateAfterDays(0),
+    dueDate: getDateAfterDays(days - 1),
+  };
+}
+
+function detectGoalWorkload(text: string) {
+  const match = text.match(/(\d+(?:\.\d+)?)\s*(쪽|페이지|문제|강|강의|챕터|장|권)/);
+  if (!match) return { amount: null, unit: null };
+
+  const normalizedUnit = match[2] === "페이지" ? "쪽" : match[2] === "강의" ? "강" : match[2];
+  return { amount: Number(match[1]), unit: normalizedUnit };
+}
+
 function detectCategory(text: string): AssistantItemWithoutId["category"] {
   /**
    * 중요:
@@ -60,7 +79,7 @@ function detectActionType(text: string): AssistantItemWithoutId["actionType"] {
     return "연락";
   }
 
-  if (/(공부|복습|예습|문제|수업 준비|시험 준비|풀기|외우기)/.test(text)) {
+  if (/(공부|복습|예습|문제|수업 준비|시험 준비|풀기|외우기|읽기|독서)/.test(text)) {
     return "공부";
   }
 
@@ -111,6 +130,13 @@ function detectProcessType(
   text: string,
   actionType: AssistantItemWithoutId["actionType"]
 ): AssistantItemWithoutId["processType"] {
+  if (
+    /(?:\d+\s*일|이번\s*주|이번주).*(?:동안|안에|내에|까지)/.test(text) &&
+    (actionType === "공부" || /(읽기|풀기|외우기|정리|완독|끝내기|다\s*하기)/.test(text))
+  ) {
+    return "시간작업";
+  }
+
   // 반복되는 고정 일정
   if (
     /(매일|매주|매달|월마다|주마다|반복|꾸준히|정기적으로|월요일마다|화요일마다|수요일마다|목요일마다|금요일마다|토요일마다|일요일마다)/.test(
@@ -194,7 +220,12 @@ export function classifyInput(originalText: string): AssistantItemWithoutId {
   const repeatType = detectRepeatType(text);
   const detectedDate = detectDate(text);
   const processType = detectProcessType(text, actionType);
-  const estimatedMinutes = detectEstimatedMinutes(actionType);
+  const goalPeriod = processType === "시간작업" ? detectGoalPeriod(text) : null;
+  const workload = processType === "시간작업" ? detectGoalWorkload(text) : { amount: null, unit: null };
+  const estimatedMinutes =
+    processType === "시간작업" && workload.amount
+      ? Math.max(60, Math.round(workload.amount * (workload.unit === "쪽" ? 2 : 5)))
+      : detectEstimatedMinutes(actionType);
   const purchaseProductName =
     actionType === "구매" ? detectPurchaseProductName(text) : null;
 
@@ -207,11 +238,16 @@ export function classifyInput(originalText: string): AssistantItemWithoutId {
     category,
     actionType,
     priority,
-    dueDate: detectedDate,
+    dueDate: goalPeriod?.dueDate ?? detectedDate,
     reminderDate: detectedDate,
     status: "미완료",
     processType,
     estimatedMinutes,
+    goalStartDate: goalPeriod?.startDate ?? null,
+    goalTotalAmount: workload.amount,
+    goalCompletedAmount: 0,
+    goalUnit: workload.unit,
+    goalSessionMinutes: processType === "시간작업" ? 60 : null,
     purchaseProductName,
     purchasePlatform: actionType === "구매" ? "coupang" : null,
   };

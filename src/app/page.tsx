@@ -350,6 +350,29 @@ export default function Home() {
       }
     }
 
+    if (result.processType === "시간작업") {
+      if (!result.goalStartDate || !result.dueDate) {
+        setSaveMessage("시간작업의 시작일과 마감일을 선택해주세요.");
+        return false;
+      }
+      if (result.goalStartDate > result.dueDate) {
+        setSaveMessage("시간작업의 마감일은 시작일보다 늦어야 해요.");
+        return false;
+      }
+      if (!result.goalTotalAmount || result.goalTotalAmount <= 0 || !result.goalUnit?.trim()) {
+        setSaveMessage("나눠서 진행할 전체 분량과 단위를 입력해주세요.");
+        return false;
+      }
+      if (!result.estimatedMinutes || result.estimatedMinutes <= 0) {
+        setSaveMessage("전체 작업에 필요한 총 예상 시간을 입력해주세요.");
+        return false;
+      }
+      if (!result.goalSessionMinutes || result.goalSessionMinutes <= 0) {
+        setSaveMessage("한 번에 작업할 시간을 입력해주세요.");
+        return false;
+      }
+    }
+
     setSaveMessage("저장하는 중이에요...");
 
     try {

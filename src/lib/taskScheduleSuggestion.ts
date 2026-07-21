@@ -28,6 +28,10 @@ export type TimeTaskSuggestion = {
   score: number;
   reason: string;
   appliedRules: string[];
+  sessionIndex?: number;
+  sessionCount?: number;
+  allocatedAmount?: number;
+  workloadUnit?: string | null;
 };
 
 type TaskContext = {
@@ -45,6 +49,10 @@ const DEFAULT_TRAVEL_BUFFER_MINUTES = 25;
 const SHOWER_BUFFER_MINUTES = 30;
 
 function getSchedulableMinutes(item: AssistantItem) {
+  if (item.processType === "시간작업" && item.goalSessionMinutes) {
+    return item.goalSessionMinutes;
+  }
+
   if (item.processType === "시간작업" && item.estimatedMinutes) {
     return item.estimatedMinutes;
   }
@@ -390,7 +398,7 @@ function getFeedbackAdjustment({
   };
 }
 
-function isValidDateText(dateText: string | null) {
+function isValidDateText(dateText: string | null | undefined) {
   if (!dateText) {
     return false;
   }
@@ -399,6 +407,23 @@ function isValidDateText(dateText: string | null) {
 }
 
 function getSearchDates(item: AssistantItem) {
+  if (
+    item.processType === "시간작업" &&
+    isValidDateText(item.goalStartDate) &&
+    isValidDateText(item.dueDate)
+  ) {
+    const start = new Date(`${item.goalStartDate}T00:00:00`);
+    const end = new Date(`${item.dueDate}T00:00:00`);
+    const dayCount = Math.min(
+      31,
+      Math.max(1, Math.floor((end.getTime() - start.getTime()) / 86_400_000) + 1)
+    );
+
+    return Array.from({ length: dayCount }, (_, index) =>
+      toDateOnlyString(addDays(start, index))
+    );
+  }
+
   if (isValidDateText(item.dueDate)) {
     return [item.dueDate as string];
   }
@@ -418,6 +443,7 @@ export function suggestTimeTaskSchedule({
   userProfile = null,
   suggestionFeedbacks = [],
   personalAiMemories = [],
+  excludedDates = [],
 }: {
   item: AssistantItem;
   routines: RoutineSchedule[];
@@ -426,12 +452,15 @@ export function suggestTimeTaskSchedule({
   userProfile?: UserProfile | null;
   suggestionFeedbacks?: SuggestionFeedback[];
   personalAiMemories?: PersonalAiMemory[];
+  excludedDates?: string[];
 }): TimeTaskSuggestion | null {
   if (item.status !== "미완료") {
     return null;
   }
 
-  const searchDates = getSearchDates(item);
+  const searchDates = getSearchDates(item).filter(
+    (date) => !excludedDates.includes(date)
+  );
   const context = inferTaskContext({
     item,
     savedPlaces,
@@ -581,18 +610,141 @@ export function suggestTimeTaskSchedules({
   personalAiMemories?: PersonalAiMemory[];
 }): TimeTaskSuggestion[] {
   return items
-    .map((item) =>
-      suggestTimeTaskSchedule({
-        item,
-        routines,
-        singleSchedules,
-        savedPlaces,
-        userProfile,
-        suggestionFeedbacks,
-        personalAiMemories,
-      })
-    )
+    .flatMap((item) => {
+      if (
+        item.processType === "시간작업" &&
+        item.goalStartDate &&
+        item.dueDate &&
+        item.estimatedMinutes &&
+        item.goalSessionMinutes
+      ) {
+        const scheduledMinutes = singleSchedules
+          .filter((schedule) => schedule.sourceItemId === item.id)
+          .reduce(
+            (total, schedule) =>
+              total +
+              Math.max(0, timeToMinutes(schedule.endTime) - timeToMinutes(schedule.startTime)),
+            0
+          );
+        const completedRatio =
+          item.goalTotalAmount && item.goalCompletedAmount
+            ? Math.min(1, item.goalCompletedAmount / item.goalTotalAmount)
+            : 0;
+        const completedMinutes = Math.round(item.estimatedMinutes * completedRatio);
+        let remainingMinutes = Math.max(
+          0,
+          item.estimatedMinutes - Math.max(scheduledMinutes, completedMinutes)
+        );
+        const virtualSchedules = [...singleSchedules];
+        const suggestions: TimeTaskSuggestion[] = [];
+        const sessionCount = Math.ceil(item.estimatedMinutes / item.goalSessionMinutes);
+        const goalDates = getSearchDates(item);
+        const baseSessionsPerDay = Math.floor(
+          sessionCount / Math.max(1, goalDates.length)
+        );
+        const extraSessionDays = sessionCount % Math.max(1, goalDates.length);
+        const getTargetSessionsForDate = (date: string) => {
+          const dateIndex = goalDates.indexOf(date);
+          return Math.max(
+            1,
+            baseSessionsPerDay + (dateIndex >= 0 && dateIndex < extraSessionDays ? 1 : 0)
+          );
+        };
+        const sessionsByDate = new Map<string, number>();
+        singleSchedules
+          .filter((schedule) => schedule.sourceItemId === item.id)
+          .forEach((schedule) => {
+            sessionsByDate.set(
+              schedule.date,
+              (sessionsByDate.get(schedule.date) ?? 0) + 1
+            );
+          });
+        const alreadyCoveredSessions = Math.floor(
+          Math.max(scheduledMinutes, completedMinutes) / item.goalSessionMinutes
+        );
+
+        while (remainingMinutes > 0 && suggestions.length < 30) {
+          const sessionMinutes = Math.min(item.goalSessionMinutes, remainingMinutes);
+          const suggestion = suggestTimeTaskSchedule({
+            item: {
+              ...item,
+              estimatedMinutes: sessionMinutes,
+              goalSessionMinutes: sessionMinutes,
+            },
+            routines,
+            singleSchedules: virtualSchedules,
+            savedPlaces,
+            userProfile,
+            suggestionFeedbacks,
+            personalAiMemories,
+            excludedDates: goalDates.filter(
+              (date) =>
+                (sessionsByDate.get(date) ?? 0) >= getTargetSessionsForDate(date)
+            ),
+          });
+
+          if (!suggestion) break;
+
+          const sessionIndex = alreadyCoveredSessions + suggestions.length + 1;
+          const allocatedAmount = item.goalTotalAmount
+            ? Math.min(
+                item.goalTotalAmount,
+                Number(
+                  ((item.goalTotalAmount * sessionMinutes) / item.estimatedMinutes).toFixed(1)
+                )
+              )
+            : undefined;
+          suggestions.push({
+            ...suggestion,
+            sessionIndex,
+            sessionCount,
+            allocatedAmount,
+            workloadUnit: item.goalUnit,
+            reason: `${suggestion.reason} 전체 목표 중 ${sessionIndex}/${sessionCount}회차${allocatedAmount && item.goalUnit ? ` · 약 ${allocatedAmount}${item.goalUnit}` : ""}입니다.`,
+            appliedRules: [
+              ...suggestion.appliedRules,
+              `목표 ${sessionIndex}/${sessionCount}회차`,
+            ],
+          });
+          sessionsByDate.set(
+            suggestion.date,
+            (sessionsByDate.get(suggestion.date) ?? 0) + 1
+          );
+          virtualSchedules.push({
+            id: `goal-preview-${item.id}-${sessionIndex}`,
+            title: item.title,
+            date: suggestion.date,
+            startTime: suggestion.startTime,
+            endTime: suggestion.endTime,
+            placeName: suggestion.placeName ?? "",
+            memo: "목표형 시간작업 미리보기",
+            sourceItemId: item.id,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          });
+          remainingMinutes -= sessionMinutes;
+        }
+
+        return suggestions;
+      }
+
+      return [
+        suggestTimeTaskSchedule({
+          item,
+          routines,
+          singleSchedules,
+          savedPlaces,
+          userProfile,
+          suggestionFeedbacks,
+          personalAiMemories,
+        }),
+      ];
+    })
     .filter((suggestion): suggestion is TimeTaskSuggestion => {
       return suggestion !== null;
+    })
+    .sort((a, b) => {
+      if (a.date !== b.date) return a.date.localeCompare(b.date);
+      return a.startTime.localeCompare(b.startTime);
     });
 }

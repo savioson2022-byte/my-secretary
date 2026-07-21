@@ -50,6 +50,17 @@ export type AssistantItemWithoutId = {
 
   estimatedMinutes: number | null;
 
+  /** 기간형 시간작업의 시작일. dueDate는 목표 마감일로 사용한다. */
+  goalStartDate?: string | null;
+  /** 사용자가 끝내려는 전체 분량. 예: 300쪽, 20문제 */
+  goalTotalAmount?: number | null;
+  /** 실제 완료한 분량. 캘린더 배치량과는 구분한다. */
+  goalCompletedAmount?: number | null;
+  /** 분량 단위. 예: 쪽, 문제, 강 */
+  goalUnit?: string | null;
+  /** 한 번에 배치할 권장 작업 시간 */
+  goalSessionMinutes?: number | null;
+
   /**
    * 시간작업의 마감일 또는 단기일정의 날짜
    * 예: "2026-06-25"

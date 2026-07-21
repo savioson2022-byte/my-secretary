@@ -189,6 +189,11 @@ const syncDomains: Array<SyncDomain<SyncableItem, { id: string }>> = [
       "idea_subcategory",
       "purchase_product_name",
       "purchase_platform",
+      "goal_start_date",
+      "goal_total_amount",
+      "goal_completed_amount",
+      "goal_unit",
+      "goal_session_minutes",
     ],
     toRow(item, userId, availableColumns) {
       const assistantItem = item as AssistantItem;
@@ -249,6 +254,22 @@ const syncDomains: Array<SyncDomain<SyncableItem, { id: string }>> = [
         });
       }
 
+      if (availableColumns.has("goal_start_date")) {
+        Object.assign(row, { goal_start_date: assistantItem.goalStartDate ?? null });
+      }
+      if (availableColumns.has("goal_total_amount")) {
+        Object.assign(row, { goal_total_amount: assistantItem.goalTotalAmount ?? null });
+      }
+      if (availableColumns.has("goal_completed_amount")) {
+        Object.assign(row, { goal_completed_amount: assistantItem.goalCompletedAmount ?? 0 });
+      }
+      if (availableColumns.has("goal_unit")) {
+        Object.assign(row, { goal_unit: assistantItem.goalUnit ?? null });
+      }
+      if (availableColumns.has("goal_session_minutes")) {
+        Object.assign(row, { goal_session_minutes: assistantItem.goalSessionMinutes ?? null });
+      }
+
       return row;
     },
     fromRow(row) {
@@ -263,6 +284,11 @@ const syncDomains: Array<SyncDomain<SyncableItem, { id: string }>> = [
         repeatType: asText(row.repeat_type, "일회성"),
         status: asText(row.status, "미완료"),
         estimatedMinutes: asNullableNumber(row.estimated_minutes),
+        goalStartDate: asNullableText(row.goal_start_date),
+        goalTotalAmount: asNullableNumber(row.goal_total_amount),
+        goalCompletedAmount: asNullableNumber(row.goal_completed_amount),
+        goalUnit: asNullableText(row.goal_unit),
+        goalSessionMinutes: asNullableNumber(row.goal_session_minutes),
         dueDate: asNullableText(row.due_date),
         reminderDate: asNullableText(row.reminder_date),
         scheduleStartTime: row.schedule_start_time

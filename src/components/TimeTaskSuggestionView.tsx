@@ -184,7 +184,11 @@ export default function TimeTaskSuggestionView({
       updatedAt: now,
     };
     const existingSchedule = getSingleSchedules().find((schedule) => {
-      return schedule.sourceItemId === suggestion.itemId;
+      if (schedule.sourceItemId !== suggestion.itemId) return false;
+
+      return sourceItem?.processType === "시간작업"
+        ? schedule.date === date && schedule.startTime === startTime
+        : true;
     });
 
     if (existingSchedule) {
@@ -198,22 +202,32 @@ export default function TimeTaskSuggestionView({
     }
 
     if (sourceItem) {
-      updateItem({
-        ...sourceItem,
-        title,
-        dueDate: date,
-        scheduleStartTime: startTime,
-        scheduleEndTime: endTime,
-        status: "완료",
-        updatedAt: now,
-      });
+      updateItem(
+        sourceItem.processType === "시간작업"
+          ? {
+              ...sourceItem,
+              title,
+              updatedAt: now,
+            }
+          : {
+              ...sourceItem,
+              title,
+              dueDate: date,
+              scheduleStartTime: startTime,
+              scheduleEndTime: endTime,
+              status: "완료",
+              updatedAt: now,
+            }
+      );
     }
 
     setEditingSuggestionId(null);
     setFeedbackMessage(
       existingSchedule
-        ? "기존 단기 일정을 추천한 시간으로 수정했어."
-        : "추천을 확정해서 단기 일정에 저장했어."
+        ? "기존 배치 시간을 수정했어."
+        : sourceItem?.processType === "시간작업"
+          ? "이 회차를 캘린더에 배치했어. 남은 분량만 다시 추천할게."
+          : "추천을 확정해서 단기 일정에 저장했어."
     );
   }
 
@@ -292,7 +306,7 @@ export default function TimeTaskSuggestionView({
           <div className="space-y-2">
             {visibleSuggestions.map((suggestion) => (
               <article
-                key={suggestion.itemId}
+                key={getSuggestionKey(suggestion)}
                 className="flex items-center gap-3 rounded-2xl bg-slate-50 p-3"
               >
                 <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-blue-100 text-blue-600">
@@ -313,6 +327,14 @@ export default function TimeTaskSuggestionView({
                     {suggestion.date} {suggestion.dayOfWeek}요일{" "}
                     {suggestion.startTime} ~ {suggestion.endTime}
                   </p>
+                  {suggestion.sessionIndex && suggestion.sessionCount && (
+                    <p className="mt-0.5 truncate text-xs font-black text-indigo-500">
+                      목표 {suggestion.sessionIndex}/{suggestion.sessionCount}
+                      {suggestion.allocatedAmount && suggestion.workloadUnit
+                        ? ` · 약 ${suggestion.allocatedAmount}${suggestion.workloadUnit}`
+                        : ""}
+                    </p>
+                  )}
                   {suggestion.placeName && (
                     <p className="mt-0.5 truncate text-xs font-black text-blue-500">
                       {suggestion.placeName} 기준
@@ -428,7 +450,7 @@ export default function TimeTaskSuggestionView({
         <div className="mt-4 space-y-3">
           {visibleSuggestions.map((suggestion) => (
             <article
-              key={suggestion.itemId}
+              key={getSuggestionKey(suggestion)}
               className="rounded-2xl border border-slate-100 bg-slate-50 p-4"
             >
               <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
@@ -441,6 +463,14 @@ export default function TimeTaskSuggestionView({
                       ? `예약 후보 · 예상 ${suggestion.estimatedMinutes}분`
                       : `예상 시간 ${suggestion.estimatedMinutes}분`}
                   </p>
+                  {suggestion.sessionIndex && suggestion.sessionCount && (
+                    <p className="mt-1 text-xs font-black text-indigo-600">
+                      목표 {suggestion.sessionIndex}/{suggestion.sessionCount}
+                      {suggestion.allocatedAmount && suggestion.workloadUnit
+                        ? ` · 약 ${suggestion.allocatedAmount}${suggestion.workloadUnit}`
+                        : ""}
+                    </p>
+                  )}
                 </div>
 
                 <div className="rounded-2xl bg-white px-3 py-2 text-sm font-black text-slate-800">
