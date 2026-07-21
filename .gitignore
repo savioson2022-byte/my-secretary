@@ -9,6 +9,7 @@ out/
 build/
 
 # local environment files
+.env
 .env*.local
 
 # system files

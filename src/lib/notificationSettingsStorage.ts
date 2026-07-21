@@ -3,7 +3,17 @@ import { STORAGE_KEYS } from "@/lib/storageKeys";
 import type { NotificationSettings } from "@/types/notification";
 
 export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
+  notificationsEnabled: true,
+  pushEnabled: true,
+  inAppAlarmEnabled: true,
+  soundEnabled: true,
   scheduleNotificationsEnabled: true,
+  timeTaskNotificationsEnabled: true,
+  periodTaskNotificationsEnabled: true,
+  aiRecommendationsEnabled: true,
+  repeatingNotificationsEnabled: true,
+  dailySummaryEnabled: false,
+  dailySummaryTime: "08:00",
   travelNotificationsEnabled: true,
   purchaseNotificationsEnabled: true,
   routineReminderEnabled: true,
