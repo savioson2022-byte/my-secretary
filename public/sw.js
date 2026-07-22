@@ -23,6 +23,9 @@ self.addEventListener("push", (event) => {
       badge: "/icons/icon-192.png",
       tag: data.tag || data.title,
       silent: Boolean(data.silent),
+      requireInteraction: data.requireInteraction !== false,
+      renotify: true,
+      vibrate: [700, 180, 700, 180, 900],
       data: {
         url: data.url || "/",
       },

@@ -6,6 +6,10 @@
   },
   "crons": [
     {
+      "path": "/api/push/dispatch",
+      "schedule": "* * * * *"
+    },
+    {
       "path": "/api/purchase/mail/cron",
       "schedule": "0 0 * * *"
     }

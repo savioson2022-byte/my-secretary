@@ -22,7 +22,7 @@ export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
   persistentAlarmEnabled: true,
   persistentAlarmPrepEnabled: true,
   persistentAlarmTravelEnabled: true,
-  persistentAlarmScheduleStartEnabled: false,
+  persistentAlarmScheduleStartEnabled: true,
   persistentAlarmIntervalMinutes: 1,
   persistentAlarmRepeatCount: 5,
   defaultPrepLeadMinutes: 30,

@@ -526,34 +526,38 @@ function getPersistentAlarmTitle(event: NotificationEvent, index: number) {
 function buildPersistentAlarmNotifications({
   event,
   startsAt,
+  settings = getNotificationSettings(),
 }: {
   event: NotificationEvent;
   startsAt: Date;
+  settings?: ReturnType<typeof getNotificationSettings>;
 }) {
   if (startsAt.getTime() <= Date.now()) {
     return [];
   }
 
-  return [
-    {
-      id: getNumericNotificationId(`${event.id}:persistent:0`),
-      title: getPersistentAlarmTitle(event, 0),
-      body: event.body,
-      sound: "default",
-      schedule: {
-        at: startsAt,
-      },
-      actionTypeId: PERSISTENT_ALARM_ACTION_TYPE_ID,
-      extra: {
-        url: event.url,
-        eventId: `${event.id}:persistent:0`,
-        originalEventId: event.id,
-        eventType: event.eventType,
-        persistentAlarm: true,
-      },
-      threadIdentifier: `persistent-${event.id}`,
+  const repeatCount = Math.max(1, settings.persistentAlarmRepeatCount);
+  const intervalMs =
+    Math.max(1, settings.persistentAlarmIntervalMinutes) * 60 * 1000;
+
+  return Array.from({ length: repeatCount }, (_, index) => ({
+    id: getNumericNotificationId(`${event.id}:persistent:${index}`),
+    title: getPersistentAlarmTitle(event, index),
+    body: event.body,
+    sound: "default",
+    schedule: {
+      at: new Date(startsAt.getTime() + intervalMs * index),
     },
-  ];
+    actionTypeId: PERSISTENT_ALARM_ACTION_TYPE_ID,
+    extra: {
+      url: event.url,
+      eventId: `${event.id}:persistent:${index}`,
+      originalEventId: event.id,
+      eventType: event.eventType,
+      persistentAlarm: true,
+    },
+    threadIdentifier: `persistent-${event.id}`,
+  }));
 }
 
 async function cancelPersistentAlarmGroup(originalEventId: string) {
@@ -733,6 +737,7 @@ async function scheduleNativeNotifications(events: NotificationEvent[]) {
         const alarmNotifications = buildPersistentAlarmNotifications({
           event,
           startsAt: scheduledAt,
+          settings,
         });
 
         notifications.push(

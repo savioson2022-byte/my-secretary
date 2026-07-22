@@ -190,10 +190,22 @@ export async function GET(request: NextRequest) {
   const todayText = getKoreanTodayText();
   const nowMinutes = getKoreanMinutesOfDay();
   const { nowIso, windowStartIso } = getDispatchWindow();
-  const entries: ScheduleEntryRecord[] = [];
-
   let sentCount = 0;
   let skippedCount = 0;
+
+  const { data: scheduleEntries, error: scheduleEntriesError } = await supabase
+    .from("notification_schedule_entries")
+    .select("*")
+    .eq("active", true)
+    .eq("occurrence_date", todayText)
+    .returns<ScheduleEntryRecord[]>();
+
+  if (scheduleEntriesError) {
+    return NextResponse.json(
+      { ok: false, reason: scheduleEntriesError.message },
+      { status: 500 }
+    );
+  }
 
   const { data: notificationEvents } = await supabase
     .from("notification_events")
@@ -261,7 +273,7 @@ export async function GET(request: NextRequest) {
     sentCount += await sendNativePushesForEvent({ supabase, event });
   }
 
-  for (const entry of entries ?? []) {
+  for (const entry of scheduleEntries ?? []) {
     const startMinutes = timeToMinutes(entry.start_time);
     const dueOffsets = entry.reminder_offsets.filter((offset) => {
       const dueMinutes = startMinutes - offset;
@@ -338,6 +350,7 @@ export async function GET(request: NextRequest) {
     ok: true,
     sentCount,
     skippedCount,
-    checkedCount: (entries?.length ?? 0) + (notificationEvents?.length ?? 0),
+    checkedCount:
+      (scheduleEntries?.length ?? 0) + (notificationEvents?.length ?? 0),
   });
 }
