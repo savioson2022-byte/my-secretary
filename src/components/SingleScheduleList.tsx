@@ -15,7 +15,11 @@ import {
   DEFAULT_SINGLE_SCHEDULE_COLOR,
   getScheduleColor,
 } from "@/lib/scheduleColors";
-import { updateSingleSchedule } from "@/lib/singleScheduleStorage";
+import {
+  getSingleSchedules,
+  updateSingleSchedule,
+} from "@/lib/singleScheduleStorage";
+import { getItems, updateItem } from "@/lib/storage";
 import { getUserProfile } from "@/lib/userProfileStorage";
 import { SavedPlace, SingleSchedule, TravelMode } from "@/types/calendar";
 import { useMemo, useState } from "react";
@@ -24,6 +28,7 @@ import { isOvernightTimeRange } from "@/lib/scheduleTime";
 type SingleScheduleListProps = {
   schedules: SingleSchedule[];
   onDelete: (id: string) => void;
+  onChange?: () => void;
 };
 
 function sortSchedulesByDateTime(schedules: SingleSchedule[]) {
@@ -66,6 +71,7 @@ const TRAVEL_MODE_OPTIONS: Array<{ value: TravelMode; label: string }> = [
 export default function SingleScheduleList({
   schedules,
   onDelete,
+  onChange,
 }: SingleScheduleListProps) {
   const sortedSchedules = sortSchedulesByDateTime(schedules);
 
@@ -83,6 +89,7 @@ export default function SingleScheduleList({
     useState<TravelMode>(getDefaultTravelMode);
   const [editMemo, setEditMemo] = useState("");
   const [editColor, setEditColor] = useState(DEFAULT_SINGLE_SCHEDULE_COLOR);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [savedPlaces, setSavedPlaces] = useState<SavedPlace[]>(() =>
     typeof window === "undefined" ? [] : getSavedPlaces()
   );
@@ -105,6 +112,7 @@ export default function SingleScheduleList({
   }, [savedPlaces, schedules]);
 
   function startEdit(schedule: SingleSchedule) {
+    setSaveMessage(null);
     setEditingId(schedule.id);
     setEditTitle(schedule.title);
     setEditDate(schedule.date);
@@ -241,7 +249,8 @@ export default function SingleScheduleList({
       return;
     }
 
-    updateSingleSchedule({
+    const updatedAt = new Date().toISOString();
+    const updatedSchedule: SingleSchedule = {
       ...schedule,
       title: editTitle.trim(),
       date: editDate,
@@ -253,11 +262,65 @@ export default function SingleScheduleList({
       travelMode: editTravelMode,
       memo: editMemo.trim(),
       color: editColor,
-      updatedAt: new Date().toISOString(),
-    });
-    savePlaceIfNeeded();
+      updatedAt,
+    };
 
-    cancelEdit();
+    try {
+      updateSingleSchedule(updatedSchedule);
+      const savedSchedule = getSingleSchedules().find(
+        (item) => item.id === updatedSchedule.id
+      );
+
+      if (
+        !savedSchedule ||
+        savedSchedule.placeName !== updatedSchedule.placeName ||
+        (savedSchedule.placeAddress ?? "") !==
+          (updatedSchedule.placeAddress ?? "")
+      ) {
+        throw new Error("저장 후 변경된 장소를 확인하지 못했습니다.");
+      }
+
+      if (schedule.sourceItemId) {
+        try {
+          const sourceItem = getItems().find(
+            (item) => item.id === schedule.sourceItemId
+          );
+          if (sourceItem) {
+            const linkedPlace = getSavedPlaceByName(
+              savedPlaces,
+              updatedSchedule.placeName
+            );
+            updateItem({
+              ...sourceItem,
+              placePreference: updatedSchedule.placeName
+                ? "specific"
+                : "anywhere",
+              placeId: linkedPlace?.id ?? null,
+              placeName: updatedSchedule.placeName || null,
+              placeAddress: updatedSchedule.placeAddress ?? null,
+              placePostalCode: updatedSchedule.placePostalCode ?? null,
+              updatedAt,
+            });
+          }
+        } catch (error) {
+          console.error("원본 기록 장소 동기화 실패, 일정 변경은 유지:", error);
+        }
+      }
+
+      try {
+        savePlaceIfNeeded();
+      } catch (error) {
+        console.error("장소 목록 저장 실패, 일정 변경은 유지:", error);
+      }
+
+      onChange?.();
+      setSaveMessage("장소 변경을 포함해 단기 일정을 저장했어요.");
+      cancelEdit();
+    } catch (error) {
+      console.error("단기 일정 수정 저장 실패:", error);
+      setSaveMessage("저장하지 못했어요. 입력 내용을 확인하고 다시 눌러주세요.");
+      return;
+    }
   }
 
   return (
@@ -270,6 +333,17 @@ export default function SingleScheduleList({
       </div>
 
       <div className="mt-4 space-y-3">
+        {saveMessage && (
+          <p
+            className={`rounded-2xl p-3 text-sm font-black ring-1 ${
+              saveMessage.includes("저장했어요")
+                ? "bg-emerald-50 text-emerald-700 ring-emerald-100"
+                : "bg-rose-50 text-rose-700 ring-rose-100"
+            }`}
+          >
+            {saveMessage}
+          </p>
+        )}
         {sortedSchedules.length === 0 ? (
           <p className="rounded-2xl bg-white p-4 text-sm text-slate-500">
             아직 등록된 단기 일정이 없습니다.

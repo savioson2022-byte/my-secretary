@@ -2072,6 +2072,10 @@ function RoutineScheduleManager({
       <SingleScheduleList
         schedules={singleSchedules}
         onDelete={handleDeleteSingleSchedule}
+        onChange={() => {
+          setSingleSchedules(getSingleSchedules());
+          setSavedPlaces(getSavedPlaces());
+        }}
       />
 
       <section className="rounded-3xl bg-white p-5 shadow-soft ring-1 ring-slate-100">

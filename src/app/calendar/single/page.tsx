@@ -71,6 +71,7 @@ export default function SingleSchedulePage() {
         <SingleScheduleList
           schedules={singleSchedules}
           onDelete={handleDeleteSingleSchedule}
+          onChange={() => setSingleSchedules(getSingleSchedules())}
         />
       </section>
         <BottomNavigation />
