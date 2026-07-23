@@ -123,6 +123,7 @@ function openAlarmMode(detail: {
   body?: string;
   url?: string;
   originalEventId?: string;
+  persistentAlarmGroupId?: string;
   eventType?: string;
   sourceLabel?: string;
 }) {
@@ -134,11 +135,16 @@ function openAlarmMode(detail: {
 }
 
 function openAlarmModeFromEvent(event: NotificationEvent) {
+  const persistentAlarmGroupId =
+    typeof event.payload?.persistentAlarmGroupId === "string"
+      ? event.payload.persistentAlarmGroupId
+      : event.id;
   openAlarmMode({
     title: event.title,
     body: event.body,
     url: event.url,
-    originalEventId: event.id,
+    originalEventId: persistentAlarmGroupId,
+    persistentAlarmGroupId,
     eventType: event.eventType,
     sourceLabel: event.sourceType,
   });
@@ -150,6 +156,7 @@ function openAlarmModeFromNotification(notification: {
   extra?: {
     url?: string;
     originalEventId?: string;
+    persistentAlarmGroupId?: string;
     eventType?: string;
   };
 }) {
@@ -158,6 +165,9 @@ function openAlarmModeFromNotification(notification: {
     body: notification.body,
     url: notification.extra?.url ?? "/",
     originalEventId: notification.extra?.originalEventId,
+    persistentAlarmGroupId:
+      notification.extra?.persistentAlarmGroupId ??
+      notification.extra?.originalEventId,
     eventType: notification.extra?.eventType,
   });
 }
@@ -435,13 +445,19 @@ async function checkDueNotificationEvents(events: NotificationEvent[]) {
 
   const now = Date.now();
   const notifiedIds = getNotifiedIds();
+  const mutedIds = getMutedPersistentAlarmIds();
   const dueEvents = events.filter((event) => {
     const scheduledAt = new Date(event.scheduledAt).getTime();
+    const groupId =
+      typeof event.payload?.persistentAlarmGroupId === "string"
+        ? event.payload.persistentAlarmGroupId
+        : event.id;
 
     return (
       scheduledAt <= now &&
       scheduledAt > now - 60 * 1000 &&
       !notifiedIds.has(event.id) &&
+      !mutedIds.has(groupId) &&
       (event.deliveryChannels?.includes("in_app") ?? true)
     );
   });
@@ -552,7 +568,14 @@ function buildPersistentAlarmNotifications({
     extra: {
       url: event.url,
       eventId: `${event.id}:persistent:${index}`,
-      originalEventId: event.id,
+      originalEventId:
+        typeof event.payload?.persistentAlarmGroupId === "string"
+          ? event.payload.persistentAlarmGroupId
+          : event.id,
+      persistentAlarmGroupId:
+        typeof event.payload?.persistentAlarmGroupId === "string"
+          ? event.payload.persistentAlarmGroupId
+          : event.id,
       eventType: event.eventType,
       persistentAlarm: true,
     },
@@ -726,8 +749,12 @@ async function scheduleNativeNotifications(events: NotificationEvent[]) {
 
     for (const event of events) {
       if (notifications.length >= MAX_LOCAL_NOTIFICATIONS) break;
-      if (!(event.deliveryChannels?.includes("in_app") ?? true)) continue;
-      if (mutedIds.has(event.id)) continue;
+      if (!(event.deliveryChannels?.includes("native_push") ?? true)) continue;
+      const groupId =
+        typeof event.payload?.persistentAlarmGroupId === "string"
+          ? event.payload.persistentAlarmGroupId
+          : event.id;
+      if (mutedIds.has(groupId)) continue;
 
       const scheduledAt = new Date(event.scheduledAt);
 
@@ -1047,6 +1074,14 @@ export default function SmartReminderAgent() {
     const token = accessToken ?? (await getAccessToken());
 
     if (!token || events.length === 0) return;
+    const mutedIds = getMutedPersistentAlarmIds();
+    const activeEvents = events.filter((event) => {
+      const groupId =
+        typeof event.payload?.persistentAlarmGroupId === "string"
+          ? event.payload.persistentAlarmGroupId
+          : event.id;
+      return !mutedIds.has(groupId);
+    });
 
     await fetch("/api/notifications/sync", {
       method: "POST",
@@ -1054,7 +1089,7 @@ export default function SmartReminderAgent() {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ events }),
+      body: JSON.stringify({ events: activeEvents }),
     });
   }
 

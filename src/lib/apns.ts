@@ -8,6 +8,7 @@ export type NativePushPayload = {
   url?: string;
   tag?: string;
   soundEnabled?: boolean;
+  timeSensitive?: boolean;
 };
 
 function base64Url(value: Buffer | string) {
@@ -68,6 +69,7 @@ export async function sendApplePushNotification({
   url = "/",
   tag,
   soundEnabled = true,
+  timeSensitive = false,
 }: NativePushPayload) {
   if (!isApnsConfigured()) {
     throw new Error("APNs 환경변수가 설정되지 않았습니다.");
@@ -86,6 +88,12 @@ export async function sendApplePushNotification({
         body,
       },
       ...(soundEnabled ? { sound: "default" } : {}),
+      ...(timeSensitive
+        ? {
+            "interruption-level": "time-sensitive",
+            "relevance-score": 1,
+          }
+        : {}),
     },
     url,
     tag,

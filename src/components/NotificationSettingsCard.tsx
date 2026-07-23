@@ -490,8 +490,8 @@ export default function NotificationSettingsCard() {
             <h3 className="mt-1 text-base font-black">움직여야 할 때 반복해서 울리기</h3>
             <p className="mt-2 text-xs font-bold leading-5 text-slate-300">
               푸시는 상기용, 지속 알람은 준비와 이동처럼 바로 행동해야 하는
-              순간에 사용합니다. 알림은 한 번만 보내고, 앱이 열리면 버튼을 누를
-              때까지 화면 안에서 계속 울립니다.
+              순간에 사용합니다. 확인 전까지 설정한 간격과 횟수로 푸시를
+              반복하고, 앱이 열리면 버튼을 누를 때까지 소리와 진동을 반복합니다.
             </p>
           </div>
           <input
@@ -527,6 +527,41 @@ export default function NotificationSettingsCard() {
               />
             </label>
           ))}
+        </div>
+
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <label className="text-xs font-black text-slate-300">
+            반복 간격(분)
+            <input
+              type="number"
+              min="1"
+              max="10"
+              value={settings.persistentAlarmIntervalMinutes}
+              disabled={!settings.persistentAlarmEnabled}
+              onChange={(event) =>
+                updateSettings({
+                  persistentAlarmIntervalMinutes: Number(event.target.value),
+                })
+              }
+              className="mt-2 w-full rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm font-semibold text-white outline-none focus:border-blue-400 disabled:opacity-40"
+            />
+          </label>
+          <label className="text-xs font-black text-slate-300">
+            최대 알림 횟수
+            <input
+              type="number"
+              min="1"
+              max="10"
+              value={settings.persistentAlarmRepeatCount}
+              disabled={!settings.persistentAlarmEnabled}
+              onChange={(event) =>
+                updateSettings({
+                  persistentAlarmRepeatCount: Number(event.target.value),
+                })
+              }
+              className="mt-2 w-full rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-sm font-semibold text-white outline-none focus:border-blue-400 disabled:opacity-40"
+            />
+          </label>
         </div>
       </div>
 

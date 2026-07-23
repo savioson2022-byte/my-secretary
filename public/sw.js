@@ -26,8 +26,15 @@ self.addEventListener("push", (event) => {
       requireInteraction: data.requireInteraction !== false,
       renotify: true,
       vibrate: [700, 180, 700, 180, 900],
+      actions: data.data?.persistentAlarm
+        ? [
+            { action: "open-alarm", title: "알람 확인" },
+            { action: "snooze", title: "나중에 확인" },
+          ]
+        : [],
       data: {
         url: data.url || "/",
+        ...(data.data || {}),
       },
     })
   );
@@ -36,8 +43,25 @@ self.addEventListener("push", (event) => {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
 
-  const targetUrl = new URL(event.notification.data?.url || "/", self.location.origin)
-    .href;
+  const target = new URL(
+    event.notification.data?.url || "/",
+    self.location.origin
+  );
+  if (event.notification.data?.persistentAlarm) {
+    target.searchParams.set("alarm", "1");
+    target.searchParams.set(
+      "alarmGroupId",
+      event.notification.data?.persistentAlarmGroupId || ""
+    );
+    target.searchParams.set(
+      "alarmEventType",
+      event.notification.data?.eventType || ""
+    );
+    target.searchParams.set("alarmTitle", event.notification.title || "");
+    target.searchParams.set("alarmBody", event.notification.body || "");
+    target.searchParams.set("alarmAction", event.action || "open-alarm");
+  }
+  const targetUrl = target.href;
 
   event.waitUntil(
     self.clients

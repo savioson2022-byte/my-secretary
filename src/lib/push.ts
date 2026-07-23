@@ -42,6 +42,7 @@ export async function sendPushNotification({
   tag,
   silent = false,
   requireInteraction = true,
+  data,
 }: {
   subscription: PushSubscriptionPayload;
   title: string;
@@ -50,6 +51,7 @@ export async function sendPushNotification({
   tag?: string;
   silent?: boolean;
   requireInteraction?: boolean;
+  data?: Record<string, unknown>;
 }) {
   if (!configureWebPush()) {
     throw new Error("Web Push 환경변수가 설정되지 않았습니다.");
@@ -64,6 +66,7 @@ export async function sendPushNotification({
       tag,
       silent,
       requireInteraction,
+      data,
     })
   );
 }

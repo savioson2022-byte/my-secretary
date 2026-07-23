@@ -45,8 +45,34 @@ export async function POST(request: NextRequest) {
   }
 
   const body = (await request.json()) as SyncRequestBody;
-  const events = (body.events ?? []).slice(0, 600);
+  const requestedEvents = (body.events ?? []).slice(0, 600);
   const now = new Date().toISOString();
+  const { data: acknowledgements, error: acknowledgementError } =
+    await supabase
+      .from("persistent_alarm_acknowledgements")
+      .select("alarm_group_id,action,snoozed_until")
+      .eq("user_id", userData.user.id);
+
+  if (acknowledgementError) {
+    return NextResponse.json(
+      { ok: false, reason: acknowledgementError.message },
+      { status: 500 }
+    );
+  }
+
+  const blockedGroupIds = new Set(
+    (acknowledgements ?? [])
+      .filter(
+        (item) =>
+          item.action !== "snoozed" ||
+          (item.snoozed_until && item.snoozed_until > now)
+      )
+      .map((item) => item.alarm_group_id)
+  );
+  const events = requestedEvents.filter((event) => {
+    const groupId = event.payload?.persistentAlarmGroupId;
+    return typeof groupId !== "string" || !blockedGroupIds.has(groupId);
+  });
 
   const { error: deactivateError } = await supabase
     .from("notification_events")

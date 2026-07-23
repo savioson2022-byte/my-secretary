@@ -21,6 +21,74 @@ import type { RoutineSchedule } from "@/types/routine";
 
 const SYNC_WINDOW_DAYS = 14;
 
+function shouldRepeatPersistentAlarm(
+  event: NotificationEvent,
+  settings: NotificationSettings
+) {
+  if (!settings.persistentAlarmEnabled) return false;
+  if (event.eventType === "prep_start") {
+    return settings.persistentAlarmPrepEnabled;
+  }
+  if (event.eventType === "travel_start") {
+    return settings.persistentAlarmTravelEnabled;
+  }
+  if (event.eventType === "schedule_start") {
+    return settings.persistentAlarmScheduleStartEnabled;
+  }
+  return false;
+}
+
+function expandPersistentAlarmEvents(
+  events: NotificationEvent[],
+  settings: NotificationSettings
+) {
+  const repeatCount = Math.max(
+    1,
+    Math.min(10, settings.persistentAlarmRepeatCount)
+  );
+  const intervalMinutes = Math.max(
+    1,
+    Math.min(10, settings.persistentAlarmIntervalMinutes)
+  );
+
+  return events.flatMap((event) => {
+    if (!shouldRepeatPersistentAlarm(event, settings)) return [event];
+
+    const groupId = event.id;
+    const startsAt = new Date(event.scheduledAt).getTime();
+
+    return Array.from({ length: repeatCount }, (_, index) => ({
+      ...event,
+      id: `${groupId}:persistent:${index}`,
+      scheduledAt: new Date(
+        startsAt + index * intervalMinutes * 60 * 1000
+      ).toISOString(),
+      title:
+        index === 0
+          ? event.title
+          : `${event.title} · 확인 필요 (${index + 1}/${repeatCount})`,
+      priority: "urgent" as const,
+      requireInteraction: true,
+      deliveryChannels:
+        index === 0
+          ? event.deliveryChannels
+          : event.deliveryChannels?.filter(
+              (channel) => channel !== "native_push"
+            ),
+      payload: {
+        ...(event.payload ?? {}),
+        persistentAlarm: true,
+        persistentAlarmGroupId: groupId,
+        persistentAlarmRepeatIndex: index,
+        persistentAlarmRepeatCount: repeatCount,
+        persistentAlarmIntervalMinutes: intervalMinutes,
+        originalEventId: groupId,
+        eventType: event.eventType,
+      },
+    }));
+  });
+}
+
 function getDeliveryChannels(settings: NotificationSettings) {
   return [
     ...(settings.inAppAlarmEnabled ? (["in_app"] as const) : []),
@@ -489,7 +557,7 @@ export function buildNotificationEvents(settings: NotificationSettings) {
     }
   });
 
-  return events.sort((left, right) => {
+  return expandPersistentAlarmEvents(events, settings).sort((left, right) => {
     return new Date(left.scheduledAt).getTime() - new Date(right.scheduledAt).getTime();
   });
 }

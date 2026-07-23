@@ -42,6 +42,9 @@ type NotificationEventRecord = {
   scheduled_at: string;
   delivery_channels: string[];
   sound_enabled: boolean;
+  require_interaction: boolean;
+  priority: string;
+  payload: Record<string, unknown>;
 };
 
 function getKoreanTodayText() {
@@ -145,6 +148,8 @@ async function sendNativePushesForEvent({
         url: event.url,
         tag: event.id,
         soundEnabled: event.sound_enabled,
+        timeSensitive:
+          event.priority === "urgent" || event.require_interaction,
       });
 
       await supabase.from("native_notification_event_deliveries").insert({
@@ -251,6 +256,14 @@ export async function GET(request: NextRequest) {
           url: event.url,
           tag: event.id,
           silent: !event.sound_enabled,
+          requireInteraction: event.require_interaction,
+          data: {
+            ...event.payload,
+            eventType: event.event_type,
+            persistentAlarm:
+              event.payload?.persistentAlarm === true ||
+              event.require_interaction,
+          },
         });
 
         await supabase.from("notification_event_deliveries").insert({

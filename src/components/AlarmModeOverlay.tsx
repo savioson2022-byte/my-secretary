@@ -6,6 +6,7 @@ import {
   stopNativeAlarmPulse,
 } from "@/lib/nativeAlarmPulse";
 import { getNotificationSettings } from "@/lib/notificationSettingsStorage";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 const ALARM_MODE_EVENT = "my-assistant-open-alarm-mode";
 const PERSISTENT_ALARM_MUTED_KEY = "my-assistant-persistent-alarm-muted-event-ids";
@@ -16,6 +17,7 @@ type AlarmModeDetail = {
   body?: string;
   url?: string;
   originalEventId?: string;
+  persistentAlarmGroupId?: string;
   eventType?: string;
   sourceLabel?: string;
 };
@@ -34,6 +36,32 @@ function saveMutedIds(ids: Set<string>) {
   const recentIds = Array.from(ids).slice(-100);
 
   localStorage.setItem(PERSISTENT_ALARM_MUTED_KEY, JSON.stringify(recentIds));
+}
+
+async function acknowledgePersistentAlarm(
+  groupId: string | undefined,
+  action: "confirmed" | "snoozed" | "muted_today",
+  snoozeMinutes?: number
+) {
+  if (!groupId) return;
+
+  try {
+    const supabase = createSupabaseBrowserClient();
+    const sessionResult = await supabase?.auth.getSession();
+    const accessToken = sessionResult?.data.session?.access_token;
+    if (!accessToken) return;
+
+    await fetch("/api/notifications/acknowledge", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ groupId, action, snoozeMinutes }),
+    });
+  } catch {
+    // 서버 연결이 끊겨도 현재 기기의 알람은 즉시 멈춥니다.
+  }
 }
 
 function getNumericNotificationId(id: string) {
@@ -79,7 +107,9 @@ function getAlarmLabel(eventType?: string) {
 
 async function scheduleSnoozeAlarm(alarm: AlarmModeDetail) {
   const originalEventId =
-    alarm.originalEventId ?? `overlay-alarm-${Date.now().toString()}`;
+    alarm.persistentAlarmGroupId ??
+    alarm.originalEventId ??
+    `overlay-alarm-${Date.now().toString()}`;
   const snoozeMinutes = getNotificationSettings().defaultSnoozeMinutes;
 
   try {
@@ -134,6 +164,27 @@ export default function AlarmModeOverlay() {
     return () => {
       window.removeEventListener(ALARM_MODE_EVENT, handleOpenAlarmMode);
     };
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("alarm") !== "1") return;
+
+    const groupId = params.get("alarmGroupId") || undefined;
+    setAlarm({
+      title: params.get("alarmTitle") || undefined,
+      body: params.get("alarmBody") || undefined,
+      eventType: params.get("alarmEventType") || undefined,
+      originalEventId: groupId,
+      persistentAlarmGroupId: groupId,
+      url: window.location.pathname,
+    });
+
+    window.history.replaceState(
+      {},
+      "",
+      `${window.location.pathname}${window.location.hash}`
+    );
   }, []);
 
   useEffect(() => {
@@ -214,28 +265,39 @@ export default function AlarmModeOverlay() {
 
   const closeAndOpenTarget = () => {
     const targetUrl = alarm.url ?? "/";
+    const groupId = alarm.persistentAlarmGroupId ?? alarm.originalEventId;
+    if (groupId) {
+      const mutedIds = getMutedIds();
+      mutedIds.add(groupId);
+      saveMutedIds(mutedIds);
+    }
     void stopNativeAlarmPulse();
-    void cancelAlarmNotifications(alarm.originalEventId);
+    void cancelAlarmNotifications(groupId);
+    void acknowledgePersistentAlarm(groupId, "confirmed");
     setAlarm(null);
     window.location.href = targetUrl;
   };
 
   const snooze = async () => {
+    const groupId = alarm.persistentAlarmGroupId ?? alarm.originalEventId;
     await stopNativeAlarmPulse();
-    await cancelAlarmNotifications(alarm.originalEventId);
+    await cancelAlarmNotifications(groupId);
     await scheduleSnoozeAlarm(alarm);
+    await acknowledgePersistentAlarm(groupId, "snoozed", snoozeMinutes);
     setAlarm(null);
   };
 
   const muteToday = () => {
-    if (alarm.originalEventId) {
+    const groupId = alarm.persistentAlarmGroupId ?? alarm.originalEventId;
+    if (groupId) {
       const mutedIds = getMutedIds();
-      mutedIds.add(alarm.originalEventId);
+      mutedIds.add(groupId);
       saveMutedIds(mutedIds);
     }
 
     void stopNativeAlarmPulse();
-    void cancelAlarmNotifications(alarm.originalEventId);
+    void cancelAlarmNotifications(groupId);
+    void acknowledgePersistentAlarm(groupId, "muted_today");
     setAlarm(null);
   };
 

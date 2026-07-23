@@ -24,6 +24,12 @@ type SettingsRecord = {
   travel_buffer_minutes: number;
   location_check_window_minutes: number;
   preferred_travel_mode: NotificationSettings["preferredTravelMode"];
+  persistent_alarm_enabled: boolean;
+  persistent_alarm_prep_enabled: boolean;
+  persistent_alarm_travel_enabled: boolean;
+  persistent_alarm_schedule_start_enabled: boolean;
+  persistent_alarm_interval_minutes: number;
+  persistent_alarm_repeat_count: number;
   updated_at: string;
 };
 
@@ -60,6 +66,13 @@ function toClientSettings(record: SettingsRecord): NotificationSettings {
     travelBufferMinutes: record.travel_buffer_minutes,
     locationCheckWindowMinutes: record.location_check_window_minutes,
     preferredTravelMode: record.preferred_travel_mode,
+    persistentAlarmEnabled: record.persistent_alarm_enabled,
+    persistentAlarmPrepEnabled: record.persistent_alarm_prep_enabled,
+    persistentAlarmTravelEnabled: record.persistent_alarm_travel_enabled,
+    persistentAlarmScheduleStartEnabled:
+      record.persistent_alarm_schedule_start_enabled,
+    persistentAlarmIntervalMinutes: record.persistent_alarm_interval_minutes,
+    persistentAlarmRepeatCount: record.persistent_alarm_repeat_count,
     updatedAt: record.updated_at,
   };
 }
@@ -154,6 +167,19 @@ export async function PUT(request: NextRequest) {
     travel_buffer_minutes: body.travelBufferMinutes ?? 5,
     location_check_window_minutes: body.locationCheckWindowMinutes ?? 90,
     preferred_travel_mode: body.preferredTravelMode ?? "transit",
+    persistent_alarm_enabled: body.persistentAlarmEnabled ?? true,
+    persistent_alarm_prep_enabled: body.persistentAlarmPrepEnabled ?? true,
+    persistent_alarm_travel_enabled: body.persistentAlarmTravelEnabled ?? true,
+    persistent_alarm_schedule_start_enabled:
+      body.persistentAlarmScheduleStartEnabled ?? true,
+    persistent_alarm_interval_minutes: Math.max(
+      1,
+      Math.min(10, body.persistentAlarmIntervalMinutes ?? 1)
+    ),
+    persistent_alarm_repeat_count: Math.max(
+      1,
+      Math.min(10, body.persistentAlarmRepeatCount ?? 5)
+    ),
     updated_at: now,
   };
 
