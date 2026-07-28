@@ -5,6 +5,8 @@ import type {
   NotificationSettings,
 } from "@/types/notification";
 import type { TravelMode } from "@/types/calendar";
+import { getSavedPlaces } from "@/lib/placeStorage";
+import { findTravelModePreference } from "@/lib/travelTimeStorage";
 
 type CurrentCoordinates = {
   latitude: number;
@@ -21,6 +23,8 @@ type TravelEstimate = {
 
 const POSITION_CACHE_MS = 2 * 60 * 1000;
 const DESTINATION_REMINDER_MINUTES = 5;
+const NEARBY_WALK_MAX_METERS = 1_200;
+const SAVED_PLACE_MATCH_MAX_METERS = 500;
 let cachedPosition:
   | { coordinates: CurrentCoordinates; capturedAt: number }
   | null = null;
@@ -101,6 +105,83 @@ function formatDepartureTime(value: Date) {
   });
 }
 
+function getTravelModeLabel(mode: TravelMode) {
+  if (mode === "walk") return "도보";
+  if (mode === "car") return "자차";
+  return "대중교통";
+}
+
+function getDistanceMeters(from: CurrentCoordinates, to: CurrentCoordinates) {
+  const earthRadiusMeters = 6_371_000;
+  const toRadians = (value: number) => (value * Math.PI) / 180;
+  const latitudeDelta = toRadians(to.latitude - from.latitude);
+  const longitudeDelta = toRadians(to.longitude - from.longitude);
+  const startLatitude = toRadians(from.latitude);
+  const endLatitude = toRadians(to.latitude);
+  const value =
+    Math.sin(latitudeDelta / 2) ** 2 +
+    Math.cos(startLatitude) *
+      Math.cos(endLatitude) *
+      Math.sin(longitudeDelta / 2) ** 2;
+  return (
+    earthRadiusMeters *
+    2 *
+    Math.atan2(Math.sqrt(value), Math.sqrt(1 - value))
+  );
+}
+
+function findCurrentSavedPlace(current: CurrentCoordinates) {
+  return getSavedPlaces()
+    .map((place) => ({
+      place,
+      distance:
+        Number.isFinite(place.latitude) && Number.isFinite(place.longitude)
+          ? getDistanceMeters(current, {
+              latitude: Number(place.latitude),
+              longitude: Number(place.longitude),
+            })
+          : Number.POSITIVE_INFINITY,
+    }))
+    .filter((item) => item.distance <= SAVED_PLACE_MATCH_MAX_METERS)
+    .sort((left, right) => left.distance - right.distance)[0]?.place;
+}
+
+function chooseTravelMode({
+  current,
+  event,
+  settings,
+  currentPlaceName,
+}: {
+  current: CurrentCoordinates;
+  event: NotificationEvent;
+  settings: NotificationSettings;
+  currentPlaceName?: string;
+}) {
+  const learnedRule = currentPlaceName
+    ? findTravelModePreference({
+        fromPlaceName: currentPlaceName,
+        toPlaceName: event.placeName,
+      })
+    : null;
+  if (learnedRule) {
+    return { mode: learnedRule.mode, source: "user-route-feedback" };
+  }
+
+  const directDistance = getDistanceMeters(current, {
+    latitude: Number(event.latitude),
+    longitude: Number(event.longitude),
+  });
+  if (directDistance <= NEARBY_WALK_MAX_METERS) {
+    return { mode: "walk" as const, source: "nearby-walk-assumption" };
+  }
+
+  return {
+    mode: (event.payload?.travelMode ??
+      settings.preferredTravelMode) as TravelMode,
+    source: event.payload?.travelMode ? "schedule-setting" : "user-default",
+  };
+}
+
 async function estimateTravel({
   current,
   event,
@@ -162,6 +243,7 @@ export async function adaptLocationAwareNotificationEvents(
   if (baseTravelEvents.length === 0) return events;
   const current = await getCurrentCoordinates();
   if (!current) return events;
+  const currentSavedPlace = findCurrentSavedPlace(current);
 
   const adaptations = new Map<
     string,
@@ -170,13 +252,21 @@ export async function adaptLocationAwareNotificationEvents(
       title: string;
       body: string;
       estimate: TravelEstimate;
+      mode: TravelMode;
+      modeSource: string;
+      fromPlaceName: string | null;
     }
   >();
 
   await Promise.all(
     baseTravelEvents.slice(0, 6).map(async (event) => {
-      const mode = (event.payload?.travelMode ??
-        settings.preferredTravelMode) as TravelMode;
+      const selection = chooseTravelMode({
+        current,
+        event,
+        settings,
+        currentPlaceName: currentSavedPlace?.name,
+      });
+      const mode = selection.mode;
       const estimate = await estimateTravel({ current, event, mode });
       if (!estimate) return;
 
@@ -198,11 +288,15 @@ export async function adaptLocationAwareNotificationEvents(
           title: `현 위치는 ${placeName}입니다`,
           body: `곧 ${scheduleTitle} 일정입니다. 시작 준비를 확인해 주세요.`,
           estimate,
+          mode,
+          modeSource: selection.source,
+          fromPlaceName: currentSavedPlace?.name ?? null,
         });
         return;
       }
 
       const minutes = Math.max(1, estimate.minutes ?? 1);
+      const modeLabel = getTravelModeLabel(mode);
       const calculatedDepartureAt =
         startAt - (minutes + settings.travelBufferMinutes) * 60 * 1000;
       const leaveNow = calculatedDepartureAt <= now + 60_000;
@@ -212,11 +306,14 @@ export async function adaptLocationAwareNotificationEvents(
         scheduledAt: departureAt,
         title: leaveNow
           ? `지금부터 ${placeName}(으)로 이동해야 늦지 않습니다`
-          : `${placeName}까지 약 ${minutes}분 소요됩니다`,
+          : `${placeName}까지 ${modeLabel}로 약 ${minutes}분 소요됩니다`,
         body: leaveNow
-          ? `현재 위치 기준 약 ${minutes}분 거리입니다. 바로 출발해 주세요.`
+          ? `현재 위치 기준 ${modeLabel}로 약 ${minutes}분 거리입니다. 바로 출발해 주세요.`
           : `${formatDepartureTime(new Date(departureAt))}에 출발하면 ${scheduleTitle} 일정에 맞출 수 있습니다.`,
         estimate,
+        mode,
+        modeSource: selection.source,
+        fromPlaceName: currentSavedPlace?.name ?? null,
       });
     })
   );
@@ -248,6 +345,9 @@ export async function adaptLocationAwareNotificationEvents(
         distanceMeters: adaptation.estimate.distanceMeters ?? null,
         atDestination: adaptation.estimate.atDestination === true,
         travelProvider: adaptation.estimate.provider ?? "unknown",
+        selectedTravelMode: adaptation.mode,
+        travelModeSource: adaptation.modeSource,
+        currentSavedPlaceName: adaptation.fromPlaceName,
         locationCalculatedAt: new Date().toISOString(),
       },
     };

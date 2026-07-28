@@ -101,6 +101,7 @@ function getTravelTimeRule({
 
   return travelTimeRules.find((rule) => {
     return (
+      rule.minutes > 0 &&
       rule.mode === mode &&
       normalizePlaceName(rule.fromPlaceName) === from &&
       normalizePlaceName(rule.toPlaceName) === to

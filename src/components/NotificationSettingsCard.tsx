@@ -9,6 +9,7 @@ import {
 } from "@/lib/notificationSettingsStorage";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { NotificationSettings } from "@/types/notification";
+import TravelModeLearningCard from "@/components/TravelModeLearningCard";
 
 const TOGGLE_OPTIONS: Array<{
   key: keyof Pick<
@@ -532,6 +533,8 @@ export default function NotificationSettingsCard() {
           </label>
         ))}
       </div>
+
+      <TravelModeLearningCard />
 
       <div className="mt-5 rounded-3xl bg-slate-950 p-4 text-white">
         <div className="flex items-start justify-between gap-4">

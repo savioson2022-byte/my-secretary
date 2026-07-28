@@ -218,6 +218,49 @@ export function saveClassificationFeedback({
   return memory;
 }
 
+export function saveTravelModeFeedback({
+  fromPlaceName,
+  toPlaceName,
+  modeLabel,
+}: {
+  fromPlaceName: string;
+  toPlaceName: string;
+  modeLabel: string;
+}) {
+  const memories = readRawMemories();
+  const routeKey = `${fromPlaceName.trim()} → ${toPlaceName.trim()}`;
+  const existing = memories.find(
+    (memory) =>
+      memory.domain === "notification" &&
+      memory.source === "feedback" &&
+      memory.examples.includes(routeKey)
+  );
+  const now = nowIso();
+  const memory: PersonalAiMemory = {
+    id: existing?.id ?? createFeedbackId(),
+    domain: "notification",
+    title: `이동수단 피드백: ${routeKey}`,
+    summary:
+      "사용자가 기본 이동수단과 다르게 특정 장소 사이의 실제 이동 방법을 직접 교정한 사례다.",
+    rules: [
+      `${fromPlaceName.trim()}에서 ${toPlaceName.trim()}로 이동할 때는 기본 이동수단보다 ${modeLabel}을 우선한다.`,
+      "장소가 가깝거나 같은 생활권이면 비슷한 경로에서도 도보 가능성을 먼저 검토한다.",
+    ],
+    examples: [routeKey],
+    confidence: "high",
+    source: "feedback",
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now,
+  };
+
+  if (existing) {
+    personalAiMemoryRepository.update(memory);
+  } else {
+    personalAiMemoryRepository.create(memory);
+  }
+  return memory;
+}
+
 const GEMMA_MIN_EVALUATIONS = 15;
 const GEMMA_WARMUP_APPROVALS = 5;
 const GEMMA_RECENT_WINDOW = 10;
