@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { adaptLocationAwareNotificationEvents } from "@/lib/adaptiveTravelNotifications";
 import { buildNotificationEvents } from "@/lib/notificationEventBuilder";
 import { getNotificationSettings } from "@/lib/notificationSettingsStorage";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -826,20 +827,21 @@ export default function SmartReminderAgent() {
   useEffect(() => {
     if (!canUseNotification) return;
 
-    const settings = getNotificationSettings();
-
-    const events = buildNotificationEvents(settings);
+    let currentEvents: NotificationEvent[] = [];
     let lastNativeScheduleSyncAt = 0;
+    let isStopped = false;
 
-    void checkDueNotificationEvents(events);
-    checkUnresolvedDigest();
-    void scheduleNativeNotifications(events);
-
-    const refreshScheduledNotifications = () => {
+    const refreshScheduledNotifications = async () => {
       const nextSettings = getNotificationSettings();
-      const nextEvents = buildNotificationEvents(nextSettings);
+      const nextEvents = await adaptLocationAwareNotificationEvents(
+        buildNotificationEvents(nextSettings),
+        nextSettings
+      );
+      if (isStopped) return;
 
+      currentEvents = nextEvents;
       lastNativeScheduleSyncAt = Date.now();
+      await checkDueNotificationEvents(nextEvents);
       void scheduleNativeNotifications(nextEvents);
       void syncNotificationEvents(undefined, nextEvents);
       if (nextSettings.notificationsEnabled && nextSettings.pushEnabled) {
@@ -847,28 +849,36 @@ export default function SmartReminderAgent() {
       }
     };
 
-    const timer = window.setInterval(() => {
-      const nextSettings = getNotificationSettings();
-      const nextEvents = buildNotificationEvents(nextSettings);
+    void refreshScheduledNotifications();
+    checkUnresolvedDigest();
 
-      void checkDueNotificationEvents(nextEvents);
+    const timer = window.setInterval(() => {
+      void checkDueNotificationEvents(currentEvents);
       checkUnresolvedDigest();
 
       if (Date.now() - lastNativeScheduleSyncAt > 2 * 60 * 1000) {
-        refreshScheduledNotifications();
+        void refreshScheduledNotifications();
       }
     }, 30 * 1000);
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void refreshScheduledNotifications();
+      }
+    };
     window.addEventListener(
       "my-assistant-notification-settings-updated",
       refreshScheduledNotifications
     );
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
+      isStopped = true;
       window.clearInterval(timer);
       window.removeEventListener(
         "my-assistant-notification-settings-updated",
         refreshScheduledNotifications
       );
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [canUseNotification]);
 
@@ -981,7 +991,10 @@ export default function SmartReminderAgent() {
       }
 
       const settings = getNotificationSettings();
-      const events = buildNotificationEvents(settings);
+      const events = await adaptLocationAwareNotificationEvents(
+        buildNotificationEvents(settings),
+        settings
+      );
 
       await syncNotificationEvents(accessToken, events);
       await scheduleNativeNotifications(events);

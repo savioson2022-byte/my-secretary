@@ -8,6 +8,10 @@ type TravelTimeRequest = {
   toAddress?: string;
   departureTime?: string;
   mode?: TravelMode;
+  fromLatitude?: number;
+  fromLongitude?: number;
+  toLatitude?: number;
+  toLongitude?: number;
 };
 
 type KakaoAddressDocument = {
@@ -19,6 +23,11 @@ type OdsayPath = {
   info?: {
     totalTime?: number;
   };
+};
+
+type Coordinates = {
+  latitude: number;
+  longitude: number;
 };
 
 const KAKAO_REST_API_KEY = process.env.KAKAO_REST_API_KEY;
@@ -71,22 +80,13 @@ async function geocodeAddress(address: string) {
 }
 
 async function getTransitMinutes({
-  fromAddress,
-  toAddress,
+  from,
+  to,
 }: {
-  fromAddress: string;
-  toAddress: string;
+  from: Coordinates;
+  to: Coordinates;
 }) {
-  if (!KAKAO_REST_API_KEY || !ODSAY_API_KEY) {
-    return null;
-  }
-
-  const [from, to] = await Promise.all([
-    geocodeAddress(fromAddress),
-    geocodeAddress(toAddress),
-  ]);
-
-  if (!from || !to) {
+  if (!ODSAY_API_KEY) {
     return null;
   }
 
@@ -119,6 +119,67 @@ async function getTransitMinutes({
   return Math.round(minutes);
 }
 
+function getDistanceMeters(from: Coordinates, to: Coordinates) {
+  const earthRadiusMeters = 6_371_000;
+  const toRadians = (value: number) => (value * Math.PI) / 180;
+  const latitudeDelta = toRadians(to.latitude - from.latitude);
+  const longitudeDelta = toRadians(to.longitude - from.longitude);
+  const startLatitude = toRadians(from.latitude);
+  const endLatitude = toRadians(to.latitude);
+  const value =
+    Math.sin(latitudeDelta / 2) ** 2 +
+    Math.cos(startLatitude) *
+      Math.cos(endLatitude) *
+      Math.sin(longitudeDelta / 2) ** 2;
+
+  return Math.round(
+    earthRadiusMeters * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value))
+  );
+}
+
+async function getCarRoute({
+  from,
+  to,
+}: {
+  from: Coordinates;
+  to: Coordinates;
+}) {
+  if (!KAKAO_REST_API_KEY) return null;
+
+  const url = new URL("https://apis-navi.kakaomobility.com/v1/directions");
+  url.searchParams.set("origin", `${from.longitude},${from.latitude}`);
+  url.searchParams.set("destination", `${to.longitude},${to.latitude}`);
+  url.searchParams.set("priority", "RECOMMEND");
+
+  const response = await fetch(url, {
+    headers: { Authorization: `KakaoAK ${KAKAO_REST_API_KEY}` },
+    cache: "no-store",
+  });
+  if (!response.ok) return null;
+
+  const data = (await response.json()) as {
+    routes?: Array<{ summary?: { duration?: number; distance?: number } }>;
+  };
+  const summary = data.routes?.[0]?.summary;
+  if (!summary?.duration) return null;
+
+  return {
+    minutes: Math.max(1, Math.ceil(summary.duration / 60)),
+    distanceMeters: summary.distance,
+    provider: "kakao-mobility",
+  };
+}
+
+function getCoordinate(body: TravelTimeRequest, prefix: "from" | "to") {
+  const latitude =
+    prefix === "from" ? body.fromLatitude : body.toLatitude;
+  const longitude =
+    prefix === "from" ? body.fromLongitude : body.toLongitude;
+
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+  return { latitude: Number(latitude), longitude: Number(longitude) };
+}
+
 export async function POST(request: Request) {
   let body: TravelTimeRequest;
 
@@ -132,40 +193,61 @@ export async function POST(request: Request) {
   const toAddress = body.toAddress?.trim();
   const mode = body.mode;
 
-  if (!fromAddress || !toAddress || !mode) {
-    return badRequest("출발 주소, 도착 주소, 이동수단이 필요합니다.");
+  if (!mode) {
+    return badRequest("이동수단이 필요합니다.");
   }
 
-  if (mode !== "transit") {
+  const from =
+    getCoordinate(body, "from") ??
+    (fromAddress ? await geocodeAddress(fromAddress) : null);
+  const to =
+    getCoordinate(body, "to") ??
+    (toAddress ? await geocodeAddress(toAddress) : null);
+
+  if (!from || !to) {
+    return badRequest("출발지와 도착지 좌표를 확인하지 못했습니다.");
+  }
+
+  const straightDistanceMeters = getDistanceMeters(from, to);
+  if (straightDistanceMeters <= 300) {
     return NextResponse.json({
-      ok: false,
-      reason: "현재 서버 API는 대중교통 계산만 지원합니다.",
+      ok: true,
+      provider: "device-location",
+      minutes: 0,
+      distanceMeters: straightDistanceMeters,
+      atDestination: true,
     });
   }
 
-  if (!KAKAO_REST_API_KEY || !ODSAY_API_KEY) {
-    return NextResponse.json({
-      ok: false,
-      reason:
-        "KAKAO_REST_API_KEY와 ODSAY_API_KEY가 설정되면 대중교통 이동시간을 계산합니다.",
-    });
+  if (mode === "car") {
+    const route = await getCarRoute({ from, to });
+    if (route) {
+      return NextResponse.json({
+        ok: true,
+        ...route,
+        distanceMeters: route.distanceMeters ?? straightDistanceMeters,
+        atDestination: false,
+      });
+    }
   }
 
-  const minutes = await getTransitMinutes({
-    fromAddress,
-    toAddress,
-  });
-
-  if (!minutes) {
-    return NextResponse.json({
-      ok: false,
-      reason: "대중교통 이동시간을 찾지 못했습니다.",
-    });
-  }
+  const transitMinutes =
+    mode === "transit" ? await getTransitMinutes({ from, to }) : null;
+  const estimatedRoadDistance =
+    mode === "walk"
+      ? straightDistanceMeters * 1.2
+      : straightDistanceMeters * 1.35;
+  const fallbackSpeedMetersPerMinute =
+    mode === "walk" ? 75 : mode === "car" ? 500 : 250;
+  const minutes =
+    transitMinutes ??
+    Math.max(1, Math.ceil(estimatedRoadDistance / fallbackSpeedMetersPerMinute));
 
   return NextResponse.json({
     ok: true,
-    provider: "odsay+kakao",
+    provider: transitMinutes ? "odsay" : `${mode}-distance-estimate`,
     minutes,
+    distanceMeters: straightDistanceMeters,
+    atDestination: false,
   });
 }

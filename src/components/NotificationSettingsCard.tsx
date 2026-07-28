@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { adaptLocationAwareNotificationEvents } from "@/lib/adaptiveTravelNotifications";
 import { buildNotificationEvents } from "@/lib/notificationEventBuilder";
 import {
   getNotificationSettings,
@@ -73,8 +74,9 @@ const TOGGLE_OPTIONS: Array<{
   },
   {
     key: "locationNotificationsEnabled",
-    title: "위치 기반 보정",
-    description: "앱에서만 일정 전후 시간대에 위치를 확인합니다.",
+    title: "반응형 위치·이동 알람",
+    description:
+      "현재 위치와 실제 이동시간을 계산해 출발 알람을 앞당기거나 도착 알람으로 바꿉니다.",
   },
 ];
 
@@ -178,7 +180,10 @@ export default function NotificationSettingsCard() {
         body: JSON.stringify(nextSettings),
       });
 
-      const events = buildNotificationEvents(nextSettings);
+      const events = await adaptLocationAwareNotificationEvents(
+        buildNotificationEvents(nextSettings),
+        nextSettings
+      );
 
       await fetch("/api/notifications/sync", {
         method: "POST",
@@ -203,6 +208,43 @@ export default function NotificationSettingsCard() {
     };
 
     void save(nextSettings);
+  }
+
+  async function enableLocationAwareAlarms() {
+    setMessage(null);
+
+    try {
+      const { Capacitor } = await import("@capacitor/core");
+      if (Capacitor.isNativePlatform()) {
+        const { Geolocation } = await import("@capacitor/geolocation");
+        const permission = await Geolocation.requestPermissions();
+        if (permission.location !== "granted") {
+          setMessage("위치 권한을 허용해야 이동시간 기반 알람을 사용할 수 있어.");
+          return;
+        }
+        updateSettings({ locationNotificationsEnabled: true });
+        setMessage("현재 위치를 반영해 출발 알람을 계산하도록 설정했어.");
+        return;
+      }
+    } catch {
+      // 웹 위치 권한 요청으로 이어집니다.
+    }
+
+    if (!("geolocation" in navigator)) {
+      setMessage("이 기기에서는 위치 기반 알람을 지원하지 않아.");
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      () => {
+        updateSettings({ locationNotificationsEnabled: true });
+        setMessage("현재 위치를 반영해 출발 알람을 계산하도록 설정했어.");
+      },
+      () => {
+        setMessage("브라우저의 위치 권한을 허용해야 이동시간을 계산할 수 있어.");
+      },
+      { enableHighAccuracy: true, timeout: 10_000 }
+    );
   }
 
   async function sendTestNotification() {
@@ -409,7 +451,8 @@ export default function NotificationSettingsCard() {
         <h2 className="mt-1 text-lg font-black text-slate-900">알림 설정</h2>
         <p className="mt-2 text-sm leading-6 text-slate-500">
           일정 준비, 이동 시작, 재구매 추천, 루틴 상기를 한곳에서 관리합니다.
-          위치 기반 보정은 앱에서만 제한적으로 사용합니다.
+          위치 권한을 켜면 앱과 지원되는 PWA에서 현재 이동시간에 맞춰 출발
+          알람을 자동 조정합니다.
         </p>
       </div>
 
@@ -474,9 +517,16 @@ export default function NotificationSettingsCard() {
             <input
               type="checkbox"
               checked={Boolean(settings[option.key])}
-              onChange={(event) =>
-                updateSettings({ [option.key]: event.target.checked })
-              }
+              onChange={(event) => {
+                if (
+                  option.key === "locationNotificationsEnabled" &&
+                  event.target.checked
+                ) {
+                  void enableLocationAwareAlarms();
+                  return;
+                }
+                updateSettings({ [option.key]: event.target.checked });
+              }}
               className="h-5 w-5 shrink-0 accent-blue-600"
             />
           </label>

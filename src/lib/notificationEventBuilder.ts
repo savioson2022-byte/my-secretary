@@ -195,7 +195,12 @@ function createScheduleEvents({
 }: {
   schedule: Pick<
     SingleSchedule | RoutineSchedule,
-    "id" | "title" | "startTime" | "placeName" | "placeAddress"
+    | "id"
+    | "title"
+    | "startTime"
+    | "placeName"
+    | "placeAddress"
+    | "travelMode"
   >;
   sourceType: "single" | "routine";
   dateText: string;
@@ -288,6 +293,11 @@ function createScheduleEvents({
           title: `${schedule.title} 이동을 확인할 시간이에요`,
           body: `현재 위치와 ${schedule.placeName} 거리를 확인해 출발 시간을 판단합니다.`,
           requiresLocationCheck: true,
+          payload: {
+            scheduleTitle: schedule.title,
+            scheduleStartAt: toDateTimeIso(dateText, schedule.startTime),
+            travelMode: schedule.travelMode ?? settings.preferredTravelMode,
+          },
         },
         place
       )
