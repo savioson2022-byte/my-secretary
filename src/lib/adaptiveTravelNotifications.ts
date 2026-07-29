@@ -21,8 +21,9 @@ type TravelEstimate = {
   provider?: string;
 };
 
-const POSITION_CACHE_MS = 2 * 60 * 1000;
-const DESTINATION_REMINDER_MINUTES = 5;
+const POSITION_CACHE_MS = 30 * 60 * 1000;
+const LOCATION_MONITOR_WINDOW_MINUTES = 180;
+const ACTION_THRESHOLD_MINUTES = 30;
 const NEARBY_WALK_MAX_METERS = 1_200;
 const SAVED_PLACE_MATCH_MAX_METERS = 500;
 let cachedPosition:
@@ -223,8 +224,7 @@ export async function adaptLocationAwareNotificationEvents(
   }
 
   const now = Date.now();
-  const checkWindowMs =
-    Math.max(15, settings.locationCheckWindowMinutes) * 60 * 1000;
+  const checkWindowMs = LOCATION_MONITOR_WINDOW_MINUTES * 60 * 1000;
   const baseTravelEvents = events.filter((event) => {
     const startAt = Number(event.payload?.scheduleStartAt
       ? new Date(String(event.payload.scheduleStartAt)).getTime()
@@ -255,6 +255,8 @@ export async function adaptLocationAwareNotificationEvents(
       mode: TravelMode;
       modeSource: string;
       fromPlaceName: string | null;
+      remainingMinutes: number;
+      slackMinutes: number;
     }
   >();
 
@@ -278,49 +280,74 @@ export async function adaptLocationAwareNotificationEvents(
           ? event.payload.scheduleTitle
           : event.title.replace(" 이동을 확인할 시간이에요", "");
       const placeName = event.placeName || "일정 장소";
+      const remainingMinutes = Math.max(
+        0,
+        Math.ceil((startAt - now) / 60_000)
+      );
+      const minutes = estimate.atDestination
+        ? 0
+        : Math.max(1, estimate.minutes ?? 1);
+      const slackMinutes = remainingMinutes - minutes;
+      const decisionAt =
+        startAt - (minutes + ACTION_THRESHOLD_MINUTES) * 60 * 1000;
+      const alertNow = decisionAt <= now + 60_000;
+      const scheduledAt = alertNow ? now + 10_000 : decisionAt;
 
       if (estimate.atDestination) {
         adaptations.set(getPersistentGroupId(event), {
-          scheduledAt: Math.max(
-            now + 10_000,
-            startAt - DESTINATION_REMINDER_MINUTES * 60 * 1000
-          ),
+          scheduledAt,
           title: `현 위치는 ${placeName}입니다`,
-          body: `곧 ${scheduleTitle} 일정입니다. 시작 준비를 확인해 주세요.`,
+          body: alertNow
+            ? `${scheduleTitle} 일정까지 ${remainingMinutes}분 남았습니다. 시작 준비를 확인해 주세요.`
+            : `${scheduleTitle} 일정 30분 전에 시작 준비를 알려드릴게요.`,
           estimate,
           mode,
           modeSource: selection.source,
           fromPlaceName: currentSavedPlace?.name ?? null,
+          remainingMinutes,
+          slackMinutes,
         });
         return;
       }
 
-      const minutes = Math.max(1, estimate.minutes ?? 1);
       const modeLabel = getTravelModeLabel(mode);
-      const calculatedDepartureAt =
-        startAt - (minutes + settings.travelBufferMinutes) * 60 * 1000;
-      const leaveNow = calculatedDepartureAt <= now + 60_000;
-      const departureAt = leaveNow ? now + 10_000 : calculatedDepartureAt;
 
       adaptations.set(getPersistentGroupId(event), {
-        scheduledAt: departureAt,
-        title: leaveNow
+        scheduledAt,
+        title: alertNow
           ? `지금부터 ${placeName}(으)로 이동해야 늦지 않습니다`
           : `${placeName}까지 ${modeLabel}로 약 ${minutes}분 소요됩니다`,
-        body: leaveNow
-          ? `현재 위치 기준 ${modeLabel}로 약 ${minutes}분 거리입니다. 바로 출발해 주세요.`
-          : `${formatDepartureTime(new Date(departureAt))}에 출발하면 ${scheduleTitle} 일정에 맞출 수 있습니다.`,
+        body: alertNow
+          ? `일정까지 ${remainingMinutes}분, 이동은 약 ${minutes}분입니다. 남은 여유가 ${Math.max(0, slackMinutes)}분이므로 바로 출발해 주세요.`
+          : `${formatDepartureTime(new Date(scheduledAt))}에 남은 여유가 30분이 됩니다. 그때 출발 판단 알람을 보낼게요.`,
         estimate,
         mode,
         modeSource: selection.source,
         fromPlaceName: currentSavedPlace?.name ?? null,
+        remainingMinutes,
+        slackMinutes,
       });
     })
   );
 
   if (adaptations.size === 0) return events;
 
-  return events.map((event) => {
+  const adaptedScheduleKeys = new Set(
+    baseTravelEvents
+      .filter((event) => adaptations.has(getPersistentGroupId(event)))
+      .map(
+        (event) =>
+          `${event.sourceType}:${event.sourceId}:${event.occurrenceDate}`
+      )
+  );
+
+  return events
+    .filter((event) => {
+      if (event.eventType !== "prep_start") return true;
+      const scheduleKey = `${event.sourceType}:${event.sourceId}:${event.occurrenceDate}`;
+      return !adaptedScheduleKeys.has(scheduleKey);
+    })
+    .map((event) => {
     if (event.eventType !== "travel_start") return event;
     const adaptation = adaptations.get(getPersistentGroupId(event));
     if (!adaptation) return event;
@@ -348,8 +375,13 @@ export async function adaptLocationAwareNotificationEvents(
         selectedTravelMode: adaptation.mode,
         travelModeSource: adaptation.modeSource,
         currentSavedPlaceName: adaptation.fromPlaceName,
+        locationMonitorWindowMinutes: LOCATION_MONITOR_WINDOW_MINUTES,
+        locationSampleIntervalMinutes: POSITION_CACHE_MS / 60_000,
+        actionThresholdMinutes: ACTION_THRESHOLD_MINUTES,
+        remainingMinutesAtCalculation: adaptation.remainingMinutes,
+        slackMinutesAtCalculation: adaptation.slackMinutes,
         locationCalculatedAt: new Date().toISOString(),
       },
     };
-  });
+    });
 }

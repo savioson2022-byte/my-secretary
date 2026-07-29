@@ -165,7 +165,10 @@ export async function PUT(request: NextRequest) {
     location_notifications_enabled: body.locationNotificationsEnabled ?? false,
     default_prep_lead_minutes: body.defaultPrepLeadMinutes ?? 30,
     travel_buffer_minutes: body.travelBufferMinutes ?? 5,
-    location_check_window_minutes: body.locationCheckWindowMinutes ?? 90,
+    location_check_window_minutes: Math.max(
+      180,
+      body.locationCheckWindowMinutes ?? 180
+    ),
     preferred_travel_mode: body.preferredTravelMode ?? "transit",
     persistent_alarm_enabled: body.persistentAlarmEnabled ?? true,
     persistent_alarm_prep_enabled: body.persistentAlarmPrepEnabled ?? true,

@@ -77,7 +77,7 @@ const TOGGLE_OPTIONS: Array<{
     key: "locationNotificationsEnabled",
     title: "반응형 위치·이동 알람",
     description:
-      "현재 위치와 실제 이동시간을 계산해 출발 알람을 앞당기거나 도착 알람으로 바꿉니다.",
+      "일정 3시간 전부터 30분 단위로 위치를 확인하고 남은 여유가 30분 이내면 알립니다.",
   },
 ];
 
@@ -650,11 +650,11 @@ export default function NotificationSettingsCard() {
           />
         </label>
         <label className="text-xs font-black text-slate-500">
-          위치 확인 범위
+          위치 확인 시작(분 전)
           <input
             type="number"
-            min="15"
-            max="240"
+            min="180"
+            max="180"
             value={settings.locationCheckWindowMinutes}
             onChange={(event) =>
               updateSettings({

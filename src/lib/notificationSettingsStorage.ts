@@ -27,7 +27,7 @@ export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
   persistentAlarmRepeatCount: 5,
   defaultPrepLeadMinutes: 30,
   travelBufferMinutes: 5,
-  locationCheckWindowMinutes: 90,
+  locationCheckWindowMinutes: 180,
   preferredTravelMode: "transit",
   updatedAt: new Date(0).toISOString(),
 };
@@ -48,7 +48,7 @@ function normalizeSettings(
         : DEFAULT_NOTIFICATION_SETTINGS.travelBufferMinutes,
     locationCheckWindowMinutes:
       Number(value?.locationCheckWindowMinutes) > 0
-        ? Number(value?.locationCheckWindowMinutes)
+        ? Math.max(180, Number(value?.locationCheckWindowMinutes))
         : DEFAULT_NOTIFICATION_SETTINGS.locationCheckWindowMinutes,
     persistentAlarmIntervalMinutes:
       Number(value?.persistentAlarmIntervalMinutes) > 0
