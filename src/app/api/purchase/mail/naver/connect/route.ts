@@ -4,6 +4,7 @@ import {
   normalizeNaverMailAppPassword,
   verifyNaverMailConnection,
 } from "@/lib/naverPurchaseSync";
+import { encryptToken } from "@/lib/tokenEncryption";
 
 export async function POST(request: Request) {
   const context = await getAuthedSupabaseForRequest(request);
@@ -59,7 +60,7 @@ export async function POST(request: Request) {
       user_id: context.auth.user.id,
       provider: "naver",
       email,
-      refresh_token: normalizedAppPassword,
+      refresh_token: encryptToken(normalizedAppPassword),
       access_token: null,
       access_token_expires_at: null,
       sync_after: "2026-07-14T00:00:00+09:00",

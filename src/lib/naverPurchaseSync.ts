@@ -4,6 +4,11 @@ import { extractReadableMailTextFromRawSource } from "@/lib/mailTextExtractor";
 import { createPurchaseHistoryFromCandidate } from "@/lib/purchaseAutomation";
 import { importPurchaseMailText } from "@/lib/purchaseMailAi";
 import { getNextPurchaseMailSyncAfter } from "@/lib/purchaseMailSyncWindow";
+import {
+  decryptToken,
+  isCurrentEncryptedToken,
+  reencryptTokenToCurrentVersion,
+} from "@/lib/tokenEncryption";
 import type { PurchaseHistoryItem } from "@/types/purchaseHistory";
 
 type NaverMailConnectionRow = {
@@ -281,10 +286,38 @@ export async function syncNaverPurchaseMails({
   const skippedCoupangSubjects: string[] = [];
 
   try {
+    const appPassword = decryptToken(connection.refresh_token);
     client = await connectNaverMailWithFallback({
       email: connection.email,
-      appPassword: connection.refresh_token,
+      appPassword,
     });
+
+    // 점진적 암호화: 성공적으로 연결되었고 기존 토큰이 v1 포맷이 아니라면 업데이트 시도
+    if (!isCurrentEncryptedToken(connection.refresh_token)) {
+      try {
+        const { error } = await supabase
+          .from("purchase_mail_connections")
+          .update({
+            refresh_token: reencryptTokenToCurrentVersion(
+              connection.refresh_token
+            ),
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", connection.id);
+
+        if (error) {
+          console.error(
+            "Failed to progressively encrypt Naver app password",
+            error
+          );
+        }
+      } catch (err) {
+        console.error(
+          "Failed to encrypt Naver app password during progressive sync",
+          err instanceof Error ? err.message : "Unknown error"
+        );
+      }
+    }
   } catch (error) {
     throw new Error(getReadableNaverMailError(error));
   }

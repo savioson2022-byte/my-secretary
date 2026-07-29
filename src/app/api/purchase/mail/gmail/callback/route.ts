@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { exchangeGoogleCodeForToken } from "@/lib/gmailPurchaseSync";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
+import { encryptToken } from "@/lib/tokenEncryption";
 
 async function getGmailProfile(accessToken: string) {
   const response = await fetch(
@@ -56,14 +57,37 @@ export async function GET(request: Request) {
     const profile = await getGmailProfile(token.access_token);
     const expiresAt = new Date(Date.now() + token.expires_in * 1000);
 
-    await supabase.from("purchase_mail_oauth_states").delete().eq("state", state);
-    await supabase.from("purchase_mail_connections").upsert(
+    const emailToSave = profile?.emailAddress;
+    if (!emailToSave) {
+      console.error("Gmail 프로필에서 이메일을 가져올 수 없습니다.");
+      return NextResponse.redirect(`${appUrl}/purchase?mail_error=gmail_no_email`);
+    }
+
+    // 기존 연결이 있다면 조회 (refresh token 보존 목적)
+    const { data: existingConnection, error: existingError } = await supabase
+      .from("purchase_mail_connections")
+      .select("refresh_token")
+      .eq("user_id", oauthState.user_id)
+      .eq("provider", "gmail")
+      .eq("email", emailToSave)
+      .maybeSingle();
+
+    if (existingError) {
+      console.error("Gmail 기존 연결 조회 실패", existingError);
+      return NextResponse.redirect(`${appUrl}/purchase?mail_error=gmail_db_query`);
+    }
+
+    const refreshTokenToSave = token.refresh_token
+      ? encryptToken(token.refresh_token)
+      : existingConnection?.refresh_token ?? null;
+
+    const { error: upsertError } = await supabase.from("purchase_mail_connections").upsert(
       {
         user_id: oauthState.user_id,
         provider: "gmail",
-        email: profile?.emailAddress ?? null,
-        refresh_token: token.refresh_token ?? null,
-        access_token: token.access_token,
+        email: emailToSave,
+        refresh_token: refreshTokenToSave,
+        access_token: encryptToken(token.access_token),
         access_token_expires_at: expiresAt.toISOString(),
         sync_after: "2026-07-14T00:00:00+09:00",
         status: "active",
@@ -75,9 +99,26 @@ export async function GET(request: Request) {
       }
     );
 
+    if (upsertError) {
+      console.error("Gmail 연결 정보 저장 실패", upsertError);
+      return NextResponse.redirect(`${appUrl}/purchase?mail_error=gmail_db_save`);
+    }
+
+    const { error: stateDeleteError } = await supabase
+      .from("purchase_mail_oauth_states")
+      .delete()
+      .eq("state", state);
+
+    if (stateDeleteError) {
+      console.error("Gmail OAuth state 정리 실패", stateDeleteError);
+    }
+
     return NextResponse.redirect(`${appUrl}/purchase?mail_connected=gmail`);
   } catch (error) {
-    console.error("Gmail 연결 실패:", error);
+    console.error(
+      "Gmail 연결 실패:",
+      error instanceof Error ? error.message : "Unknown error"
+    );
 
     return NextResponse.redirect(`${appUrl}/purchase?mail_error=gmail`);
   }

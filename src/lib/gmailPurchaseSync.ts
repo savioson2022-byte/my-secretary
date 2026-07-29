@@ -2,6 +2,12 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createPurchaseHistoryFromCandidate } from "@/lib/purchaseAutomation";
 import { importPurchaseMailText } from "@/lib/purchaseMailAi";
 import { getNextPurchaseMailSyncAfter } from "@/lib/purchaseMailSyncWindow";
+import {
+  decryptToken,
+  encryptToken,
+  isCurrentEncryptedToken,
+  reencryptTokenToCurrentVersion,
+} from "@/lib/tokenEncryption";
 import type { PurchaseHistoryItem } from "@/types/purchaseHistory";
 
 type GmailTokenResponse = {
@@ -105,7 +111,7 @@ async function refreshGmailAccessToken(connection: MailConnectionRow) {
     body: new URLSearchParams({
       client_id: config.clientId,
       client_secret: config.clientSecret,
-      refresh_token: connection.refresh_token,
+      refresh_token: decryptToken(connection.refresh_token),
       grant_type: "refresh_token",
     }),
   });
@@ -135,19 +141,43 @@ async function getFreshAccessToken({
     : 0;
 
   if (connection.access_token && expiresAt > Date.now() + 60000) {
-    return connection.access_token;
+    return decryptToken(connection.access_token);
   }
 
   const refreshed = await refreshGmailAccessToken(connection);
 
-  await supabase
+  const updatePayload: {
+    access_token: string;
+    access_token_expires_at: string;
+    updated_at: string;
+    refresh_token?: string;
+  } = {
+    access_token: encryptToken(refreshed.accessToken),
+    access_token_expires_at: refreshed.expiresAt,
+    updated_at: new Date().toISOString(),
+  };
+
+  if (
+    connection.refresh_token &&
+    !isCurrentEncryptedToken(connection.refresh_token)
+  ) {
+    try {
+      updatePayload.refresh_token = reencryptTokenToCurrentVersion(
+        connection.refresh_token
+      );
+    } catch (err) {
+      console.error("Failed to progressively encrypt Gmail refresh_token", err);
+    }
+  }
+
+  const { error } = await supabase
     .from("purchase_mail_connections")
-    .update({
-      access_token: refreshed.accessToken,
-      access_token_expires_at: refreshed.expiresAt,
-      updated_at: new Date().toISOString(),
-    })
+    .update(updatePayload)
     .eq("id", connection.id);
+
+  if (error) {
+    console.error("Failed to update Gmail connection tokens", error);
+  }
 
   return refreshed.accessToken;
 }
