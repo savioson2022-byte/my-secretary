@@ -185,6 +185,8 @@ export default function AccountManager() {
   const [message, setMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   const [displayName, setDisplayName] = useState("");
   const [classificationPreference, setClassificationPreference] = useState("");
@@ -723,6 +725,48 @@ export default function AccountManager() {
     setDevices([]);
     setUnifiedAccount(null);
     setMessage("로그아웃했습니다.");
+  }
+
+  async function handleDeleteAccount() {
+    if (!supabase || !user || deleteConfirmation !== "계정 삭제") return;
+
+    setIsDeletingAccount(true);
+    setMessage(null);
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token;
+
+    if (!accessToken) {
+      setIsDeletingAccount(false);
+      setMessage("로그인 상태를 다시 확인한 뒤 삭제해주세요.");
+      return;
+    }
+
+    const response = await fetch("/api/account/delete", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+    const result = (await response.json().catch(() => null)) as
+      | { ok?: boolean; error?: string }
+      | null;
+
+    if (!response.ok || !result?.ok) {
+      setIsDeletingAccount(false);
+      setMessage(result?.error ?? "계정을 삭제하지 못했습니다.");
+      return;
+    }
+
+    await supabase.auth.signOut({ scope: "local" }).catch(() => undefined);
+    window.localStorage.clear();
+    window.sessionStorage.clear();
+    setUser(null);
+    setDevices([]);
+    setUnifiedAccount(null);
+    setDeleteConfirmation("");
+    setIsDeletingAccount(false);
+    window.location.href = "/";
   }
 
   async function handleSaveProfile() {
@@ -1519,6 +1563,43 @@ export default function AccountManager() {
               </div>
             ))
           )}
+        </div>
+      </section>
+
+      <section className="rounded-3xl border border-red-100 bg-red-50 p-5">
+        <h3 className="font-black text-red-700">계정 및 데이터 삭제</h3>
+        <p className="mt-2 text-sm font-semibold leading-6 text-red-600">
+          인증 계정과 서버에 저장된 일정, 메모, 장소, 구매 이력, AI 학습 기록,
+          알림 및 기기 정보를 영구 삭제합니다. 삭제 후에는 복구할 수 없습니다.
+        </p>
+        <div className="mt-4 space-y-2">
+          <label className="block text-xs font-black text-red-700">
+            계속하려면 ‘계정 삭제’를 입력하세요.
+          </label>
+          <input
+            value={deleteConfirmation}
+            onChange={(event) => setDeleteConfirmation(event.target.value)}
+            placeholder="계정 삭제"
+            className="w-full rounded-2xl border border-red-200 bg-white px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:border-red-400"
+          />
+          <button
+            type="button"
+            onClick={handleDeleteAccount}
+            disabled={
+              isDeletingAccount || deleteConfirmation !== "계정 삭제"
+            }
+            className="w-full rounded-2xl bg-red-600 px-4 py-3 text-sm font-black text-white transition hover:bg-red-500 disabled:bg-red-200"
+          >
+            {isDeletingAccount ? "삭제 중..." : "계정과 모든 데이터 영구 삭제"}
+          </button>
+        </div>
+        <div className="mt-4 flex flex-wrap gap-3 text-xs font-black">
+          <a href="/privacy" className="text-red-700 underline">
+            개인정보처리방침
+          </a>
+          <a href="/support" className="text-red-700 underline">
+            지원 안내
+          </a>
         </div>
       </section>
 
