@@ -4,6 +4,7 @@ import Capacitor
 final class MySecretaryBridgeViewController: CAPBridgeViewController {
     override func capacitorDidLoad() {
         super.capacitorDidLoad()
+        bridge?.registerPluginInstance(AppleSignInPlugin())
         bridge?.registerPluginInstance(GemmaRuntimePlugin())
     }
 }

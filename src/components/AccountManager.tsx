@@ -13,6 +13,10 @@ import { RegisteredDevice, UserProfileRecord } from "@/types/device";
 import { UserProfile } from "@/types/userProfile";
 import { TravelMode } from "@/types/calendar";
 import type { UnifiedAccountState } from "@/types/unifiedAccount";
+import {
+  canUseNativeAppleSignIn,
+  signInWithAppleNative,
+} from "@/lib/appleSignIn";
 
 const TRAVEL_MODE_OPTIONS: Array<{ value: TravelMode; label: string }> = [
   { value: "walk", label: "도보" },
@@ -493,6 +497,56 @@ export default function AccountManager() {
         ? "이미 가입된 이메일일 수 있습니다. 메일이 오지 않으면 로그인 탭에서 기존 아이디로 로그인하거나 아래 재발송을 눌러보세요."
         : "인증 메일을 보냈습니다. 메일 확인 후 이 아이디와 비밀번호로 로그인하세요. 메일이 안 보이면 스팸함도 확인해주세요."
     );
+  }
+
+  async function handleAppleSignIn() {
+    if (!supabase) return;
+
+    setIsSaving(true);
+    setMessage(null);
+
+    try {
+      if (!canUseNativeAppleSignIn()) {
+        setMessage("Apple 로그인은 현재 iPhone 또는 iPad 앱에서 사용할 수 있습니다.");
+        return;
+      }
+
+      const credential = await signInWithAppleNative();
+      const { data, error } = await supabase.auth.signInWithIdToken({
+        provider: "apple",
+        token: credential.identityToken,
+        nonce: credential.nonce,
+      });
+
+      if (error) throw error;
+
+      const fullName = credential.fullName?.trim();
+      if (fullName) {
+        await supabase.auth.updateUser({
+          data: {
+            full_name: fullName,
+            display_name: fullName,
+          },
+        });
+      }
+
+      const nextUser = data.user ?? data.session?.user ?? null;
+      setUser(nextUser);
+
+      if (nextUser) {
+        await ensureProfileAndDevice(nextUser);
+      }
+
+      setMessage("Apple 계정으로 로그인했습니다.");
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Apple 로그인에 실패했습니다. 잠시 후 다시 시도해주세요."
+      );
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   async function handleResendSignupEmail() {
@@ -1087,25 +1141,23 @@ export default function AccountManager() {
           </div>
 
           <div className="mt-4 rounded-3xl bg-slate-50 p-4 ring-1 ring-slate-100">
-            <p className="text-xs font-black text-slate-500">
-              카카오, 네이버, Google로 시작하기
+            <p className="text-center text-xs font-black text-slate-400">
+              또는
             </p>
-            <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
-              다음 단계에서 이 버튼들은 이메일 인증을 줄이는 용도로만 다시
-              연결합니다. 최종 로그인 기준은 지금 만든 앱 아이디입니다.
+            <button
+              type="button"
+              onClick={handleAppleSignIn}
+              disabled={isSaving}
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-black px-4 py-3.5 text-sm font-black text-white transition hover:bg-slate-800 disabled:bg-slate-400"
+              aria-label="Apple로 로그인"
+            >
+              <span aria-hidden="true" className="text-xl leading-none"></span>
+              Apple로 로그인
+            </button>
+            <p className="mt-3 text-center text-xs font-semibold leading-5 text-slate-500">
+              Apple은 이메일 가리기를 선택할 수 있으며, 광고 목적의 앱 사용
+              기록을 수집하지 않습니다.
             </p>
-            <div className="mt-3 grid grid-cols-3 gap-2">
-              {["카카오", "네이버", "Google"].map((label) => (
-                <button
-                  key={label}
-                  type="button"
-                  disabled
-                  className="rounded-2xl bg-white px-3 py-3 text-xs font-black text-slate-400 ring-1 ring-slate-100"
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
           </div>
 
           {message && (
@@ -1173,8 +1225,8 @@ export default function AccountManager() {
                   : "통합계정 연결 준비 중"}
               </h3>
               <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
-                카카오, Google, Apple, 이메일 로그인을 하나의 앱 계정으로
-                묶기 위한 기반입니다.
+                Apple과 이메일 로그인을 하나의 앱 계정으로 묶어 기기 간 데이터를
+                연결합니다.
               </p>
             </div>
             {unifiedAccount?.identity.provider ? (
