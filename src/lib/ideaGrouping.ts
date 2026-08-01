@@ -2,6 +2,7 @@ import type { AssistantItem } from "@/types/assistant";
 import { formatPersonalAiMemoryForPrompt } from "@/lib/personalAiMemoryStorage";
 import type { PersonalAiMemory } from "@/types/personalAi";
 import { runGemmaOnDevice } from "@/lib/local-ai/gemmaAdapter";
+import { getAiRequestHeaders } from "@/lib/aiDataConsent";
 
 export type IdeaGroupingResult = {
   ideaGroupId: string;
@@ -128,10 +129,13 @@ export async function groupIdeaWithAi({
       return localResult.output;
     }
 
+    const consentHeaders = await getAiRequestHeaders();
+    if (!consentHeaders) return fallbackResult;
     const response = await fetch("/api/ideas/group", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        ...consentHeaders,
       },
       body: JSON.stringify({
         text,

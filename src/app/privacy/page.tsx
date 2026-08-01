@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   description: "나의 비서 앱의 개인정보 처리 기준입니다.",
 };
 
-const updatedAt = "2026년 7월 30일";
+const updatedAt = "2026년 8월 1일";
 
 export default function PrivacyPolicyPage() {
   return (
@@ -70,8 +70,18 @@ export default function PrivacyPolicyPage() {
         </section>
 
         <section>
+          <h2 className="text-xl font-black text-slate-900">4. 외부 AI 전송과 동의</h2>
+          <p className="mt-2">
+            OpenAI를 이용하는 분류·아이디어 정리·구매 정보 추출 기능은 사용자가 앱 안의 사전 안내에서 명시적으로 동의한 경우에만 실행합니다. 이때 사용자가 입력한 일정·작업·메모, 개인화 기준, 연결한 구매 메일 중 주문 관련 제목과 본문이 처리 목적에 필요한 범위에서 OpenAI로 전송될 수 있습니다. 비밀번호, OAuth 토큰, 앱 비밀번호와 전체 메일함은 전송하지 않습니다.
+          </p>
+          <p className="mt-2">
+            동의하지 않아도 규칙 기반 기능과 기기 안에서 실행되는 Gemma를 사용할 수 있습니다. 동의는 설정 &gt; 개인 AI에서 언제든 철회할 수 있으며, 철회 즉시 새로운 외부 AI 전송과 자동 구매 메일 분석을 중단합니다.
+          </p>
+        </section>
+
+        <section>
           <h2 className="text-xl font-black text-slate-900">
-            4. 보관 및 삭제
+            5. 보관 및 삭제
           </h2>
           <p className="mt-2">
             계정 데이터는 사용자가 서비스를 이용하는 동안 보관합니다. 설정의
@@ -83,7 +93,7 @@ export default function PrivacyPolicyPage() {
 
         <section>
           <h2 className="text-xl font-black text-slate-900">
-            5. 사용자의 선택권
+            6. 사용자의 선택권
           </h2>
           <p className="mt-2">
             위치, 마이크, 음성 인식, 알림 권한은 기기 설정에서 언제든 철회할 수
@@ -93,7 +103,7 @@ export default function PrivacyPolicyPage() {
         </section>
 
         <section>
-          <h2 className="text-xl font-black text-slate-900">6. 보호 조치</h2>
+          <h2 className="text-xl font-black text-slate-900">7. 보호 조치</h2>
           <p className="mt-2">
             전송 구간 암호화, 접근 권한 통제, 사용자별 데이터 접근 정책을
             적용합니다. Gmail 토큰과 Naver 앱 비밀번호는 서버에서 암호화하여
@@ -102,7 +112,7 @@ export default function PrivacyPolicyPage() {
         </section>
 
         <section>
-          <h2 className="text-xl font-black text-slate-900">7. 문의</h2>
+          <h2 className="text-xl font-black text-slate-900">8. 문의</h2>
           <p className="mt-2">
             개인정보 또는 계정 삭제에 관한 문의는{" "}
             <Link href="/support" className="font-black text-blue-600">

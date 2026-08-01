@@ -104,10 +104,22 @@ export async function GET(request: Request) {
     );
   }
 
+  const userIds = Array.from(new Set((connections ?? []).map((item) => item.user_id)));
+  const { data: consentRows } = userIds.length
+    ? await supabase
+        .from("ai_data_consents")
+        .select("user_id")
+        .in("user_id", userIds)
+        .eq("consent_version", "2026-08-01")
+        .not("accepted_at", "is", null)
+        .is("revoked_at", null)
+    : { data: [] };
+  const consentedUserIds = new Set((consentRows ?? []).map((item) => item.user_id));
+
   let importedCount = 0;
   let checkedConnections = 0;
 
-  for (const connection of connections ?? []) {
+  for (const connection of (connections ?? []).filter((item) => consentedUserIds.has(item.user_id))) {
     const { data: historyRows, error: historyError } = await supabase
       .from("purchase_history")
       .select("*")

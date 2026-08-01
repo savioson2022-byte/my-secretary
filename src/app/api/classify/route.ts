@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { verifyAiDataConsent } from "@/lib/serverAiDataConsent";
 import { NextResponse } from "next/server";
 import { classifyInput } from "@/lib/classifyInput";
 import { AssistantItemWithoutId } from "@/types/assistant";
@@ -219,6 +220,9 @@ function normalizeResult(
 }
 
 export async function POST(request: Request) {
+  if (!(await verifyAiDataConsent(request))) {
+    return NextResponse.json({ error: "외부 AI 전송 동의가 필요합니다." }, { status: 403 });
+  }
   const body = await request.json();
   const text = String(body.text ?? "").trim();
   const userContext = String(body.userContext ?? "").trim().slice(0, 3000);

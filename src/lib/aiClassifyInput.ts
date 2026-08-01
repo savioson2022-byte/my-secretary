@@ -4,6 +4,7 @@ import {
   getGemmaClassificationReadiness,
   getPersonalAiMemories,
 } from "@/lib/personalAiMemoryStorage";
+import { getAiRequestHeaders } from "@/lib/aiDataConsent";
 
 export type AiClassifySource = "gemma-on-device" | "ai" | "fallback";
 
@@ -37,10 +38,13 @@ export async function aiClassifyInput(
     };
   }
 
+  const consentHeaders = await getAiRequestHeaders();
+  if (!consentHeaders) throw new Error("외부 AI 전송 동의가 필요합니다.");
   const response = await fetch("/api/classify", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      ...consentHeaders,
     },
     body: JSON.stringify({
       text,

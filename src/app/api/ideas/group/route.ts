@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import { NextResponse } from "next/server";
 import { fallbackGroupIdea } from "@/lib/ideaGrouping";
 import type { AssistantItem } from "@/types/assistant";
+import { verifyAiDataConsent } from "@/lib/serverAiDataConsent";
 
 const IDEA_GROUP_SCHEMA = {
   type: "object",
@@ -29,6 +30,9 @@ const IDEA_GROUP_SCHEMA = {
 };
 
 export async function POST(request: Request) {
+  if (!(await verifyAiDataConsent(request))) {
+    return NextResponse.json({ error: "외부 AI 전송 동의가 필요합니다." }, { status: 403 });
+  }
   const body = await request.json();
   const text = String(body.text ?? "").trim();
   const personalAiContext = String(body.personalAiContext ?? "")

@@ -4,6 +4,7 @@ import { syncGmailPurchaseMails } from "@/lib/gmailPurchaseSync";
 import { syncNaverPurchaseMails } from "@/lib/naverPurchaseSync";
 import { getPurchaseMailBackfillSyncAfter } from "@/lib/purchaseMailSyncWindow";
 import type { PurchaseHistoryItem } from "@/types/purchaseHistory";
+import { verifyAiDataConsent } from "@/lib/serverAiDataConsent";
 
 type PurchaseHistoryRow = {
   id: string;
@@ -71,6 +72,10 @@ export async function POST(request: Request) {
         status: 401,
       }
     );
+  }
+
+  if (!(await verifyAiDataConsent(request))) {
+    return NextResponse.json({ error: "구매 메일 AI 분석 동의가 필요합니다." }, { status: 403 });
   }
 
   const { data: connections, error: connectionError } = await context.supabase

@@ -2,6 +2,7 @@ import Link from "next/link";
 import BottomNavigation from "@/components/BottomNavigation";
 import GemmaOnDeviceSettingsCard from "@/components/GemmaOnDeviceSettingsCard";
 import SettingsPageHeader from "@/components/SettingsPageHeader";
+import AiDataConsentSettingsCard from "@/components/AiDataConsentSettingsCard";
 
 export default function AiSettingsPage() {
   return (
@@ -11,6 +12,7 @@ export default function AiSettingsPage() {
         description="기기용 Gemma 모델과 내 피드백을 바탕으로 쌓인 개인화 기준을 관리합니다."
       />
       <div className="space-y-5">
+        <AiDataConsentSettingsCard />
         <GemmaOnDeviceSettingsCard />
         <Link
           href="/settings/personal-ai"

@@ -9,6 +9,7 @@ import {
 } from "@/lib/purchaseHistoryStorage";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { PurchaseHistoryItem } from "@/types/purchaseHistory";
+import { getAiRequestHeaders } from "@/lib/aiDataConsent";
 
 const AUTO_SYNC_STORAGE_KEY = "my-assistant-purchase-mail-auto-sync-at";
 const INITIAL_MAIL_IMPORT_PENDING_KEY =
@@ -86,10 +87,12 @@ export default function PurchaseMailAutoSyncBridge() {
       isSyncing = true;
 
       try {
+        const consentHeaders = await getAiRequestHeaders();
+        if (!consentHeaders) return;
         const response = await fetch("/api/purchase/mail/sync", {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${accessToken}`,
+            ...consentHeaders,
           },
         });
 
