@@ -19,23 +19,44 @@ const AUTH_TAG_LENGTH = 16;
 const SEPARATOR = ":";
 const PREFIX_V1 = "enc:v1:";
 
-function getEncryptionKey(): Buffer | null {
-  const keyHex = process.env.TOKEN_ENCRYPTION_KEY;
+function parseEncryptionKey(
+  keyHex: string | undefined,
+  variableName: "TOKEN_ENCRYPTION_KEY" | "TOKEN_ENCRYPTION_KEY_PREVIOUS"
+): Buffer | null {
 
   if (!keyHex) {
     return null;
   }
 
   if (keyHex.length !== 64 || !/^[0-9a-fA-F]{64}$/.test(keyHex)) {
-    throw new Error("TOKEN_ENCRYPTION_KEY의 길이가 올바르지 않거나 형식이 잘못되었습니다.");
+    throw new Error(`${variableName}의 길이가 올바르지 않거나 형식이 잘못되었습니다.`);
   }
 
   const key = Buffer.from(keyHex, "hex");
   if (key.length !== 32) {
-    throw new Error("TOKEN_ENCRYPTION_KEY의 바이트 길이가 올바르지 않습니다.");
+    throw new Error(`${variableName}의 바이트 길이가 올바르지 않습니다.`);
   }
 
   return key;
+}
+
+function getEncryptionKey(): Buffer | null {
+  return parseEncryptionKey(
+    process.env.TOKEN_ENCRYPTION_KEY,
+    "TOKEN_ENCRYPTION_KEY"
+  );
+}
+
+function getDecryptionKeys(): Buffer[] {
+  const currentKey = getEncryptionKey();
+  const previousKey = parseEncryptionKey(
+    process.env.TOKEN_ENCRYPTION_KEY_PREVIOUS,
+    "TOKEN_ENCRYPTION_KEY_PREVIOUS"
+  );
+
+  if (!currentKey) return previousKey ? [previousKey] : [];
+  if (!previousKey || currentKey.equals(previousKey)) return [currentKey];
+  return [currentKey, previousKey];
 }
 
 /**
@@ -68,6 +89,51 @@ export function isEncryptedToken(value: string): boolean {
 
 export function isCurrentEncryptedToken(value: string): boolean {
   return value.startsWith(PREFIX_V1);
+}
+
+function decryptWithKey(stored: string, key: Buffer): string {
+  const isV1 = stored.startsWith(PREFIX_V1);
+  const parts = isV1
+    ? stored.slice(PREFIX_V1.length).split(SEPARATOR)
+    : stored.split(SEPARATOR);
+  const [ivHex, authTagHex, ciphertextHex] = parts;
+
+  if (
+    parts.length !== 3 ||
+    ivHex.length !== IV_LENGTH * 2 ||
+    authTagHex.length !== AUTH_TAG_LENGTH * 2 ||
+    !/^[0-9a-fA-F]+$/.test(ciphertextHex)
+  ) {
+    throw new Error("손상된 암호화 토큰 형식입니다.");
+  }
+
+  const iv = Buffer.from(ivHex, "hex");
+  const authTag = Buffer.from(authTagHex, "hex");
+  const ciphertext = Buffer.from(ciphertextHex, "hex");
+  const decipher = createDecipheriv(ALGORITHM, key, iv, {
+    authTagLength: AUTH_TAG_LENGTH,
+  });
+  decipher.setAuthTag(authTag);
+
+  return Buffer.concat([
+    decipher.update(ciphertext),
+    decipher.final(),
+  ]).toString("utf8");
+}
+
+export function needsTokenReencryption(stored: string): boolean {
+  if (!stored || !isEncryptedToken(stored)) return true;
+  if (!isCurrentEncryptedToken(stored)) return true;
+
+  const currentKey = getEncryptionKey();
+  if (!currentKey) return true;
+
+  try {
+    decryptWithKey(stored, currentKey);
+    return false;
+  } catch {
+    return true;
+  }
 }
 
 /**
@@ -136,44 +202,24 @@ export function decryptToken(stored: string): string {
     return stored;
   }
 
-  const isV1 = stored.startsWith(PREFIX_V1);
-  const parts = isV1
-    ? stored.slice(PREFIX_V1.length).split(SEPARATOR)
-    : stored.split(SEPARATOR);
-
-  const key = getEncryptionKey();
-  if (!key) {
+  const keys = getDecryptionKeys();
+  if (keys.length === 0) {
     throw new Error("암호화된 토큰을 복호화하려면 올바른 TOKEN_ENCRYPTION_KEY가 필요합니다.");
   }
 
-  const [ivHex, authTagHex, ciphertextHex] = parts;
-  if (ivHex.length !== IV_LENGTH * 2 || authTagHex.length !== AUTH_TAG_LENGTH * 2) {
-    throw new Error("손상된 암호화 토큰 형식입니다.");
+  for (const key of keys) {
+    try {
+      return decryptWithKey(stored, key);
+    } catch {
+      // 키 회전 중에는 현재 키 실패 후 이전 키로 한 번 더 시도합니다.
+    }
   }
 
-  try {
-    const iv = Buffer.from(ivHex, "hex");
-    const authTag = Buffer.from(authTagHex, "hex");
-    const ciphertext = Buffer.from(ciphertextHex, "hex");
-
-    const decipher = createDecipheriv(ALGORITHM, key, iv, {
-      authTagLength: AUTH_TAG_LENGTH,
-    });
-    decipher.setAuthTag(authTag);
-
-    const decrypted = Buffer.concat([
-      decipher.update(ciphertext),
-      decipher.final(),
-    ]);
-
-    return decrypted.toString("utf8");
-  } catch (error) {
-    throw new Error("토큰 복호화에 실패했습니다. 키가 올바르지 않거나 데이터가 손상되었습니다.");
-  }
+  throw new Error("토큰 복호화에 실패했습니다. 키가 올바르지 않거나 데이터가 손상되었습니다.");
 }
 
 export function reencryptTokenToCurrentVersion(stored: string): string {
-  if (!stored || isCurrentEncryptedToken(stored)) {
+  if (!stored || !needsTokenReencryption(stored)) {
     return stored;
   }
 

@@ -6,7 +6,7 @@ import { importPurchaseMailText } from "@/lib/purchaseMailAi";
 import { getNextPurchaseMailSyncAfter } from "@/lib/purchaseMailSyncWindow";
 import {
   decryptToken,
-  isCurrentEncryptedToken,
+  needsTokenReencryption,
   reencryptTokenToCurrentVersion,
 } from "@/lib/tokenEncryption";
 import type { PurchaseHistoryItem } from "@/types/purchaseHistory";
@@ -292,8 +292,8 @@ export async function syncNaverPurchaseMails({
       appPassword,
     });
 
-    // 점진적 암호화: 성공적으로 연결되었고 기존 토큰이 v1 포맷이 아니라면 업데이트 시도
-    if (!isCurrentEncryptedToken(connection.refresh_token)) {
+    // 점진적 암호화: 평문·레거시 형식·이전 키 암호문을 현재 키로 업데이트합니다.
+    if (needsTokenReencryption(connection.refresh_token)) {
       try {
         const { error } = await supabase
           .from("purchase_mail_connections")

@@ -5,11 +5,13 @@ import {
   encryptToken,
   isCurrentEncryptedToken,
   isEncryptedToken,
+  needsTokenReencryption,
   reencryptTokenToCurrentVersion,
 } from "../src/lib/tokenEncryption.ts";
 
 const PLAINTEXT = "my-secret-token-12345";
-const KEY = "d68ec21c9996593b8df3c8c94f4d81aff69cd08b34b84420131d3c31229655cb";
+const KEY = randomBytes(32).toString("hex");
+const PREVIOUS_KEY = randomBytes(32).toString("hex");
 
 function createV0Token(plaintext = PLAINTEXT) {
   const key = Buffer.from(KEY, "hex");
@@ -29,6 +31,7 @@ function createV0Token(plaintext = PLAINTEXT) {
 async function withEnv(overrides, callback) {
   const original = {
     TOKEN_ENCRYPTION_KEY: process.env.TOKEN_ENCRYPTION_KEY,
+    TOKEN_ENCRYPTION_KEY_PREVIOUS: process.env.TOKEN_ENCRYPTION_KEY_PREVIOUS,
     ALLOW_PLAINTEXT_TOKENS: process.env.ALLOW_PLAINTEXT_TOKENS,
     NODE_ENV: process.env.NODE_ENV,
   };
@@ -38,7 +41,7 @@ async function withEnv(overrides, callback) {
       if (value === undefined) delete process.env[key];
       else process.env[key] = value;
     }
-    await callback();
+    return await callback();
   } finally {
     for (const [key, value] of Object.entries(original)) {
       if (value === undefined) delete process.env[key];
@@ -157,6 +160,40 @@ const tests = [
       assert.equal(reencryptTokenToCurrentVersion(encrypted), encrypted);
     }
   )],
+  ["이전 키로 암호화된 v1 토큰 회전", async () => {
+    const legacyEncrypted = await withEnv(
+      { TOKEN_ENCRYPTION_KEY: PREVIOUS_KEY },
+      () => encryptToken(PLAINTEXT)
+    );
+
+    await withEnv(
+      {
+        TOKEN_ENCRYPTION_KEY: KEY,
+        TOKEN_ENCRYPTION_KEY_PREVIOUS: PREVIOUS_KEY,
+      },
+      () => {
+        assert.equal(decryptToken(legacyEncrypted), PLAINTEXT);
+        assert.equal(needsTokenReencryption(legacyEncrypted), true);
+        const rotated = reencryptTokenToCurrentVersion(legacyEncrypted);
+        assert.equal(decryptToken(rotated), PLAINTEXT);
+        assert.equal(needsTokenReencryption(rotated), false);
+      }
+    );
+  }],
+  ["이전 키가 없으면 과거 암호문 거부", async () => {
+    const legacyEncrypted = await withEnv(
+      { TOKEN_ENCRYPTION_KEY: PREVIOUS_KEY },
+      () => encryptToken(PLAINTEXT)
+    );
+
+    await withEnv(
+      {
+        TOKEN_ENCRYPTION_KEY: KEY,
+        TOKEN_ENCRYPTION_KEY_PREVIOUS: undefined,
+      },
+      () => assert.throws(() => decryptToken(legacyEncrypted))
+    );
+  }],
 ];
 
 let passed = 0;

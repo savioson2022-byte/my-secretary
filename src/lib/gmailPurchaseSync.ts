@@ -5,7 +5,7 @@ import { getNextPurchaseMailSyncAfter } from "@/lib/purchaseMailSyncWindow";
 import {
   decryptToken,
   encryptToken,
-  isCurrentEncryptedToken,
+  needsTokenReencryption,
   reencryptTokenToCurrentVersion,
 } from "@/lib/tokenEncryption";
 import type { PurchaseHistoryItem } from "@/types/purchaseHistory";
@@ -159,7 +159,7 @@ async function getFreshAccessToken({
 
   if (
     connection.refresh_token &&
-    !isCurrentEncryptedToken(connection.refresh_token)
+    needsTokenReencryption(connection.refresh_token)
   ) {
     try {
       updatePayload.refresh_token = reencryptTokenToCurrentVersion(
