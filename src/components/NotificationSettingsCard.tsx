@@ -9,6 +9,11 @@ import {
 } from "@/lib/notificationSettingsStorage";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import type { NotificationSettings } from "@/types/notification";
+import {
+  getNativeSystemAlarmStatus,
+  requestNativeSystemAlarmPermission,
+  scheduleNativeSystemAlarm,
+} from "@/lib/nativeSystemAlarm";
 import TravelModeLearningCard from "@/components/TravelModeLearningCard";
 
 const TOGGLE_OPTIONS: Array<{
@@ -356,6 +361,12 @@ export default function NotificationSettingsCard() {
 
       const now = Date.now();
       const originalEventId = `persistent-test-${now}`;
+      const alarmKitStatus = await requestNativeSystemAlarmPermission();
+      const systemAlarmScheduled = await scheduleNativeSystemAlarm({
+        groupId: originalEventId,
+        title: "나의 비서 지속 알람 테스트",
+        fireAt: new Date(now + 8_000),
+      });
 
       await LocalNotifications.schedule({
         notifications: [
@@ -391,11 +402,35 @@ export default function NotificationSettingsCard() {
         );
       }, 5000);
       setMessage(
-        "5초 뒤 알림 1개와 전체 화면 지속 알람 테스트를 함께 예약했어."
+        systemAlarmScheduled
+          ? "5초 뒤 앱 알림, 8초 뒤 iOS 시스템 알람을 예약했어. 화면을 잠그고도 확인해봐."
+          : `5초 뒤 앱 알림과 전체 화면 알람을 예약했어. 시스템 알람은 ${
+              alarmKitStatus.available
+                ? "권한을 허용해야 사용할 수 있어"
+                : "iOS 26 이상에서 추가로 사용할 수 있어"
+            }.`
       );
     } catch {
       setMessage("지속 알람 테스트 예약에 실패했어.");
     }
+  }
+
+  async function checkStrongAlarmStatus() {
+    const status = await getNativeSystemAlarmStatus();
+    if (!status.available) {
+      setMessage("이 기기는 iOS 시스템 알람을 지원하지 않아. 기존 반복 푸시와 앱 알람으로 동작해.");
+      return;
+    }
+    if (status.authorizationState === "authorized") {
+      setMessage("iOS 시스템 알람 권한이 켜져 있어. 잠금 화면에서도 강한 알람을 사용할 수 있어.");
+      return;
+    }
+    const requested = await requestNativeSystemAlarmPermission();
+    setMessage(
+      requested.authorizationState === "authorized"
+        ? "iOS 시스템 알람 권한을 켰어."
+        : "설정 앱에서 나의 비서의 알람 권한을 허용해줘."
+    );
   }
 
   async function sendServerPushTest() {
@@ -543,8 +578,9 @@ export default function NotificationSettingsCard() {
             <h3 className="mt-1 text-base font-black">움직여야 할 때 반복해서 울리기</h3>
             <p className="mt-2 text-xs font-bold leading-5 text-slate-300">
               푸시는 상기용, 지속 알람은 준비와 이동처럼 바로 행동해야 하는
-              순간에 사용합니다. 확인 전까지 설정한 간격과 횟수로 푸시를
+              순간에 사용합니다. 확인 전까지 0·1·3·5분처럼 점진적으로
               반복하고, 앱이 열리면 버튼을 누를 때까지 소리와 진동을 반복합니다.
+              iOS 26 이상에서는 잠금 화면 시스템 알람도 함께 사용합니다.
             </p>
           </div>
           <input
@@ -618,7 +654,7 @@ export default function NotificationSettingsCard() {
         </div>
       </div>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+      <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <label className="text-xs font-black text-slate-500">
           준비 시작
           <input
@@ -715,6 +751,13 @@ export default function NotificationSettingsCard() {
           className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white"
         >
           서버 푸시 테스트
+        </button>
+        <button
+          type="button"
+          onClick={checkStrongAlarmStatus}
+          className="rounded-2xl bg-amber-500 px-4 py-3 text-sm font-black text-slate-950"
+        >
+          강한 알람 권한 확인
         </button>
       </div>
 

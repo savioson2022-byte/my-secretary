@@ -9,6 +9,11 @@ import { getRoutineSchedules } from "@/lib/routineStorage";
 import { getSingleSchedules } from "@/lib/singleScheduleStorage";
 import { getItems } from "@/lib/storage";
 import { getUserProfile } from "@/lib/userProfileStorage";
+import {
+  cancelNativeSystemAlarm,
+  scheduleNativeSystemAlarm,
+} from "@/lib/nativeSystemAlarm";
+import { getPersistentAlarmOffsets } from "@/lib/persistentAlarmSchedule";
 import type { NotificationEvent } from "@/types/notification";
 import { DayOfWeek, RoutineSchedule } from "@/types/routine";
 
@@ -16,6 +21,7 @@ const REMINDER_OFFSETS = [10, 0];
 const NOTIFIED_KEY = "my-assistant-notified-reminders";
 const DIGEST_NOTIFIED_KEY = "my-assistant-notified-unresolved-digests";
 const NATIVE_SCHEDULED_KEY = "my-assistant-native-notification-event-ids";
+const SYSTEM_ALARM_GROUPS_KEY = "my-assistant-system-alarm-group-ids";
 const PERSISTENT_ALARM_MUTED_KEY = "my-assistant-persistent-alarm-muted-event-ids";
 const PERSISTENT_ALARM_ACTION_TYPE_ID = "persistent-alarm-actions";
 const ALARM_MODE_EVENT = "my-assistant-open-alarm-mode";
@@ -553,17 +559,18 @@ function buildPersistentAlarmNotifications({
     return [];
   }
 
-  const repeatCount = Math.max(1, settings.persistentAlarmRepeatCount);
-  const intervalMs =
-    Math.max(1, settings.persistentAlarmIntervalMinutes) * 60 * 1000;
+  const offsets = getPersistentAlarmOffsets(
+    settings.persistentAlarmRepeatCount,
+    settings.persistentAlarmIntervalMinutes
+  );
 
-  return Array.from({ length: repeatCount }, (_, index) => ({
+  return offsets.map((offsetMinutes, index) => ({
     id: getNumericNotificationId(`${event.id}:persistent:${index}`),
     title: getPersistentAlarmTitle(event, index),
     body: event.body,
     sound: "default",
     schedule: {
-      at: new Date(startsAt.getTime() + intervalMs * index),
+      at: new Date(startsAt.getTime() + offsetMinutes * 60 * 1000),
     },
     actionTypeId: PERSISTENT_ALARM_ACTION_TYPE_ID,
     extra: {
@@ -585,6 +592,7 @@ function buildPersistentAlarmNotifications({
 }
 
 async function cancelPersistentAlarmGroup(originalEventId: string) {
+  void cancelNativeSystemAlarm(originalEventId);
   try {
     const { LocalNotifications } = await import(
       "@capacitor/local-notifications"
@@ -599,6 +607,29 @@ async function cancelPersistentAlarmGroup(originalEventId: string) {
     });
   } catch {
     // 웹에서는 Capacitor 로컬 알림을 사용할 수 없습니다.
+  }
+}
+
+async function recordPersistentAlarmAction(
+  groupId: string,
+  action: "confirmed" | "snoozed" | "muted_today",
+  snoozeMinutes?: number
+) {
+  try {
+    const supabase = createSupabaseBrowserClient();
+    const session = await supabase?.auth.getSession();
+    const accessToken = session?.data.session?.access_token;
+    if (!accessToken) return;
+    await fetch("/api/notifications/acknowledge", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ groupId, action, snoozeMinutes }),
+    });
+  } catch {
+    // 오프라인이어도 현재 기기의 알람 동작은 계속 처리합니다.
   }
 }
 
@@ -694,6 +725,12 @@ async function registerPersistentAlarmActions() {
 
         if (actionId === "snooze") {
           await snoozePersistentAlarm(notification);
+          await recordPersistentAlarmAction(originalEventId, "snoozed", 5);
+          return;
+        }
+
+        if (actionId === "tap") {
+          openAlarmModeFromNotification(notification);
           return;
         }
 
@@ -704,10 +741,11 @@ async function registerPersistentAlarmActions() {
         }
 
         await cancelPersistentAlarmGroup(originalEventId);
+        await recordPersistentAlarmAction(
+          originalEventId,
+          actionId === "mute_today" ? "muted_today" : "confirmed"
+        );
 
-        if (actionId === "confirm" || actionId === "tap") {
-          openAlarmModeFromNotification(notification);
-        }
       }
     );
   } catch {
@@ -737,16 +775,21 @@ async function scheduleNativeNotifications(events: NotificationEvent[]) {
     }
 
     const previousIds = getStoredNativeNotificationIds();
+    const previousSystemAlarmGroups = JSON.parse(
+      localStorage.getItem(SYSTEM_ALARM_GROUPS_KEY) ?? "[]"
+    ) as string[];
 
     if (previousIds.length > 0) {
       await LocalNotifications.cancel({
         notifications: previousIds.map((id) => ({ id })),
       });
     }
+    await Promise.all(previousSystemAlarmGroups.map(cancelNativeSystemAlarm));
 
     const now = Date.now();
     const mutedIds = getMutedPersistentAlarmIds();
     const notifications = [];
+    const systemAlarmGroups: string[] = [];
 
     for (const event of events) {
       if (notifications.length >= MAX_LOCAL_NOTIFICATIONS) break;
@@ -774,6 +817,15 @@ async function scheduleNativeNotifications(events: NotificationEvent[]) {
             MAX_LOCAL_NOTIFICATIONS - notifications.length
           )
         );
+        if (
+          await scheduleNativeSystemAlarm({
+            groupId,
+            title: event.title,
+            fireAt: scheduledAt,
+          })
+        ) {
+          systemAlarmGroups.push(groupId);
+        }
         continue;
       }
 
@@ -793,10 +845,15 @@ async function scheduleNativeNotifications(events: NotificationEvent[]) {
 
     if (notifications.length === 0) {
       saveStoredNativeNotificationIds([]);
+      localStorage.setItem(SYSTEM_ALARM_GROUPS_KEY, "[]");
       return;
     }
 
     await LocalNotifications.schedule({ notifications });
+    localStorage.setItem(
+      SYSTEM_ALARM_GROUPS_KEY,
+      JSON.stringify(systemAlarmGroups.slice(0, MAX_LOCAL_NOTIFICATIONS))
+    );
     saveStoredNativeNotificationIds(
       notifications.map((notification) => notification.id)
     );

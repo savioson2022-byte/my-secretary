@@ -7,6 +7,7 @@ import {
 } from "@/lib/nativeAlarmPulse";
 import { getNotificationSettings } from "@/lib/notificationSettingsStorage";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
+import { cancelNativeSystemAlarm } from "@/lib/nativeSystemAlarm";
 
 const ALARM_MODE_EVENT = "my-assistant-open-alarm-mode";
 const PERSISTENT_ALARM_MUTED_KEY = "my-assistant-persistent-alarm-muted-event-ids";
@@ -76,6 +77,7 @@ function getNumericNotificationId(id: string) {
 
 async function cancelAlarmNotifications(originalEventId?: string) {
   if (!originalEventId) return;
+  void cancelNativeSystemAlarm(originalEventId);
 
   try {
     const { Capacitor } = await import("@capacitor/core");
