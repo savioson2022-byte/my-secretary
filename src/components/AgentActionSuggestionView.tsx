@@ -31,6 +31,7 @@ type AgentActionSuggestionViewProps = {
   items: AssistantItem[];
   compact?: boolean;
   maxItems?: number;
+  includeReservations?: boolean;
 };
 
 type PurchaseAssistantDraft = {
@@ -115,6 +116,7 @@ export default function AgentActionSuggestionView({
   items,
   compact = false,
   maxItems,
+  includeReservations = true,
 }: AgentActionSuggestionViewProps) {
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [draft, setDraft] = useState({
@@ -139,7 +141,8 @@ export default function AgentActionSuggestionView({
       item.status === "미완료" &&
       (item.processType === "에이전트위임" ||
         item.actionType === "구매" ||
-        item.actionType === "예약")
+        item.actionType === "예약") &&
+      (includeReservations || item.actionType !== "예약")
     );
   });
   const dueRepurchaseHistories = getDueRepurchaseHistories(

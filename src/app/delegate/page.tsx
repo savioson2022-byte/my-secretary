@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import AgentActionSuggestionView from "@/components/AgentActionSuggestionView";
 import BottomNavigation from "@/components/BottomNavigation";
 import UserStatusBadge from "@/components/UserStatusBadge";
 import PageHelpButton from "@/components/PageHelpButton";
+import ReservationAssistant from "@/components/ReservationAssistant";
 import { getCloudDataSyncedEventName } from "@/lib/dataSyncEvents";
+import { getLocalDataUpdatedEventName } from "@/lib/localStorageRepository";
 import { getItems } from "@/lib/storage";
 import type { AssistantItem } from "@/types/assistant";
 
@@ -20,23 +22,13 @@ export default function DelegatePage() {
 
     refreshItems();
     window.addEventListener(getCloudDataSyncedEventName(), refreshItems);
+    window.addEventListener(getLocalDataUpdatedEventName(), refreshItems);
 
     return () => {
       window.removeEventListener(getCloudDataSyncedEventName(), refreshItems);
+      window.removeEventListener(getLocalDataUpdatedEventName(), refreshItems);
     };
   }, []);
-
-  const delegateCount = useMemo(
-    () =>
-      items.filter(
-        (item) =>
-          item.processType === "즉시처리" ||
-          item.processType === "에이전트위임" ||
-          item.actionType === "구매" ||
-          item.actionType === "예약"
-      ).length,
-    [items]
-  );
 
   return (
     <main className="app-page mx-auto max-w-3xl px-4">
@@ -60,8 +52,8 @@ export default function DelegatePage() {
 
       <section className="mb-5 grid gap-3 sm:grid-cols-2">
         {[
-          ["확인할 일", `${delegateCount}개`, "오늘 바로 결정할 위임 요청"],
-          ["구매 준비", "메일 기반", "이미 산 적 있는 상품 재구매"],
+          ["구매 준비", "재구매", "메일에서 찾은 상품을 다시 구매"],
+          ["예약 준비", `${items.filter((item) => item.status === "미완료" && item.actionType === "예약").length}개`, "장소 검색부터 캘린더 저장까지"],
         ].map(([title, value, body]) => (
           <div
             key={title}
@@ -92,7 +84,9 @@ export default function DelegatePage() {
         </Link>
       </section>
 
-      <AgentActionSuggestionView items={items} />
+      <ReservationAssistant items={items} />
+
+      <div className="mt-5"><AgentActionSuggestionView items={items} includeReservations={false} /></div>
 
       <BottomNavigation />
     </main>
