@@ -1,13 +1,18 @@
 import { Capacitor, registerPlugin } from "@capacitor/core";
 
-type AlarmKitStatus = {
+export type NativeSystemAlarmStatus = {
   available: boolean;
   authorizationState: "notDetermined" | "denied" | "authorized" | "unavailable";
+  systemAlarmAvailable?: boolean;
+  fallbackAvailable?: boolean;
+  mode?: "alarmKit" | "timeSensitive" | "standard" | "unavailable";
+  osVersion?: string;
+  reason?: "notNativeIos" | "appUpdateRequired" | "bridgeError";
 };
 
 type AlarmKitPlugin = {
-  getStatus(): Promise<AlarmKitStatus>;
-  requestAuthorization(): Promise<AlarmKitStatus>;
+  getStatus(): Promise<NativeSystemAlarmStatus>;
+  requestAuthorization(): Promise<NativeSystemAlarmStatus>;
   schedule(options: {
     id: string;
     title: string;
@@ -19,15 +24,19 @@ type AlarmKitPlugin = {
 
 const AlarmKit = registerPlugin<AlarmKitPlugin>("AlarmKit");
 
-export async function getNativeSystemAlarmStatus(): Promise<AlarmKitStatus> {
+export async function getNativeSystemAlarmStatus(): Promise<NativeSystemAlarmStatus> {
   if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== "ios") {
-    return { available: false, authorizationState: "unavailable" };
+    return { available: false, authorizationState: "unavailable", mode: "unavailable", reason: "notNativeIos" };
+  }
+
+  if (!Capacitor.isPluginAvailable("AlarmKit")) {
+    return { available: false, authorizationState: "unavailable", mode: "unavailable", reason: "appUpdateRequired" };
   }
 
   try {
     return await AlarmKit.getStatus();
   } catch {
-    return { available: false, authorizationState: "unavailable" };
+    return { available: false, authorizationState: "unavailable", mode: "unavailable", reason: "bridgeError" };
   }
 }
 
@@ -35,7 +44,7 @@ export async function requestNativeSystemAlarmPermission() {
   try {
     return await AlarmKit.requestAuthorization();
   } catch {
-    return { available: false, authorizationState: "unavailable" as const };
+    return { available: false, authorizationState: "unavailable" as const, mode: "unavailable" as const };
   }
 }
 

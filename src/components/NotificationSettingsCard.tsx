@@ -403,7 +403,9 @@ export default function NotificationSettingsCard() {
       }, 5000);
       setMessage(
         systemAlarmScheduled
-          ? "5초 뒤 앱 알림, 8초 뒤 iOS 시스템 알람을 예약했어. 화면을 잠그고도 확인해봐."
+          ? alarmKitStatus.mode === "alarmKit"
+            ? "5초 뒤 앱 알림, 8초 뒤 iOS 시스템 알람을 예약했어. 화면을 잠그고도 확인해봐."
+            : "5초 뒤 앱 알림, 8초 뒤 시간 민감 알림을 예약했어. 이후 반복 알림과 앱의 지속 소리·진동이 이어져."
           : `5초 뒤 앱 알림과 전체 화면 알람을 예약했어. 시스템 알람은 ${
               alarmKitStatus.available
                 ? "권한을 허용해야 사용할 수 있어"
@@ -418,17 +420,29 @@ export default function NotificationSettingsCard() {
   async function checkStrongAlarmStatus() {
     const status = await getNativeSystemAlarmStatus();
     if (!status.available) {
-      setMessage("이 기기는 iOS 시스템 알람을 지원하지 않아. 기존 반복 푸시와 앱 알람으로 동작해.");
+      setMessage(
+        status.reason === "appUpdateRequired"
+          ? "기기는 강한 알람을 지원하지만 설치된 나의 비서가 이전 버전이야. 최신 앱으로 업데이트하면 AlarmKit 권한을 켤 수 있어."
+          : status.reason === "bridgeError"
+            ? "강한 알람 연결을 확인하지 못했어. 앱을 완전히 종료해 다시 열고, 계속되면 최신 앱으로 업데이트해줘."
+            : "강한 알람 권한은 설치된 iPhone 앱에서 확인할 수 있어. Safari나 PWA에서는 반복 푸시 방식으로 동작해."
+      );
       return;
     }
     if (status.authorizationState === "authorized") {
-      setMessage("iOS 시스템 알람 권한이 켜져 있어. 잠금 화면에서도 강한 알람을 사용할 수 있어.");
+      setMessage(
+        status.mode === "alarmKit"
+          ? `iOS ${status.osVersion ?? "26 이상"} 시스템 알람 권한이 켜져 있어. 무음·집중 모드에서도 강한 알람을 사용할 수 있어.`
+          : `iOS ${status.osVersion ?? "현재 버전"}에서 시간 민감 알림과 반복 알림을 사용하도록 설정했어. 앱을 열면 확인할 때까지 소리와 진동도 반복돼.`
+      );
       return;
     }
     const requested = await requestNativeSystemAlarmPermission();
     setMessage(
       requested.authorizationState === "authorized"
-        ? "iOS 시스템 알람 권한을 켰어."
+        ? requested.mode === "alarmKit"
+          ? "iOS 시스템 알람 권한을 켰어."
+          : "이 기기에서 사용할 수 있는 시간 민감 알림과 반복 알림 권한을 켰어."
         : "설정 앱에서 나의 비서의 알람 권한을 허용해줘."
     );
   }

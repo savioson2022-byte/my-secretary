@@ -811,19 +811,18 @@ async function scheduleNativeNotifications(events: NotificationEvent[]) {
           settings,
         });
 
-        notifications.push(
-          ...alarmNotifications.slice(
-            0,
-            MAX_LOCAL_NOTIFICATIONS - notifications.length
-          )
-        );
-        if (
-          await scheduleNativeSystemAlarm({
+        const nativeStrongAlarmScheduled = await scheduleNativeSystemAlarm({
             groupId,
             title: event.title,
             fireAt: scheduledAt,
-          })
-        ) {
+          });
+        notifications.push(
+          ...alarmNotifications.slice(
+            nativeStrongAlarmScheduled ? 1 : 0,
+            MAX_LOCAL_NOTIFICATIONS - notifications.length
+          )
+        );
+        if (nativeStrongAlarmScheduled) {
           systemAlarmGroups.push(groupId);
         }
         continue;

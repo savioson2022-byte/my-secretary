@@ -50,7 +50,7 @@ export const PAGE_HELP_CONTENT: Record<HelpTopic, HelpContent> = {
   settings: { title: "설정", summary: "계정, 알림, 장소, AI와 빠른 입력 방식을 내 생활에 맞게 조정합니다.", sections: [{ title: "처음이라면", body: "먼저 알림 권한과 장소를 설정하고, 개인 AI 화면에서 분류 방식을 확인하는 것을 권장합니다." }] },
   account: { title: "계정 설정", summary: "로그인 정보와 동기화 상태를 관리합니다.", sections: [{ title: "동기화", body: "로그인하면 여러 기기에서 일정과 설정을 이어서 사용할 수 있습니다." }] },
   ai: { title: "AI 설정", summary: "입력 분류와 추천에 사용할 AI 및 데이터 동의 상태를 관리합니다.", sections: [{ title: "분류 학습", body: "처음에는 기본 AI가 분류를 돕고, 사용자가 수정한 결과가 쌓이면 개인 AI가 그 패턴을 참고합니다." }] },
-  notifications: { title: "알림 설정", summary: "푸시, 소리, 사전 알림과 지속 알람 동작을 설정합니다.", sections: [{ title: "강한 알람", body: "기기 알림 권한과 소리를 허용해야 합니다. iPhone 집중 모드·무음·시스템 정책에 따라 소리가 제한될 수 있으니 테스트 알림으로 확인하세요." }] },
+  notifications: { title: "알림 설정", summary: "푸시, 소리, 사전 알림과 지속 알람 동작을 설정합니다.", sections: [{ title: "강한 알람", body: "iOS 26 이상은 시스템 AlarmKit을 사용합니다. 이전 iOS는 시간 민감 알림과 1분 간격 반복 알림을 사용하고, 앱을 열면 확인할 때까지 소리와 진동을 반복합니다. 기기 알림 권한과 시간 민감 알림을 허용해주세요." }] },
   "personal-ai": { title: "개인 AI", summary: "내가 수정한 분류와 생활 패턴을 바탕으로 점점 개인화되는 기능입니다.", sections: [{ title: "정확도를 높이는 법", body: "틀린 분류, 장소, 이동 방식을 승인 전에 바로잡아 주세요. 수정 결과가 다음 제안의 기준이 됩니다." }] },
   shortcuts: { title: "빠른 입력", summary: "iPhone 단축어, 동작 버튼 또는 뒷면 탭으로 음성 기록을 빠르게 시작합니다.", sections: [{ title: "설정 방법", body: "화면에 표시된 앱 주소를 단축어로 열도록 등록한 뒤, 원하는 버튼이나 뒷면 탭 동작에 연결하세요." }] },
 };
