@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import AlarmModeOverlay from "@/components/AlarmModeOverlay";
+import FirstSignupTimeTaskGuide from "@/components/FirstSignupTimeTaskGuide";
 import AiDataConsentGate from "@/components/AiDataConsentGate";
 import CloudDataSyncBridge from "@/components/CloudDataSyncBridge";
 import PurchaseMailAutoSyncBridge from "@/components/PurchaseMailAutoSyncBridge";
@@ -64,6 +65,7 @@ export default function RootLayout({
       <body>
         {children}
         <AiDataConsentGate />
+        <FirstSignupTimeTaskGuide />
         <CloudDataSyncBridge />
         <PurchaseMailAutoSyncBridge />
         <SmartReminderAgent />

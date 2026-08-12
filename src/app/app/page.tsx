@@ -1,6 +1,7 @@
 import BottomNavigation from "@/components/BottomNavigation";
 import UserStatusBadge from "@/components/UserStatusBadge";
 import Link from "next/link";
+import PageHelpButton from "@/components/PageHelpButton";
 
 const QUICK_ACTIONS = [
   {
@@ -43,7 +44,7 @@ export default function AppInstallPage() {
           </p>
         </div>
         <div className="self-start sm:self-auto">
-          <UserStatusBadge />
+          <div className="flex items-center gap-2"><PageHelpButton topic="shortcuts" /><UserStatusBadge /></div>
         </div>
       </header>
 

@@ -8,6 +8,7 @@ export default function AiSettingsPage() {
   return (
     <main className="app-page mx-auto max-w-3xl px-4">
       <SettingsPageHeader
+        helpTopic="ai"
         title="개인 AI"
         description="기기용 Gemma 모델과 내 피드백을 바탕으로 쌓인 개인화 기준을 관리합니다."
       />

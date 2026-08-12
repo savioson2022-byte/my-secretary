@@ -5,6 +5,7 @@ import BottomNavigation from "@/components/BottomNavigation";
 import CalendarNavigation from "@/components/CalendarNavigation";
 import RoutineScheduleManager from "@/components/RoutineScheduleManager";
 import UserStatusBadge from "@/components/UserStatusBadge";
+import PageHelpButton from "@/components/PageHelpButton";
 import { getCloudDataSyncedEventName } from "@/lib/dataSyncEvents";
 import { getItems } from "@/lib/storage";
 import { AssistantItem } from "@/types/assistant";
@@ -42,7 +43,7 @@ export default function WeeklyCalendarPage() {
               확인합니다. 자세한 입력과 편집은 일정관리 화면에서 합니다.
             </p>
           </div>
-          <UserStatusBadge />
+          <div className="flex items-center gap-2"><PageHelpButton topic="weekly" /><UserStatusBadge /></div>
         </header>
 
       <CalendarNavigation />

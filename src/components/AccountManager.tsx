@@ -472,6 +472,7 @@ export default function AccountManager() {
         data: {
           login_id: nextLoginId,
           display_name: nextName || nextLoginId,
+          time_task_guide_pending: true,
         },
       },
     });

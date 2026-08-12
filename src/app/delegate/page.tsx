@@ -5,6 +5,7 @@ import Link from "next/link";
 import AgentActionSuggestionView from "@/components/AgentActionSuggestionView";
 import BottomNavigation from "@/components/BottomNavigation";
 import UserStatusBadge from "@/components/UserStatusBadge";
+import PageHelpButton from "@/components/PageHelpButton";
 import { getCloudDataSyncedEventName } from "@/lib/dataSyncEvents";
 import { getItems } from "@/lib/storage";
 import type { AssistantItem } from "@/types/assistant";
@@ -54,7 +55,7 @@ export default function DelegatePage() {
             위임한 일만 자세히 보여줍니다.
           </p>
         </div>
-        <UserStatusBadge />
+        <div className="flex items-center gap-2"><PageHelpButton topic="delegate" /><UserStatusBadge /></div>
       </header>
 
       <section className="mb-5 grid gap-3 sm:grid-cols-2">

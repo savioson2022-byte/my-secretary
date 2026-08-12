@@ -1,16 +1,20 @@
 import Link from "next/link";
 import UserStatusBadge from "@/components/UserStatusBadge";
+import PageHelpButton from "@/components/PageHelpButton";
+import type { HelpTopic } from "@/lib/pageHelpContent";
 
 export default function SettingsPageHeader({
   title,
   description,
   backHref = "/settings",
   backLabel = "설정",
+  helpTopic,
 }: {
   title: string;
   description: string;
   backHref?: string;
   backLabel?: string;
+  helpTopic: HelpTopic;
 }) {
   return (
     <header className="mb-5">
@@ -34,7 +38,7 @@ export default function SettingsPageHeader({
           </svg>
           <span>{backLabel}</span>
         </Link>
-        <UserStatusBadge />
+        <div className="flex items-center gap-2"><PageHelpButton topic={helpTopic} /><UserStatusBadge /></div>
       </div>
       <div className="min-w-0">
         <h1 className="text-3xl font-black text-slate-950">{title}</h1>

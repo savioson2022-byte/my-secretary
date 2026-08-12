@@ -1,6 +1,7 @@
 import BottomNavigation from "@/components/BottomNavigation";
 import PurchaseHistoryManager from "@/components/PurchaseHistoryManager";
 import UserStatusBadge from "@/components/UserStatusBadge";
+import PageHelpButton from "@/components/PageHelpButton";
 
 export default function PurchasePage() {
   return (
@@ -16,7 +17,7 @@ export default function PurchasePage() {
             확인한 뒤 쿠팡 결제 직전까지 빠르게 이동합니다.
           </p>
         </div>
-        <UserStatusBadge />
+        <div className="flex items-center gap-2"><PageHelpButton topic="purchase" /><UserStatusBadge /></div>
       </header>
 
       <PurchaseHistoryManager />

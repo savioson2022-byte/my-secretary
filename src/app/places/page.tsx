@@ -1,6 +1,7 @@
 import BottomNavigation from "@/components/BottomNavigation";
 import SavedPlaceManager from "@/components/SavedPlaceManager";
 import UserStatusBadge from "@/components/UserStatusBadge";
+import PageHelpButton from "@/components/PageHelpButton";
 
 export default function PlacesPage() {
   return (
@@ -16,7 +17,7 @@ export default function PlacesPage() {
             작동하도록 만듭니다.
           </p>
         </div>
-        <UserStatusBadge />
+        <div className="flex items-center gap-2"><PageHelpButton topic="places" /><UserStatusBadge /></div>
       </header>
 
       <SavedPlaceManager />

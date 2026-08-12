@@ -7,6 +7,7 @@ export default function AccountSettingsPage() {
   return (
     <main className="app-page mx-auto max-w-3xl px-4">
       <SettingsPageHeader
+        helpTopic="account"
         title="계정과 동기화"
         description="로그인한 계정과 아이폰·맥북의 데이터 동기화 상태를 관리합니다."
       />

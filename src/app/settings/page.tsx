@@ -1,6 +1,7 @@
 import Link from "next/link";
 import BottomNavigation from "@/components/BottomNavigation";
 import UserStatusBadge from "@/components/UserStatusBadge";
+import PageHelpButton from "@/components/PageHelpButton";
 
 const SETTINGS_GROUPS = [
   {
@@ -61,7 +62,7 @@ export default function SettingsPage() {
             바꾸려는 항목을 선택하면 세부 설정을 확인할 수 있습니다.
           </p>
         </div>
-        <UserStatusBadge />
+        <div className="flex items-center gap-2"><PageHelpButton topic="settings" /><UserStatusBadge /></div>
       </header>
 
       <div className="space-y-7">

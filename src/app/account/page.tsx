@@ -3,6 +3,7 @@ import BottomNavigation from "@/components/BottomNavigation";
 import LocalDataTransfer from "@/components/LocalDataTransfer";
 import SavedPlaceManager from "@/components/SavedPlaceManager";
 import UserStatusBadge from "@/components/UserStatusBadge";
+import PageHelpButton from "@/components/PageHelpButton";
 
 export default function AccountPage() {
   return (
@@ -17,7 +18,7 @@ export default function AccountPage() {
             같은 사용자로 인식할 기기를 연결하고, AI 분류 기준을 관리합니다.
           </p>
         </div>
-        <UserStatusBadge />
+        <div className="flex items-center gap-2"><PageHelpButton topic="account" /><UserStatusBadge /></div>
       </header>
 
       <div className="space-y-5">
