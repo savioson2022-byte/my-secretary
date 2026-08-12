@@ -16,6 +16,7 @@ import { classifyInput } from "@/lib/classifyInput";
 import { buildClassificationContext } from "@/lib/classificationContext";
 import {
   clearCaptureDraft,
+  deleteCaptureReview,
   getCaptureDraft,
   getCaptureReviews,
   saveCaptureReview,
@@ -158,6 +159,7 @@ export default function Home() {
   const [captureReviews, setCaptureReviews] = useState<CaptureReview[]>([]);
   const [captureReviewTab, setCaptureReviewTab] = useState<"pending" | "approved">("pending");
   const [activeCaptureReviewId, setActiveCaptureReviewId] = useState<string | null>(null);
+  const [captureReviewDeleteConfirmId, setCaptureReviewDeleteConfirmId] = useState<string | null>(null);
 
   useEffect(() => {
     function refreshLocalData() {
@@ -404,6 +406,30 @@ export default function Home() {
     setClassificationSource(review.classificationSource);
     setClassificationGemmaCandidate(review.gemmaCandidate);
     setSaveMessage(null);
+  }
+
+  function handleDeleteCaptureReview(review: CaptureReview) {
+    if (captureReviewDeleteConfirmId !== review.id) {
+      setCaptureReviewDeleteConfirmId(review.id);
+      return;
+    }
+
+    deleteCaptureReview(review.id);
+    setCaptureReviewDeleteConfirmId(null);
+    setCaptureReviews(getCaptureReviews());
+
+    if (activeCaptureReviewId === review.id) {
+      setActiveCaptureReviewId(null);
+      setClassificationResult(null);
+      setClassificationSource(null);
+      setClassificationGemmaCandidate(null);
+    }
+
+    setSaveMessage(
+      review.status === "approved"
+        ? "검토 기록을 삭제했어요. 이미 저장된 일정이나 작업은 그대로 유지됩니다."
+        : "승인 전 음성 기록을 삭제했어요."
+    );
   }
 
   function handleInputTextChange(nextText: string) {
@@ -879,16 +905,29 @@ export default function Home() {
                                 : review.status === "classifying" ? "AI가 분류하는 중..." : review.errorMessage}
                             </p>
                           </div>
-                          {review.status === "pending" && (
-                            <button type="button" onClick={() => openCaptureReview(review)}
-                              className="shrink-0 rounded-full bg-blue-600 px-3 py-2 text-xs font-black text-white">
-                              수정·승인
+                          <div className="flex shrink-0 flex-col items-end gap-2">
+                            {review.status === "pending" && (
+                              <button type="button" onClick={() => openCaptureReview(review)}
+                                className="rounded-full bg-blue-600 px-3 py-2 text-xs font-black text-white">
+                                수정·승인
+                              </button>
+                            )}
+                            {review.status === "approved" && (
+                              <span className="rounded-full bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-700">승인됨</span>
+                            )}
+                            <button type="button" onClick={() => handleDeleteCaptureReview(review)}
+                              aria-label={`${review.classification?.title || review.originalText} 검토 기록 삭제`}
+                              className={`rounded-full px-3 py-2 text-xs font-black ring-1 ${captureReviewDeleteConfirmId === review.id ? "bg-rose-600 text-white ring-rose-600" : "bg-white text-rose-600 ring-rose-200"}`}>
+                              {captureReviewDeleteConfirmId === review.id ? "정말 삭제" : "삭제"}
                             </button>
-                          )}
-                          {review.status === "approved" && (
-                            <span className="shrink-0 rounded-full bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-700">승인됨</span>
-                          )}
+                          </div>
                         </div>
+                        {captureReviewDeleteConfirmId === review.id && (
+                          <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700">
+                            <span>{review.status === "approved" ? "검토 기록만 삭제되며 저장된 항목은 유지됩니다." : "이 음성 기록은 복구할 수 없습니다."}</span>
+                            <button type="button" onClick={() => setCaptureReviewDeleteConfirmId(null)} className="shrink-0 underline">취소</button>
+                          </div>
+                        )}
                       </div>
                     ))}
                   {captureReviews.filter((review) => captureReviewTab === "pending" ? review.status !== "approved" : review.status === "approved").length === 0 && (

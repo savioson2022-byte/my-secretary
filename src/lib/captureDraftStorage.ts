@@ -43,3 +43,7 @@ export function saveCaptureReview(review: CaptureReview) {
 export function updateCaptureReview(review: CaptureReview) {
   captureReviewRepository.update(review);
 }
+
+export function deleteCaptureReview(id: string) {
+  captureReviewRepository.delete(id);
+}
