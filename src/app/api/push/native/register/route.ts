@@ -23,7 +23,7 @@ export async function POST(request: Request) {
 
   if (!token) {
     return NextResponse.json(
-      { ok: false, reason: "아이폰 푸시 토큰을 확인하지 못했습니다." },
+      { ok: false, reason: "기기 푸시 토큰을 확인하지 못했습니다." },
       { status: 400 }
     );
   }
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
       user_id: context.auth.user.id,
       platform: body.platform?.trim() || "ios",
       token,
-      device_name: body.deviceName?.trim() || "iPhone",
+      device_name: body.deviceName?.trim() || "Mobile",
       app_version: body.appVersion?.trim() || "",
       enabled: true,
       last_seen_at: now,

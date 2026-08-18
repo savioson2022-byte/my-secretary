@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut android:shortcutId="voice" android:enabled="true" android:icon="@mipmap/ic_launcher" android:shortcutShortLabel="음성 기록" android:shortcutLongLabel="음성으로 바로 기록">
+        <intent android:action="android.intent.action.VIEW" android:data="mysecretary://voice" />
+        <categories android:name="android.shortcut.conversation" />
+    </shortcut>
+    <shortcut android:shortcutId="today" android:enabled="true" android:icon="@mipmap/ic_launcher" android:shortcutShortLabel="오늘 일정" android:shortcutLongLabel="오늘 일정 열기">
+        <intent android:action="android.intent.action.VIEW" android:data="mysecretary://today" />
+    </shortcut>
+    <shortcut android:shortcutId="settings" android:enabled="true" android:icon="@mipmap/ic_launcher" android:shortcutShortLabel="설정" android:shortcutLongLabel="알림 설정 열기">
+        <intent android:action="android.intent.action.VIEW" android:data="mysecretary://settings" />
+    </shortcut>
+</shortcuts>

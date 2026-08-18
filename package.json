@@ -12,12 +12,15 @@
     "test:persistent-alarm": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/test-persistent-alarm-schedule.mjs",
     "check:purchase": "node scripts/verify-purchase-automation.mjs",
     "purchase:coupang": "node scripts/coupang-repurchase-assistant.mjs",
+    "android:sync": "cap sync android",
+    "android:open": "cap open android",
     "ios:sync": "cap sync ios",
     "ios:open": "cap open ios"
   },
   "dependencies": {
+    "@capacitor/android": "8.4.1",
     "@capacitor/cli": "^8.4.1",
-    "@capacitor/core": "^8.4.1",
+    "@capacitor/core": "8.4.1",
     "@capacitor/geolocation": "^8.0.0",
     "@capacitor/ios": "^8.4.1",
     "@capacitor/local-notifications": "^8.0.0",

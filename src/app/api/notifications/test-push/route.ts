@@ -5,6 +5,7 @@ import {
   sendApplePushNotification,
 } from "@/lib/apns";
 import { sendPushNotification } from "@/lib/push";
+import { isFcmConfigured, sendAndroidPushNotification } from "@/lib/fcm";
 
 type PushSubscriptionRecord = {
   id: string;
@@ -16,6 +17,7 @@ type PushSubscriptionRecord = {
 type NativePushTokenRecord = {
   id: string;
   token: string;
+  platform: string;
 };
 
 export async function POST(request: Request) {
@@ -51,7 +53,7 @@ export async function POST(request: Request) {
 
   const { data: nativeTokens } = await context.supabase
     .from("native_push_tokens")
-    .select("id, token")
+    .select("id, token, platform")
     .eq("user_id", context.auth.user.id)
     .eq("enabled", true)
     .returns<NativePushTokenRecord[]>();
@@ -91,13 +93,18 @@ export async function POST(request: Request) {
     }
   }
 
-  if (nativeTokens && nativeTokens.length > 0 && isApnsConfigured()) {
+  if (nativeTokens && nativeTokens.length > 0) {
     for (const nativeToken of nativeTokens) {
       try {
-        await sendApplePushNotification({
+        const isAndroid = nativeToken.platform === "android";
+        const sender = isAndroid
+          ? sendAndroidPushNotification
+          : sendApplePushNotification;
+        if (isAndroid ? !isFcmConfigured() : !isApnsConfigured()) continue;
+        await sender({
           token: nativeToken.token,
           title: "나의 비서 앱 푸시 테스트",
-          body: "아이폰 앱 푸시가 서버에서 정상으로 도착했어요.",
+          body: "모바일 앱 푸시가 서버에서 정상으로 도착했어요.",
           url: "/settings",
           tag: `native-server-test-${Date.now()}`,
         });
@@ -107,7 +114,7 @@ export async function POST(request: Request) {
         nativeFailureReason =
           error instanceof Error
             ? error.message
-            : "아이폰 앱 푸시 발송에 실패했습니다.";
+            : "모바일 앱 푸시 발송에 실패했습니다.";
       }
     }
   }
@@ -127,6 +134,7 @@ export async function POST(request: Request) {
     webPushSubscriptionCount,
     nativePushTokenCount,
     apnsConfigured: isApnsConfigured(),
+    fcmConfigured: isFcmConfigured(),
     reason:
       totalSentCount > 0
         ? null

@@ -50,3 +50,9 @@ OPENAI_API_KEY
 배포 후 iPhone에서 `https://배포주소/?voice=1`을 단축어, 동작 버튼, 뒷면 탭에 연결하면 음성 기록 화면으로 빠르게 진입할 수 있습니다.
 
 자세한 배포 절차는 `docs/deployment.md`를 참고합니다.
+
+## 네이티브 앱
+
+- iOS: `npm run ios:sync`, `npm run ios:open`
+- Android: `npm run android:sync`, `npm run android:open`
+- Android 빌드와 Google Play 출시 준비는 `docs/android-release.md` 참고

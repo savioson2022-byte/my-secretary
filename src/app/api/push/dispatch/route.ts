@@ -4,6 +4,7 @@ import {
   sendApplePushNotification,
 } from "@/lib/apns";
 import { sendPushNotification } from "@/lib/push";
+import { isFcmConfigured, sendAndroidPushNotification } from "@/lib/fcm";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 
 type ScheduleEntryRecord = {
@@ -30,6 +31,7 @@ type NativePushTokenRecord = {
   id: string;
   user_id: string;
   token: string;
+  platform: string;
 };
 
 type NotificationEventRecord = {
@@ -107,7 +109,7 @@ async function sendNativePushesForEvent({
   supabase: NonNullable<ReturnType<typeof createSupabaseAdminClient>>;
   event: NotificationEventRecord;
 }) {
-  if (!isApnsConfigured()) {
+  if (!isApnsConfigured() && !isFcmConfigured()) {
     return 0;
   }
 
@@ -129,6 +131,11 @@ async function sendNativePushesForEvent({
   let sentCount = 0;
 
   for (const nativeToken of nativeTokens ?? []) {
+    const isAndroid = nativeToken.platform === "android";
+    if (isAndroid ? !isFcmConfigured() : !isApnsConfigured()) {
+      continue;
+    }
+
     const { data: existingDelivery } = await supabase
       .from("native_notification_event_deliveries")
       .select("id")
@@ -141,7 +148,11 @@ async function sendNativePushesForEvent({
     }
 
     try {
-      await sendApplePushNotification({
+      const sendNativePush =
+        isAndroid
+          ? sendAndroidPushNotification
+          : sendApplePushNotification;
+      await sendNativePush({
         token: nativeToken.token,
         title: event.title,
         body: event.body,

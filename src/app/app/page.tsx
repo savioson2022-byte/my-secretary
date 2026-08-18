@@ -29,6 +29,14 @@ const APP_STEPS = [
   "문제가 없으면 같은 빌드를 App Store 심사로 보낸다.",
 ];
 
+const ANDROID_STEPS = [
+  "Android Studio에서 android 폴더를 연다.",
+  "Firebase 프로젝트에 app.mysecretary.mobile 앱을 등록하고 google-services.json을 android/app에 넣는다.",
+  "실제 Android 기기에서 로그인, 딥링크, 위치, 로컬/원격 알림을 검증한다.",
+  "서명된 Android App Bundle(AAB)을 만든다.",
+  "Google Play Console 내부 테스트에 올린 뒤 프로덕션 출시를 신청한다.",
+];
+
 export default function AppInstallPage() {
   return (
     <main className="app-page mx-auto max-w-3xl px-4">
@@ -39,8 +47,8 @@ export default function AppInstallPage() {
             앱으로 사용하기
           </h1>
           <p className="mt-2 text-sm leading-6 text-slate-500">
-            웹 바로가기보다 빠르게 열고, TestFlight와 App Store 배포로
-            실제 앱처럼 쓰기 위한 준비 화면입니다.
+            웹 바로가기보다 빠르게 열고, App Store와 Google Play에
+            실제 앱으로 배포하기 위한 준비 화면입니다.
           </p>
         </div>
         <div className="self-start sm:self-auto">
@@ -78,6 +86,31 @@ export default function AppInstallPage() {
               </Link>
             ))}
           </div>
+        </section>
+
+        <section className="app-card p-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2 className="text-lg font-black text-slate-900">
+                Android 출시 준비 순서
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-slate-500">
+                Capacitor Android 프로젝트와 FCM 푸시, 딥링크, 앱 아이콘
+                빠른 동작이 준비되어 있습니다.
+              </p>
+            </div>
+            <a href="https://play.google.com/console/" target="_blank" rel="noreferrer" className="rounded-full bg-emerald-600 px-4 py-2 text-center text-xs font-black text-white no-underline">
+              Google Play Console
+            </a>
+          </div>
+          <ol className="mt-5 space-y-3">
+            {ANDROID_STEPS.map((step, index) => (
+              <li key={step} className="flex gap-3 rounded-2xl bg-white p-3 ring-1 ring-slate-100">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-xs font-black text-white">{index + 1}</span>
+                <span className="pt-1 text-sm font-bold leading-5 text-slate-700">{step}</span>
+              </li>
+            ))}
+          </ol>
         </section>
 
         <section className="app-card p-5">

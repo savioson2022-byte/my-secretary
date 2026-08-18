@@ -11,6 +11,9 @@ const config: CapacitorConfig = {
   ios: {
     scheme: "MySecretary",
   },
+  android: {
+    allowMixedContent: false,
+  },
   plugins: {
     PushNotifications: {
       presentationOptions: ["badge", "sound", "alert"],
