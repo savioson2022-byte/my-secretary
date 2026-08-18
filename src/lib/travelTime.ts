@@ -12,12 +12,13 @@ import {
   TravelTimeEstimate,
   TravelTimeRule,
 } from "@/types/calendar";
+import type { ExternalCalendarEvent } from "@/types/externalCalendar";
 import { RoutineSchedule } from "@/types/routine";
 
 export type ScheduleTravelBlock = {
   id: string;
   title: string;
-  sourceType: "routine" | "single";
+  sourceType: "routine" | "single" | "external";
   date: string;
   startTime: string;
   endTime: string;
@@ -143,10 +144,12 @@ export function getScheduleBlocksForDate({
   date,
   routines,
   singleSchedules,
+  externalEvents = [],
 }: {
   date: string;
   routines: RoutineSchedule[];
   singleSchedules: SingleSchedule[];
+  externalEvents?: ExternalCalendarEvent[];
 }): ScheduleTravelBlock[] {
   const dayOfWeek = getDayOfWeekFromDateText(date);
 
@@ -175,7 +178,20 @@ export function getScheduleBlocksForDate({
       placeName: schedule.placeName || NO_PLACE_TEXT,
     }));
 
-  return [...routineBlocks, ...singleBlocks].sort((a, b) => {
+  // 종일 일정은 이동 구간을 만들 수 없으므로 시간을 점유하는 일정만 쓴다.
+  const externalBlocks = externalEvents
+    .filter((event) => event.date === date && event.blocksTime)
+    .map((event) => ({
+      id: event.externalId,
+      title: event.title,
+      sourceType: "external" as const,
+      date,
+      startTime: event.startTime,
+      endTime: event.endTime,
+      placeName: event.placeName || NO_PLACE_TEXT,
+    }));
+
+  return [...routineBlocks, ...singleBlocks, ...externalBlocks].sort((a, b) => {
     return timeToMinutes(a.startTime) - timeToMinutes(b.startTime);
   });
 }
@@ -184,6 +200,7 @@ export function calculateTravelTransitionsForDate({
   date,
   routines,
   singleSchedules,
+  externalEvents = [],
   travelTimeRules,
   travelTimeEstimates,
   mode,
@@ -191,6 +208,7 @@ export function calculateTravelTransitionsForDate({
   date: string;
   routines: RoutineSchedule[];
   singleSchedules: SingleSchedule[];
+  externalEvents?: ExternalCalendarEvent[];
   travelTimeRules: TravelTimeRule[];
   travelTimeEstimates?: TravelTimeEstimate[];
   mode: TravelMode;
@@ -198,6 +216,7 @@ export function calculateTravelTransitionsForDate({
   const blocks = getScheduleBlocksForDate({
     date,
     routines,
+    externalEvents,
     singleSchedules,
   });
 
@@ -324,6 +343,7 @@ export function calculateTravelTransitionsForDate({
 export function calculateWeeklyTravelTransitions({
   routines,
   singleSchedules,
+  externalEvents = [],
   travelTimeRules,
   travelTimeEstimates,
   mode,
@@ -331,6 +351,7 @@ export function calculateWeeklyTravelTransitions({
 }: {
   routines: RoutineSchedule[];
   singleSchedules: SingleSchedule[];
+  externalEvents?: ExternalCalendarEvent[];
   travelTimeRules: TravelTimeRule[];
   travelTimeEstimates?: TravelTimeEstimate[];
   mode: TravelMode;
@@ -346,6 +367,7 @@ export function calculateWeeklyTravelTransitions({
       date,
       routines,
       singleSchedules,
+      externalEvents,
       travelTimeRules,
       travelTimeEstimates,
       mode,

@@ -1223,11 +1223,12 @@ export default function AccountManager() {
               <h3 className="mt-1 text-sm font-black text-slate-900">
                 {unifiedAccount
                   ? "이 로그인은 통합계정에 연결됐습니다."
-                  : "통합계정 연결 준비 중"}
+                  : "이 기기의 로그인만 사용 중입니다."}
               </h3>
               <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">
-                Apple과 이메일 로그인을 하나의 앱 계정으로 묶어 기기 간 데이터를
-                연결합니다.
+                {unifiedAccount
+                  ? "Apple과 이메일 로그인이 하나의 앱 계정으로 묶여 기기 간 데이터가 연결됩니다."
+                  : "같은 방법으로 다시 로그인하면 기기 간 데이터가 이어집니다."}
               </p>
             </div>
             {unifiedAccount?.identity.provider ? (

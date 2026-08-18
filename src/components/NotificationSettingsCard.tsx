@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { adaptLocationAwareNotificationEvents } from "@/lib/adaptiveTravelNotifications";
 import { buildNotificationEvents } from "@/lib/notificationEventBuilder";
+import { loadEnabledExternalCalendarEvents } from "@/lib/externalCalendar";
+import { getNotificationSearchWindow } from "@/lib/suggestionSearchWindow";
 import {
   getNotificationSettings,
   saveNotificationSettings,
@@ -187,7 +189,10 @@ export default function NotificationSettingsCard() {
       });
 
       const events = await adaptLocationAwareNotificationEvents(
-        buildNotificationEvents(nextSettings),
+        buildNotificationEvents(
+          nextSettings,
+          await loadEnabledExternalCalendarEvents(getNotificationSearchWindow())
+        ),
         nextSettings
       );
 

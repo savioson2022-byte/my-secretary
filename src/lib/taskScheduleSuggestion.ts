@@ -13,6 +13,7 @@ import { RoutineSchedule } from "@/types/routine";
 import type { SuggestionFeedback } from "@/types/suggestionFeedback";
 import { UserProfile } from "@/types/userProfile";
 import { getScheduleBlocksForDate } from "@/lib/travelTime";
+import type { ExternalCalendarEvent } from "@/types/externalCalendar";
 import type { PersonalAiMemory } from "@/types/personalAi";
 
 export type TimeTaskSuggestion = {
@@ -254,6 +255,7 @@ function getTravelBuffers({
   targetPlace,
   routines,
   singleSchedules,
+  externalEvents,
 }: {
   date: string;
   candidateStartTime: string;
@@ -261,6 +263,7 @@ function getTravelBuffers({
   targetPlace: SavedPlace | null;
   routines: RoutineSchedule[];
   singleSchedules: SingleSchedule[];
+  externalEvents?: ExternalCalendarEvent[];
 }) {
   if (!targetPlace) {
     return {
@@ -274,6 +277,7 @@ function getTravelBuffers({
     date,
     routines,
     singleSchedules,
+    externalEvents,
   });
   const startMinutes = timeToMinutes(candidateStartTime);
   const endMinutes = timeToMinutes(candidateEndTime);
@@ -452,6 +456,7 @@ export function suggestTimeTaskSchedule({
   item,
   routines,
   singleSchedules,
+  externalEvents = [],
   savedPlaces = [],
   userProfile = null,
   suggestionFeedbacks = [],
@@ -461,6 +466,7 @@ export function suggestTimeTaskSchedule({
   item: AssistantItem;
   routines: RoutineSchedule[];
   singleSchedules: SingleSchedule[];
+  externalEvents?: ExternalCalendarEvent[];
   savedPlaces?: SavedPlace[];
   userProfile?: UserProfile | null;
   suggestionFeedbacks?: SuggestionFeedback[];
@@ -505,6 +511,7 @@ export function suggestTimeTaskSchedule({
       date,
       routines,
       singleSchedules,
+      externalEvents,
     });
 
     for (const block of freeBlocks) {
@@ -526,6 +533,7 @@ export function suggestTimeTaskSchedule({
         targetPlace: context.targetPlace,
         routines,
         singleSchedules,
+        externalEvents,
       });
       const requiredMinutes =
         estimatedMinutes +
@@ -609,6 +617,7 @@ export function suggestTimeTaskSchedules({
   items,
   routines,
   singleSchedules,
+  externalEvents = [],
   savedPlaces = [],
   userProfile = null,
   suggestionFeedbacks = [],
@@ -617,6 +626,7 @@ export function suggestTimeTaskSchedules({
   items: AssistantItem[];
   routines: RoutineSchedule[];
   singleSchedules: SingleSchedule[];
+  externalEvents?: ExternalCalendarEvent[];
   savedPlaces?: SavedPlace[];
   userProfile?: UserProfile | null;
   suggestionFeedbacks?: SuggestionFeedback[];
@@ -686,6 +696,7 @@ export function suggestTimeTaskSchedules({
             },
             routines,
             singleSchedules: virtualSchedules,
+            externalEvents,
             savedPlaces,
             userProfile,
             suggestionFeedbacks,
@@ -746,6 +757,7 @@ export function suggestTimeTaskSchedules({
           item,
           routines,
           singleSchedules,
+          externalEvents,
           savedPlaces,
           userProfile,
           suggestionFeedbacks,

@@ -1,24 +1,15 @@
 import BottomNavigation from "@/components/BottomNavigation";
 import PurchaseHistoryManager from "@/components/PurchaseHistoryManager";
-import UserStatusBadge from "@/components/UserStatusBadge";
-import PageHelpButton from "@/components/PageHelpButton";
+import SettingsPageHeader from "@/components/SettingsPageHeader";
 
 export default function PurchasePage() {
   return (
     <main className="app-page mx-auto w-full max-w-6xl px-4 lg:px-8">
-      <header className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="max-w-2xl">
-          <p className="text-sm font-black text-blue-600">나의 비서</p>
-          <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-950">
-            구매 준비
-          </h1>
-          <p className="mt-2 text-sm leading-6 text-slate-500">
-            이미 구매한 적 있는 상품만 재구매 후보로 관리하고, 사용자가
-            확인한 뒤 쿠팡 결제 직전까지 빠르게 이동합니다.
-          </p>
-        </div>
-        <div className="flex items-center gap-2"><PageHelpButton topic="purchase" /><UserStatusBadge /></div>
-      </header>
+      <SettingsPageHeader
+        title="구매 준비"
+        description="이미 구매한 적 있는 상품만 재구매 후보로 관리하고, 확인한 뒤 결제 직전까지 빠르게 이동합니다."
+        helpTopic="purchase"
+      />
 
       <PurchaseHistoryManager />
 

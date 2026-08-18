@@ -8,5 +8,6 @@ final class MySecretaryBridgeViewController: CAPBridgeViewController {
         bridge?.registerPluginInstance(GemmaRuntimePlugin())
         bridge?.registerPluginInstance(AlarmKitPlugin())
         bridge?.registerPluginInstance(AlarmPulsePlugin())
+        bridge?.registerPluginInstance(CalendarBridgePlugin())
     }
 }

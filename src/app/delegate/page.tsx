@@ -4,8 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import AgentActionSuggestionView from "@/components/AgentActionSuggestionView";
 import BottomNavigation from "@/components/BottomNavigation";
-import UserStatusBadge from "@/components/UserStatusBadge";
-import PageHelpButton from "@/components/PageHelpButton";
+import SettingsPageHeader from "@/components/SettingsPageHeader";
 import ReservationAssistant from "@/components/ReservationAssistant";
 import { getCloudDataSyncedEventName } from "@/lib/dataSyncEvents";
 import { getLocalDataUpdatedEventName } from "@/lib/localStorageRepository";
@@ -32,23 +31,11 @@ export default function DelegatePage() {
 
   return (
     <main className="app-page mx-auto max-w-3xl px-4">
-      <header className="mb-5 flex items-start justify-between gap-4">
-        <div>
-          <p className="text-sm font-black text-blue-600">나의 비서</p>
-          <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-950">
-            위임
-          </h1>
-          <p className="mt-2 text-sm leading-6 text-slate-500">
-            위임 준비함은 구매와 예약처럼 비서에게 맡긴 일만 모아, 사용자의
-            최종 확인 전까지 준비하는 공간입니다.
-          </p>
-          <p className="mt-2 text-xs font-bold leading-5 text-slate-400">
-            홈의 오늘의 작업함은 일정, 기록, 위임을 함께 요약하고, 이 화면은
-            위임한 일만 자세히 보여줍니다.
-          </p>
-        </div>
-        <div className="flex items-center gap-2"><PageHelpButton topic="delegate" /><UserStatusBadge /></div>
-      </header>
+      <SettingsPageHeader
+        title="위임"
+        description="구매와 예약처럼 비서에게 맡긴 일만 모아, 최종 확인 전까지 준비하는 공간입니다."
+        helpTopic="delegate"
+      />
 
       <section className="mb-5 grid gap-3 sm:grid-cols-2">
         {[

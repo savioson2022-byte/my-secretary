@@ -12,6 +12,7 @@ export type HelpTopic =
   | "account"
   | "ai"
   | "notifications"
+  | "calendar-integration"
   | "personal-ai"
   | "shortcuts";
 
@@ -50,6 +51,12 @@ export const PAGE_HELP_CONTENT: Record<HelpTopic, HelpContent> = {
   settings: { title: "설정", summary: "계정, 알림, 장소, AI와 빠른 입력 방식을 내 생활에 맞게 조정합니다.", sections: [{ title: "처음이라면", body: "먼저 알림 권한과 장소를 설정하고, 개인 AI 화면에서 분류 방식을 확인하는 것을 권장합니다." }] },
   account: { title: "계정 설정", summary: "로그인 정보와 동기화 상태를 관리합니다.", sections: [{ title: "동기화", body: "로그인하면 여러 기기에서 일정과 설정을 이어서 사용할 수 있습니다." }] },
   ai: { title: "AI 설정", summary: "입력 분류와 추천에 사용할 AI 및 데이터 동의 상태를 관리합니다.", sections: [{ title: "분류 학습", body: "처음에는 기본 AI가 분류를 돕고, 사용자가 수정한 결과가 쌓이면 개인 AI가 그 패턴을 참고합니다." }] },
+  "calendar-integration": { title: "캘린더 연동", summary: "iPhone 캘린더의 일정을 읽어 실제로 비어 있는 시간만 추천에 사용합니다.", sections: [
+    { title: "왜 필요한가", body: "앱에 일정을 다시 입력하지 않아도 됩니다. 이미 캘린더에 있는 일정을 읽어 그 시간을 제외하고 빈 시간을 계산합니다." },
+    { title: "읽기만 합니다", body: "연동은 읽기 전용입니다. 이 앱이 만들지 않은 일정은 수정하거나 삭제하지 않습니다." },
+    { title: "구독 캘린더", body: "공휴일이나 스포츠 일정처럼 구독으로 들어온 캘린더는 기본으로 꺼져 있습니다. 그것까지 바쁜 시간으로 계산하면 빈 시간이 사라집니다." },
+    { title: "거절한 회의와 종일 일정", body: "내가 거절한 회의는 비어 있는 시간으로 처리합니다. 휴가나 생일 같은 종일 일정은 화면에는 보여주지만 하루 전체를 바쁜 시간으로 만들지는 않습니다." },
+  ] },
   notifications: { title: "알림 설정", summary: "푸시, 소리, 사전 알림과 지속 알람 동작을 설정합니다.", sections: [{ title: "강한 알람", body: "iOS 26 이상은 시스템 AlarmKit을 사용합니다. 이전 iOS는 시간 민감 알림과 1분 간격 반복 알림을 사용하고, 앱을 열면 확인할 때까지 소리와 진동을 반복합니다. 기기 알림 권한과 시간 민감 알림을 허용해주세요." }] },
   "personal-ai": { title: "개인 AI", summary: "내가 수정한 분류와 생활 패턴을 바탕으로 점점 개인화되는 기능입니다.", sections: [{ title: "정확도를 높이는 법", body: "틀린 분류, 장소, 이동 방식을 승인 전에 바로잡아 주세요. 수정 결과가 다음 제안의 기준이 됩니다." }] },
   shortcuts: { title: "빠른 입력", summary: "iPhone 단축어, 동작 버튼 또는 뒷면 탭으로 음성 기록을 빠르게 시작합니다.", sections: [{ title: "설정 방법", body: "화면에 표시된 앱 주소를 단축어로 열도록 등록한 뒤, 원하는 버튼이나 뒷면 탭 동작에 연결하세요." }] },

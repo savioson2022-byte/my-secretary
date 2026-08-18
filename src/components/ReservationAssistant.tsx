@@ -7,6 +7,7 @@ import { getSavedPlaces, saveSavedPlace } from "@/lib/placeStorage";
 import { getRoutineSchedules } from "@/lib/routineStorage";
 import { getSingleSchedules, saveSingleSchedule } from "@/lib/singleScheduleStorage";
 import { updateItem } from "@/lib/storage";
+import { useExternalCalendarEvents } from "@/lib/useExternalCalendarEvents";
 import { getUserProfile } from "@/lib/userProfileStorage";
 import type { AssistantItem } from "@/types/assistant";
 import type { SavedPlace, SingleSchedule } from "@/types/calendar";
@@ -94,6 +95,7 @@ export default function ReservationAssistant({ items }: { items: AssistantItem[]
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedItemId]);
 
+  const { events: externalEvents } = useExternalCalendarEvents(date, date);
   const durationMinutes = Math.max(30, Math.min(360, Number(duration) || 60));
   const endTime = minutesToTime(timeToMinutes(startTime) + durationMinutes);
   const suggestedSlots = useMemo(() => {
@@ -102,7 +104,12 @@ export default function ReservationAssistant({ items }: { items: AssistantItem[]
     const businessEnd = selectedPlace?.businessHoursEnd ?? "21:00";
     const earliest = timeToMinutes(businessStart);
     const latest = timeToMinutes(businessEnd);
-    return calculateFreeTimeBlocksForDate({ date, routines, singleSchedules })
+    return calculateFreeTimeBlocksForDate({
+      date,
+      routines,
+      singleSchedules,
+      externalEvents,
+    })
       .flatMap((block) => {
         const start = Math.max(timeToMinutes(block.startTime), earliest);
         const end = Math.min(timeToMinutes(block.endTime), latest);
@@ -120,7 +127,14 @@ export default function ReservationAssistant({ items }: { items: AssistantItem[]
         );
       })
       .slice(0, 3);
-  }, [date, durationMinutes, routines, selectedPlace, singleSchedules]);
+  }, [
+    date,
+    durationMinutes,
+    externalEvents,
+    routines,
+    selectedPlace,
+    singleSchedules,
+  ]);
 
   const hasConflict = singleSchedules.some((schedule) =>
     schedule.date === date && timeToMinutes(schedule.startTime) < timeToMinutes(endTime) && timeToMinutes(schedule.endTime) > timeToMinutes(startTime)

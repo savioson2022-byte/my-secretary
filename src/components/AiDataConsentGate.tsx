@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   AI_DATA_CONSENT_CHANGED_EVENT,
+  AI_DATA_CONSENT_REQUESTED_EVENT,
   getAiDataConsentChoice,
   saveAiDataConsent,
   type AiDataConsentChoice,
@@ -14,6 +15,7 @@ export default function AiDataConsentGate() {
   const [signedIn, setSignedIn] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [choice, setChoice] = useState<AiDataConsentChoice>(null);
+  const [isRequested, setIsRequested] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -46,19 +48,22 @@ export default function AiDataConsentGate() {
       setSignedIn(Boolean(session));
       refresh();
     }) ?? { data: { subscription: null } };
+    const open = () => setIsRequested(true);
     window.addEventListener(AI_DATA_CONSENT_CHANGED_EVENT, refresh);
+    window.addEventListener(AI_DATA_CONSENT_REQUESTED_EVENT, open);
     return () => {
       listener.subscription?.unsubscribe();
       window.removeEventListener(AI_DATA_CONSENT_CHANGED_EVENT, refresh);
+      window.removeEventListener(AI_DATA_CONSENT_REQUESTED_EVENT, open);
     };
   }, []);
 
-  if (!signedIn || !userId || choice !== null) return null;
+  if (!isRequested || !signedIn || !userId || choice !== null) return null;
 
   return (
     <div className="fixed inset-0 z-[100] grid place-items-center bg-slate-950/60 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="ai-consent-title">
       <section className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl">
-        <p className="text-sm font-black text-blue-600">선택 후 사용</p>
+        <p className="text-sm font-black text-blue-600">한 번만 물어봅니다</p>
         <h2 id="ai-consent-title" className="mt-2 text-2xl font-black text-slate-950">외부 AI로 내용 보내기</h2>
         <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
           동의하면 입력한 일정·작업·메모와 개인화 기준, 연결한 구매 메일의 주문 관련 내용이 분류·정리를 위해 OpenAI로 전송됩니다. OpenAI는 나의 비서와 별개의 제3자 서비스입니다.

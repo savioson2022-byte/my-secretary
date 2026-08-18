@@ -1,4 +1,5 @@
 import { SingleSchedule } from "@/types/calendar";
+import type { ExternalCalendarEvent } from "@/types/externalCalendar";
 import { DayOfWeek, RoutineSchedule } from "@/types/routine";
 
 export type FreeTimeBlock = {
@@ -22,6 +23,11 @@ type CalculateFreeTimeBlocksForDateParams = {
   date: string;
   routines: RoutineSchedule[];
   singleSchedules: SingleSchedule[];
+  /**
+   * 시스템 캘린더에서 읽어온 일정.
+   * 넘기지 않으면 기존과 똑같이 앱 안의 일정만으로 계산한다.
+   */
+  externalEvents?: ExternalCalendarEvent[];
 };
 
 const DAY_START_MINUTES = 0;
@@ -218,6 +224,7 @@ export function calculateFreeTimeBlocksForDate({
   date,
   routines,
   singleSchedules,
+  externalEvents = [],
 }: CalculateFreeTimeBlocksForDateParams): FreeTimeBlock[] {
   const dayOfWeek = getDayOfWeekFromDateText(date);
 
@@ -251,10 +258,20 @@ export function calculateFreeTimeBlocksForDate({
       endMinutes: timeToMinutes(schedule.endTime),
     }));
 
+  // 자정 넘김과 종일 일정은 어댑터에서 이미 처리돼 있으므로
+  // 여기서는 blocksTime과 날짜만 확인한다.
+  const externalBusyBlocks = externalEvents
+    .filter((event) => event.date === date && event.blocksTime)
+    .map((event) => ({
+      startMinutes: timeToMinutes(event.startTime),
+      endMinutes: timeToMinutes(event.endTime),
+    }));
+
   return calculateFreeTimeFromBusyBlocks([
     ...routineBusyBlocks,
     ...singleScheduleBusyBlocks,
     ...overnightContinuationBlocks,
+    ...externalBusyBlocks,
   ]);
 }
 

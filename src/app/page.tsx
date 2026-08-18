@@ -11,6 +11,7 @@ import ItemCard from "@/components/ItemCard";
 import NotificationSummaryCard from "@/components/NotificationSummaryCard";
 import UserStatusBadge from "@/components/UserStatusBadge";
 import PageHelpButton from "@/components/PageHelpButton";
+import SettingsLinkButton from "@/components/SettingsLinkButton";
 import { aiClassifyInput } from "@/lib/aiClassifyInput";
 import { classifyInput } from "@/lib/classifyInput";
 import { buildClassificationContext } from "@/lib/classificationContext";
@@ -29,14 +30,6 @@ import {
   shouldAttachToIdeaRecord,
 } from "@/lib/ideaGrouping";
 import { getLocalDataUpdatedEventName } from "@/lib/localStorageRepository";
-import {
-  getDueRepurchaseHistories,
-  getNextPurchaseDateFromToday,
-} from "@/lib/purchaseAutomation";
-import {
-  getPurchaseHistories,
-  updatePurchaseHistory,
-} from "@/lib/purchaseHistoryStorage";
 import {
   getGemmaClassificationReadiness,
   getPersonalAiMemories,
@@ -57,7 +50,6 @@ import {
 import { SingleSchedule } from "@/types/calendar";
 import { DayOfWeek, RoutineSchedule } from "@/types/routine";
 import { UserProfile } from "@/types/userProfile";
-import { PurchaseHistoryItem } from "@/types/purchaseHistory";
 import type { CaptureReview } from "@/types/captureReview";
 
 function createId() {
@@ -144,9 +136,6 @@ export default function Home() {
   const [items, setItems] = useState<AssistantItem[]>([]);
   const [routines, setRoutines] = useState<RoutineSchedule[]>([]);
   const [singleSchedules, setSingleSchedules] = useState<SingleSchedule[]>([]);
-  const [purchaseHistories, setPurchaseHistories] = useState<
-    PurchaseHistoryItem[]
-  >([]);
   const [selectedFilter, setSelectedFilter] = useState<FilterType>("전체");
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
 
@@ -166,7 +155,6 @@ export default function Home() {
       setItems(getItems());
       setRoutines(getRoutineSchedules());
       setSingleSchedules(getSingleSchedules());
-      setPurchaseHistories(getPurchaseHistories());
       setUserProfile(getUserProfile());
       setCaptureReviews(getCaptureReviews());
     }
@@ -260,10 +248,6 @@ export default function Home() {
       );
     }).length;
   }, [items, userProfile]);
-
-  const dueRepurchaseItems = useMemo(() => {
-    return getDueRepurchaseHistories(purchaseHistories, 2);
-  }, [purchaseHistories]);
 
   const inboxItemCount = useMemo(() => {
     return items.filter((item) => {
@@ -629,18 +613,6 @@ export default function Home() {
     setItems(getItems());
   }
 
-  function postponeRepurchase(history: PurchaseHistoryItem) {
-    const nextPurchaseCheckDate =
-      getNextPurchaseDateFromToday(history) ?? history.nextPurchaseCheckDate;
-
-    updatePurchaseHistory({
-      ...history,
-      nextPurchaseCheckDate,
-      updatedAt: new Date().toISOString(),
-    });
-    setPurchaseHistories(getPurchaseHistories());
-  }
-
   return (
     <main className="mx-auto min-h-screen max-w-[1440px] px-0 py-0 sm:px-5 sm:py-6 md:px-6 md:pl-[7.5rem] xl:grid xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.55fr)] xl:items-start xl:gap-5 xl:px-6 xl:pl-[7.5rem]">
       <section className="hidden">
@@ -710,8 +682,6 @@ export default function Home() {
                 ["월간 캘린더", "/calendar/monthly"],
                 ["일정관리", "/schedule/manage"],
                 ["기록", "/records"],
-                ["위임", "/delegate"],
-                ["개인 AI", "/settings/ai"],
               ].map(([label, href]) => (
                 <Link
                   key={href}
@@ -724,7 +694,7 @@ export default function Home() {
             </nav>
           </div>
           <div className="flex shrink-0 flex-col items-end gap-2">
-            <div className="flex items-center gap-2"><PageHelpButton topic="home" /><UserStatusBadge /></div>
+            <div className="flex items-center gap-2"><PageHelpButton topic="home" /><SettingsLinkButton /><UserStatusBadge /></div>
             <div className="grid h-9 w-9 place-items-center rounded-2xl bg-slate-50 text-slate-700 ring-1 ring-slate-100">
               <svg viewBox="0 0 24 24" className="h-5 w-5" fill="currentColor" aria-hidden="true">
                 <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9ZM10 21h4" />
@@ -761,12 +731,11 @@ export default function Home() {
               </Link>
             </div>
 
-            <div className="mt-4 grid grid-cols-4 gap-2">
+            <div className="mt-4 grid grid-cols-3 gap-2">
               {[
                 ["일정", todayScheduleItems.length, "/calendar/monthly"],
                 ["중요", todayItems.length, "/records"],
                 ["메모", openMemoCount, "/records"],
-                ["위임", pendingAgentCount, "/delegate"],
               ].map(([label, count, href]) => (
                 <Link
                   key={label}
@@ -793,68 +762,6 @@ export default function Home() {
               </Link>
             )}
 
-            {dueRepurchaseItems.length > 0 && (
-              <div className="mt-3 rounded-2xl bg-emerald-50 p-3 ring-1 ring-emerald-100">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-black text-emerald-700">
-                      재구매 추천
-                    </p>
-                    <p className="mt-0.5 text-[11px] font-bold text-emerald-600">
-                      메일에서 확인한 주기를 기준으로 알려드려요.
-                    </p>
-                  </div>
-                  <Link
-                    href="/purchase"
-                    className="shrink-0 rounded-full bg-white px-3 py-1.5 text-[11px] font-black text-emerald-700 ring-1 ring-emerald-100"
-                  >
-                    관리
-                  </Link>
-                </div>
-                <div className="mt-3 grid gap-2">
-                  {dueRepurchaseItems.map((history) => (
-                    <div
-                      key={history.id}
-                      className="rounded-2xl bg-white p-3 ring-1 ring-emerald-100"
-                    >
-                      <p className="truncate text-sm font-black text-slate-900">
-                        {history.productName}
-                      </p>
-                      <p className="mt-1 text-[11px] font-bold text-slate-400">
-                        {history.repeatCycleDays
-                          ? `${history.repeatCycleDays}일 주기`
-                          : "구매 주기 확인 필요"}
-                        {history.maxBudgetKrw
-                          ? ` · ${history.maxBudgetKrw.toLocaleString()}원`
-                          : ""}
-                      </p>
-                      <div className="mt-3 grid grid-cols-2 gap-2">
-                        <a
-                          href={
-                            history.productUrl ||
-                            `https://www.coupang.com/np/search?q=${encodeURIComponent(
-                              history.productName
-                            )}`
-                          }
-                          target="_blank"
-                          rel="noreferrer"
-                          className="rounded-full bg-emerald-600 px-3 py-2 text-center text-xs font-black text-white"
-                        >
-                          쿠팡 열기
-                        </a>
-                        <button
-                          type="button"
-                          onClick={() => postponeRepurchase(history)}
-                          className="rounded-full bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-700 ring-1 ring-emerald-100"
-                        >
-                          다음에
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </section>
 
           <div className="space-y-4 md:order-1 md:col-span-8">
@@ -995,7 +902,7 @@ export default function Home() {
                 <div>
                   <h3 className="font-black text-slate-900">오늘의 작업함</h3>
                   <p className="mt-1 text-xs font-bold leading-5 text-slate-400">
-                    일정, 기록, 위임에서 오늘 확인할 핵심만 함께 보여줍니다.
+                    오늘 확인할 것만 모아서 보여줍니다.
                   </p>
                 </div>
               </div>
@@ -1027,7 +934,7 @@ export default function Home() {
                     body:
                       pendingAgentCount > 0
                         ? "구매, 예약처럼 확인이 필요한 요청입니다."
-                        : "대기 중인 위임 요청 없음",
+                        : "지금 확인할 요청 없음",
                     href: "/records",
                     tone: "violet",
                   },

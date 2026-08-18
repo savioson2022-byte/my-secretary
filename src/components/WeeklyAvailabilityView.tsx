@@ -8,6 +8,7 @@ import {
   getTodayDateOnly,
   toDateOnlyString,
 } from "@/lib/availability";
+import { useExternalCalendarEvents } from "@/lib/useExternalCalendarEvents";
 import { SingleSchedule } from "@/types/calendar";
 import { RoutineSchedule } from "@/types/routine";
 import { useState } from "react";
@@ -51,10 +52,15 @@ export default function WeeklyAvailabilityView({
   const [selectedDateText, setSelectedDateText] = useState(() => {
     return toDateOnlyString(today);
   });
+  const { events: externalEvents } = useExternalCalendarEvents(
+    weekDates[0],
+    weekDates[weekDates.length - 1]
+  );
   const selectedFreeTimeBlocks = calculateFreeTimeBlocksForDate({
     date: selectedDateText,
     routines,
     singleSchedules,
+    externalEvents,
   });
   const selectedDayOfWeek = getDayOfWeekFromDateText(selectedDateText);
 
@@ -65,7 +71,9 @@ export default function WeeklyAvailabilityView({
           이번 주 빈 시간
         </h3>
         <p className="mt-1 text-sm text-slate-500">
-          정기 일정과 단기 일정을 모두 제외하고 실제로 남는 시간을 계산합니다.
+          {externalEvents.length > 0
+            ? "정기 일정, 단기 일정, 연동한 캘린더 일정을 모두 제외하고 실제로 남는 시간을 계산합니다."
+            : "정기 일정과 단기 일정을 모두 제외하고 실제로 남는 시간을 계산합니다."}
         </p>
       </div>
 
@@ -75,6 +83,7 @@ export default function WeeklyAvailabilityView({
             date: dateText,
             routines,
             singleSchedules,
+            externalEvents,
           });
 
           const dayOfWeek = getDayOfWeekFromDateText(dateText);

@@ -6,6 +6,7 @@ import CalendarNavigation from "@/components/CalendarNavigation";
 import MonthlyCalendarView from "@/components/MonthlyCalendarView";
 import UserStatusBadge from "@/components/UserStatusBadge";
 import PageHelpButton from "@/components/PageHelpButton";
+import SettingsLinkButton from "@/components/SettingsLinkButton";
 import { getCloudDataSyncedEventName } from "@/lib/dataSyncEvents";
 import {
   getSingleScheduleUpdatedEventName,
@@ -60,7 +61,7 @@ export default function MonthlyCalendarPage() {
               월간 캘린더
             </h1>
           </div>
-          <div className="flex items-center gap-2"><PageHelpButton topic="monthly" /><UserStatusBadge /></div>
+          <div className="flex items-center gap-2"><PageHelpButton topic="monthly" /><SettingsLinkButton /><UserStatusBadge /></div>
         </header>
 
       <CalendarNavigation />

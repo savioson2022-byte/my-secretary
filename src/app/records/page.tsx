@@ -5,6 +5,7 @@ import BottomNavigation from "@/components/BottomNavigation";
 import ItemCard from "@/components/ItemCard";
 import UserStatusBadge from "@/components/UserStatusBadge";
 import PageHelpButton from "@/components/PageHelpButton";
+import SettingsLinkButton from "@/components/SettingsLinkButton";
 import { groupIdeaWithAi, isIdeaRecord } from "@/lib/ideaGrouping";
 import { deleteItem, getItems, saveItem, updateItem } from "@/lib/storage";
 import { AssistantItem } from "@/types/assistant";
@@ -149,7 +150,7 @@ export default function RecordsPage() {
             이어서 남깁니다.
           </p>
         </div>
-        <div className="flex items-center gap-2"><PageHelpButton topic="records" /><UserStatusBadge /></div>
+        <div className="flex items-center gap-2"><PageHelpButton topic="records" /><SettingsLinkButton /><UserStatusBadge /></div>
       </header>
 
       <section className="app-card p-5">

@@ -19,16 +19,6 @@ const LINKS = [
     label: "기록",
     icon: "M7 4h10a2 2 0 0 1 2 2v15l-7-3-7 3V6a2 2 0 0 1 2-2Z",
   },
-  {
-    href: "/delegate",
-    label: "위임",
-    icon: "M6 12h12M13 7l5 5-5 5M5 5h4a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5",
-  },
-  {
-    href: "/settings",
-    label: "설정",
-    icon: "M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7ZM19.4 15a1.7 1.7 0 0 0 .34 1.88l.04.04a2 2 0 0 1-2.83 2.83l-.04-.04A1.7 1.7 0 0 0 15 19.4a1.7 1.7 0 0 0-1 .6l-.03.04a2 2 0 0 1-3.94 0L10 20a1.7 1.7 0 0 0-1-.6 1.7 1.7 0 0 0-1.88.34l-.04.04a2 2 0 0 1-2.83-2.83l.04-.04A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-.6-1l-.04-.03a2 2 0 0 1 0-3.94L4 10a1.7 1.7 0 0 0 .6-1 1.7 1.7 0 0 0-.34-1.88l-.04-.04a2 2 0 0 1 2.83-2.83l.04.04A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-.6l.03-.04a2 2 0 0 1 3.94 0L14 4a1.7 1.7 0 0 0 1 .6 1.7 1.7 0 0 0 1.88-.34l.04-.04a2 2 0 0 1 2.83 2.83l-.04.04A1.7 1.7 0 0 0 19.4 9c.04.36.25.7.6 1l.04.03a2 2 0 0 1 0 3.94L20 14c-.35.3-.56.64-.6 1Z",
-  },
 ];
 
 export default function BottomNavigation() {
@@ -37,14 +27,13 @@ export default function BottomNavigation() {
   return (
     <>
       <nav className="desktop-side-nav fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-[430px] border-t border-slate-100 bg-white/95 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2 shadow-[0_-14px_38px_rgba(15,23,42,0.08)] backdrop-blur md:bottom-auto md:right-auto md:top-1/2 md:mx-0 md:w-[88px] md:-translate-y-1/2 md:rounded-2xl md:border md:border-slate-100 md:px-2 md:py-3 md:shadow-soft">
-        <div className="grid grid-cols-5 gap-1 md:grid-cols-1">
+        <div className="grid grid-cols-3 gap-1 md:grid-cols-1">
           {LINKS.map((link) => {
             const isActive =
               pathname === link.href ||
               (link.href === "/calendar/monthly" &&
                 pathname.startsWith("/calendar")) ||
-              (link.href === "/delegate" && pathname.startsWith("/delegate")) ||
-              (link.href === "/settings" && pathname.startsWith("/settings"));
+              (link.href === "/records" && pathname.startsWith("/records"));
 
             return (
               <Link

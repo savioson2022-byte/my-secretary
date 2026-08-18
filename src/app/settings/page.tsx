@@ -3,7 +3,19 @@ import BottomNavigation from "@/components/BottomNavigation";
 import UserStatusBadge from "@/components/UserStatusBadge";
 import PageHelpButton from "@/components/PageHelpButton";
 
-const SETTINGS_GROUPS = [
+type SettingsGroup = {
+  title: string;
+  note?: string;
+  items: {
+    href: string;
+    title: string;
+    description: string;
+    color: string;
+    icon: string;
+  }[];
+};
+
+const SETTINGS_GROUPS: SettingsGroup[] = [
   {
     title: "내 정보",
     items: [
@@ -14,18 +26,18 @@ const SETTINGS_GROUPS = [
         color: "bg-blue-600",
         icon: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm7 9a7 7 0 0 0-14 0",
       },
-      {
-        href: "/settings/ai",
-        title: "개인 AI",
-        description: "Gemma 모델과 개인 AI 학습 기록",
-        color: "bg-violet-500",
-        icon: "M12 3v3m0 12v3M3 12h3m12 0h3M6.3 6.3l2.1 2.1m7.2 7.2 2.1 2.1m0-11.4-2.1 2.1m-7.2 7.2-2.1 2.1M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z",
-      },
     ],
   },
   {
     title: "앱 동작",
     items: [
+      {
+        href: "/settings/calendar",
+        title: "캘린더 연동",
+        description: "iPhone 캘린더를 읽어 빈 시간을 정확하게 계산",
+        color: "bg-indigo-500",
+        icon: "M7 2v3M17 2v3M3.5 9h17M5 4h14a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z",
+      },
       {
         href: "/settings/notifications",
         title: "알림과 알람",
@@ -46,6 +58,33 @@ const SETTINGS_GROUPS = [
         description: "저장 장소와 이동시간 기본값",
         color: "bg-emerald-500",
         icon: "M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Zm-8 3a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z",
+      },
+    ],
+  },
+  {
+    title: "실험실",
+    note: "아직 다듬는 중인 기능입니다. 켜두면 동작하지만 바뀔 수 있어요.",
+    items: [
+      {
+        href: "/settings/ai",
+        title: "개인 AI",
+        description: "기기 안에서 도는 Gemma 모델과 학습 기록",
+        color: "bg-violet-500",
+        icon: "M12 3v3m0 12v3M3 12h3m12 0h3M6.3 6.3l2.1 2.1m7.2 7.2 2.1 2.1m0-11.4-2.1 2.1m-7.2 7.2-2.1 2.1M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z",
+      },
+      {
+        href: "/purchase",
+        title: "구매 기록과 재구매",
+        description: "메일에서 주문을 읽어와 재구매 주기를 추정",
+        color: "bg-teal-600",
+        icon: "M6 6h15l-1.5 9h-12L5 3H2m5 18a1 1 0 1 0 0-2 1 1 0 0 0 0 2Zm11 0a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z",
+      },
+      {
+        href: "/delegate",
+        title: "위임",
+        description: "비서에게 넘긴 작업의 진행 상황",
+        color: "bg-slate-500",
+        icon: "M6 12h12M13 7l5 5-5 5M5 5h4a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5",
       },
     ],
   },
@@ -71,6 +110,11 @@ export default function SettingsPage() {
             <h2 className="mb-2 px-1 text-xs font-black text-slate-400">
               {group.title}
             </h2>
+            {group.note && (
+              <p className="mb-2 px-1 text-xs font-semibold leading-5 text-slate-400">
+                {group.note}
+              </p>
+            )}
             <div className="overflow-hidden rounded-2xl bg-white shadow-soft ring-1 ring-slate-100">
               {group.items.map((item, index) => (
                 <Link

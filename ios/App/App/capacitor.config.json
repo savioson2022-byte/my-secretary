@@ -9,6 +9,9 @@
 	"ios": {
 		"scheme": "MySecretary"
 	},
+	"android": {
+		"allowMixedContent": false
+	},
 	"plugins": {
 		"PushNotifications": {
 			"presentationOptions": [
@@ -19,7 +22,6 @@
 		}
 	},
 	"packageClassList": [
-		"AlarmPulsePlugin",
 		"GeolocationPlugin",
 		"LocalNotificationsPlugin",
 		"PushNotificationsPlugin"

@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { buildNotificationEvents } from "@/lib/notificationEventBuilder";
+import { loadEnabledExternalCalendarEvents } from "@/lib/externalCalendar";
+import { getNotificationSearchWindow } from "@/lib/suggestionSearchWindow";
 import { getNotificationSettings } from "@/lib/notificationSettingsStorage";
 import type { NotificationEvent } from "@/types/notification";
 
@@ -48,7 +50,21 @@ export default function NotificationSummaryCard() {
   }, [events, todayText]);
 
   useEffect(() => {
-    setEvents(buildNotificationEvents(getNotificationSettings()));
+    let cancelled = false;
+
+    async function load() {
+      const externalEvents = await loadEnabledExternalCalendarEvents(
+        getNotificationSearchWindow()
+      );
+      if (cancelled) return;
+      setEvents(buildNotificationEvents(getNotificationSettings(), externalEvents));
+    }
+
+    void load();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   if (todayEvents.length === 0) {

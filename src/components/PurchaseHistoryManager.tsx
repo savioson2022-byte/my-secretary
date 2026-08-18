@@ -12,7 +12,11 @@ import {
   updatePurchaseHistory,
 } from "@/lib/purchaseHistoryStorage";
 import type { PurchaseHistoryItem } from "@/types/purchaseHistory";
-import { getAiRequestHeaders } from "@/lib/aiDataConsent";
+import {
+  getAiDataConsentChoice,
+  getAiRequestHeaders,
+  requestAiDataConsent,
+} from "@/lib/aiDataConsent";
 
 type PurchaseDraft = {
   id: string | null;
@@ -453,7 +457,12 @@ export default function PurchaseHistoryManager() {
     try {
       const consentHeaders = await getAiRequestHeaders();
       if (!consentHeaders) {
-        setMailAutomationMessage("설정의 개인 AI에서 외부 AI 전송에 동의해야 메일을 분석할 수 있어.");
+        if (getAiDataConsentChoice() === null) {
+          requestAiDataConsent();
+          setMailAutomationMessage("메일을 분석하려면 외부 AI 전송에 동의해주세요.");
+        } else {
+          setMailAutomationMessage("설정의 개인 AI에서 외부 AI 전송에 동의해야 메일을 분석할 수 있어.");
+        }
         return;
       }
       const response = await fetch("/api/purchase/mail/sync", {

@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { suggestTimeTaskSchedules } from "@/lib/taskScheduleSuggestion";
+import { useExternalCalendarEvents } from "@/lib/useExternalCalendarEvents";
+import { getSuggestionSearchWindow } from "@/lib/suggestionSearchWindow";
 import { getCloudDataSyncedEventName } from "@/lib/dataSyncEvents";
 import { getLocalDataUpdatedEventName } from "@/lib/localStorageRepository";
 import { getSavedPlaces } from "@/lib/placeStorage";
@@ -92,10 +94,16 @@ export default function TimeTaskSuggestionView({
     };
   }, []);
 
+  const searchWindow = getSuggestionSearchWindow();
+  const { events: externalEvents } = useExternalCalendarEvents(
+    searchWindow.startDate,
+    searchWindow.endDate
+  );
   const suggestions = suggestTimeTaskSchedules({
     items,
     routines,
     singleSchedules,
+    externalEvents,
     savedPlaces,
     userProfile,
     suggestionFeedbacks,

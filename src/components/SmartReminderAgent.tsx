@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { adaptLocationAwareNotificationEvents } from "@/lib/adaptiveTravelNotifications";
 import { buildNotificationEvents } from "@/lib/notificationEventBuilder";
+import { loadEnabledExternalCalendarEvents } from "@/lib/externalCalendar";
+import { getNotificationSearchWindow } from "@/lib/suggestionSearchWindow";
 import { getNotificationSettings } from "@/lib/notificationSettingsStorage";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { getRoutineSchedules } from "@/lib/routineStorage";
@@ -14,7 +16,10 @@ import {
   scheduleNativeSystemAlarm,
 } from "@/lib/nativeSystemAlarm";
 import { getPersistentAlarmOffsets } from "@/lib/persistentAlarmSchedule";
-import type { NotificationEvent } from "@/types/notification";
+import type {
+  NotificationEvent,
+  NotificationSettings,
+} from "@/types/notification";
 import { DayOfWeek, RoutineSchedule } from "@/types/routine";
 
 const REMINDER_OFFSETS = [10, 0];
@@ -861,6 +866,20 @@ async function scheduleNativeNotifications(events: NotificationEvent[]) {
   }
 }
 
+/**
+ * 연동한 시스템 캘린더까지 반영해서 알림 목록을 만든다.
+ * 캘린더 일정 자체로 알람을 울리지는 않고, 빈 시간 판단에만 쓴다.
+ */
+async function buildNotificationEventsWithCalendar(
+  settings: NotificationSettings
+) {
+  const externalEvents = await loadEnabledExternalCalendarEvents(
+    getNotificationSearchWindow()
+  );
+
+  return buildNotificationEvents(settings, externalEvents);
+}
+
 export default function SmartReminderAgent() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const [isMounted, setIsMounted] = useState(false);
@@ -890,7 +909,7 @@ export default function SmartReminderAgent() {
     const refreshScheduledNotifications = async () => {
       const nextSettings = getNotificationSettings();
       const nextEvents = await adaptLocationAwareNotificationEvents(
-        buildNotificationEvents(nextSettings),
+        await buildNotificationEventsWithCalendar(nextSettings),
         nextSettings
       );
       if (isStopped) return;
@@ -1048,7 +1067,7 @@ export default function SmartReminderAgent() {
 
       const settings = getNotificationSettings();
       const events = await adaptLocationAwareNotificationEvents(
-        buildNotificationEvents(settings),
+        await buildNotificationEventsWithCalendar(settings),
         settings
       );
 
@@ -1076,10 +1095,13 @@ export default function SmartReminderAgent() {
       const { PushNotifications } = await import(
         "@capacitor/push-notifications"
       );
+      const { Capacitor } = await import("@capacitor/core");
+      const platform = Capacitor.getPlatform();
+      const deviceLabel = platform === "android" ? "Android" : "iPhone";
       const permission = await PushNotifications.requestPermissions();
 
       if (permission.receive !== "granted") {
-        setMessage("아이폰 원격 푸시 권한을 허용해야 앱 푸시를 받을 수 있습니다.");
+        setMessage(`${deviceLabel} 알림 권한을 허용해야 앱 푸시를 받을 수 있습니다.`);
         return;
       }
 
@@ -1093,27 +1115,27 @@ export default function SmartReminderAgent() {
           },
           body: JSON.stringify({
             token: token.value,
-            platform: "ios",
-            deviceName: "iPhone",
+            platform,
+            deviceName: deviceLabel,
           }),
         });
         const result = await response.json();
 
         if (!result.ok) {
           setMessage(
-            result.reason ?? "아이폰 푸시 토큰 저장에 실패했습니다."
+            result.reason ?? `${deviceLabel} 푸시 토큰 저장에 실패했습니다.`
           );
           return;
         }
 
-        setMessage("아이폰 앱 푸시 토큰을 연결했습니다.");
+        setMessage(`${deviceLabel} 앱 푸시 토큰을 연결했습니다.`);
       });
       await PushNotifications.addListener("registrationError", () => {
-        setMessage("아이폰 원격 푸시 등록에 실패했습니다.");
+        setMessage(`${deviceLabel} 원격 푸시 등록에 실패했습니다.`);
       });
       await PushNotifications.register();
     } catch {
-      setMessage("아이폰 원격 푸시 준비 중 문제가 생겼습니다.");
+      setMessage("기기 원격 푸시 준비 중 문제가 생겼습니다.");
     }
   }
 
@@ -1138,13 +1160,16 @@ export default function SmartReminderAgent() {
 
   async function syncNotificationEvents(
     accessToken?: string,
-    events = buildNotificationEvents(getNotificationSettings())
+    events?: NotificationEvent[]
   ) {
+    const resolvedEvents =
+      events ??
+      (await buildNotificationEventsWithCalendar(getNotificationSettings()));
     const token = accessToken ?? (await getAccessToken());
 
-    if (!token || events.length === 0) return;
+    if (!token || resolvedEvents.length === 0) return;
     const mutedIds = getMutedPersistentAlarmIds();
-    const activeEvents = events.filter((event) => {
+    const activeEvents = resolvedEvents.filter((event) => {
       const groupId =
         typeof event.payload?.persistentAlarmGroupId === "string"
           ? event.payload.persistentAlarmGroupId

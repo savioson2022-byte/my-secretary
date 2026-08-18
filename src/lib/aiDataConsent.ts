@@ -4,6 +4,16 @@ export const AI_DATA_CONSENT_VERSION = "2026-08-01";
 export const AI_DATA_CONSENT_HEADER = "X-AI-Data-Consent";
 const STORAGE_KEY = "my-assistant-ai-data-consent";
 export const AI_DATA_CONSENT_CHANGED_EVENT = "my-assistant-ai-data-consent-changed";
+export const AI_DATA_CONSENT_REQUESTED_EVENT = "my-assistant-ai-data-consent-requested";
+
+/**
+ * 외부 AI가 실제로 필요해진 순간에만 동의 창을 띄운다.
+ * 앱을 처음 열자마자 묻지 않기 위해 호출 지점에서 직접 부른다.
+ */
+export function requestAiDataConsent() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(AI_DATA_CONSENT_REQUESTED_EVENT));
+}
 
 export type AiDataConsentChoice = "accepted" | "declined" | null;
 

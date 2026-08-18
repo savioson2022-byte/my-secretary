@@ -6,6 +6,7 @@ import CalendarNavigation from "@/components/CalendarNavigation";
 import SingleScheduleList from "@/components/SingleScheduleList";
 import UserStatusBadge from "@/components/UserStatusBadge";
 import PageHelpButton from "@/components/PageHelpButton";
+import SettingsLinkButton from "@/components/SettingsLinkButton";
 import { getCloudDataSyncedEventName } from "@/lib/dataSyncEvents";
 import {
   deleteSingleSchedule,
@@ -63,7 +64,7 @@ export default function SingleSchedulePage() {
               한 번만 발생하는 일정의 날짜, 시간, 위치, 메모를 수정하고 관리합니다.
             </p>
           </div>
-          <div className="flex items-center gap-2"><PageHelpButton topic="single" /><UserStatusBadge /></div>
+          <div className="flex items-center gap-2"><PageHelpButton topic="single" /><SettingsLinkButton /><UserStatusBadge /></div>
         </header>
 
       <CalendarNavigation />

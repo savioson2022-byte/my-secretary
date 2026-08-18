@@ -13,6 +13,7 @@
 		4A5F44C22D38000100AA0001 /* AlarmPulsePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A5F44C12D38000100AA0001 /* AlarmPulsePlugin.swift */; };
 		4A5F44CE2D38000100AA0001 /* AlarmKitPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A5F44CD2D38000100AA0001 /* AlarmKitPlugin.swift */; };
 		4A5F44CC2D38000100AA0001 /* AppleSignInPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A5F44CB2D38000100AA0001 /* AppleSignInPlugin.swift */; };
+		4A5F44D02D38000100AA0001 /* CalendarBridgePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A5F44CF2D38000100AA0001 /* CalendarBridgePlugin.swift */; };
 		4A5F44C42D38000100AA0001 /* GemmaRuntimePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A5F44C32D38000100AA0001 /* GemmaRuntimePlugin.swift */; };
 		4A5F44C62D38000100AA0001 /* LiteRTLM in Frameworks */ = {isa = PBXBuildFile; productRef = 4A5F44C72D38000100AA0001 /* LiteRTLM */; };
 		4A5F44CA2D38000100AA0001 /* MySecretaryBridgeViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A5F44C92D38000100AA0001 /* MySecretaryBridgeViewController.swift */; };
@@ -29,6 +30,7 @@
 		4A5F44C12D38000100AA0001 /* AlarmPulsePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlarmPulsePlugin.swift; sourceTree = "<group>"; };
 		4A5F44CD2D38000100AA0001 /* AlarmKitPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlarmKitPlugin.swift; sourceTree = "<group>"; };
 		4A5F44CB2D38000100AA0001 /* AppleSignInPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleSignInPlugin.swift; sourceTree = "<group>"; };
+		4A5F44CF2D38000100AA0001 /* CalendarBridgePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarBridgePlugin.swift; sourceTree = "<group>"; };
 		4A5F44C32D38000100AA0001 /* GemmaRuntimePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GemmaRuntimePlugin.swift; sourceTree = "<group>"; };
 		4A5F44C92D38000100AA0001 /* MySecretaryBridgeViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MySecretaryBridgeViewController.swift; sourceTree = "<group>"; };
 		504EC3041FED79650016851F /* App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = App.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -79,6 +81,7 @@
 				4A5F44C12D38000100AA0001 /* AlarmPulsePlugin.swift */,
 				4A5F44CB2D38000100AA0001 /* AppleSignInPlugin.swift */,
 				4A5F44CD2D38000100AA0001 /* AlarmKitPlugin.swift */,
+				4A5F44CF2D38000100AA0001 /* CalendarBridgePlugin.swift */,
 				4A5F44C32D38000100AA0001 /* GemmaRuntimePlugin.swift */,
 				4A5F44C92D38000100AA0001 /* MySecretaryBridgeViewController.swift */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
@@ -179,6 +182,7 @@
 				4A5F44C22D38000100AA0001 /* AlarmPulsePlugin.swift in Sources */,
 				4A5F44CE2D38000100AA0001 /* AlarmKitPlugin.swift in Sources */,
 				4A5F44CC2D38000100AA0001 /* AppleSignInPlugin.swift in Sources */,
+				4A5F44D02D38000100AA0001 /* CalendarBridgePlugin.swift in Sources */,
 				4A5F44C42D38000100AA0001 /* GemmaRuntimePlugin.swift in Sources */,
 				4A5F44CA2D38000100AA0001 /* MySecretaryBridgeViewController.swift in Sources */,
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,

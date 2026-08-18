@@ -11,6 +11,7 @@ import { getSingleSchedules } from "@/lib/singleScheduleStorage";
 import { getItems } from "@/lib/storage";
 import type { AssistantItem } from "@/types/assistant";
 import type { SavedPlace, SingleSchedule } from "@/types/calendar";
+import type { ExternalCalendarEvent } from "@/types/externalCalendar";
 import type {
   NotificationEvent,
   NotificationEventType,
@@ -437,15 +438,39 @@ function createTimeTaskEvent({
   };
 }
 
-export function buildNotificationEvents(settings: NotificationSettings) {
+/**
+ * 알림 계산에 필요한 모든 데이터. 저장소를 직접 읽지 않으므로
+ * 브라우저 밖(서버 에이전트 루프)에서도 그대로 호출할 수 있다.
+ */
+export type NotificationEventInput = {
+  settings: NotificationSettings;
+  items: AssistantItem[];
+  routines: RoutineSchedule[];
+  singleSchedules: SingleSchedule[];
+  savedPlaces: SavedPlace[];
+  purchaseHistories: PurchaseHistoryItem[];
+  /**
+   * 시스템 캘린더 일정. 빈 시간 계산에만 쓴다.
+   * 사용자가 앱에 직접 넣지 않은 일정으로 알람을 울리지는 않는다.
+   */
+  externalEvents?: ExternalCalendarEvent[];
+  referenceDate?: Date;
+};
+
+/** 저장소에 의존하지 않는 순수 계산. */
+export function buildNotificationEventsFrom({
+  settings,
+  items,
+  routines,
+  singleSchedules,
+  savedPlaces,
+  purchaseHistories,
+  externalEvents = [],
+  referenceDate,
+}: NotificationEventInput): NotificationEvent[] {
   if (!settings.notificationsEnabled) return [];
 
-  const today = new Date();
-  const savedPlaces = getSavedPlaces();
-  const routines = getRoutineSchedules();
-  const singleSchedules = getSingleSchedules();
-  const purchaseHistories = getPurchaseHistories();
-  const items = getItems();
+  const today = referenceDate ?? new Date();
   const activeTimeTasks = items.filter(
     (item) => item.status === "미완료" && item.processType === "시간작업"
   );
@@ -530,6 +555,7 @@ export function buildNotificationEvents(settings: NotificationSettings) {
         date: dateText,
         routines,
         singleSchedules,
+        externalEvents,
       }).reduce((total, block) => total + block.minutes, 0);
       const recommendedItem = activeTimeTasks.find(
         (item) => !item.dueDate || item.dueDate >= dateText
@@ -569,5 +595,24 @@ export function buildNotificationEvents(settings: NotificationSettings) {
 
   return expandPersistentAlarmEvents(events, settings).sort((left, right) => {
     return new Date(left.scheduledAt).getTime() - new Date(right.scheduledAt).getTime();
+  });
+}
+
+/**
+ * 브라우저에서 저장소를 읽어 위 순수 함수를 호출하는 얇은 래퍼.
+ * 기존 호출부는 그대로 두고, 서버로 옮길 때는 buildNotificationEventsFrom을 쓴다.
+ */
+export function buildNotificationEvents(
+  settings: NotificationSettings,
+  externalEvents: ExternalCalendarEvent[] = []
+): NotificationEvent[] {
+  return buildNotificationEventsFrom({
+    settings,
+    items: getItems(),
+    routines: getRoutineSchedules(),
+    singleSchedules: getSingleSchedules(),
+    savedPlaces: getSavedPlaces(),
+    purchaseHistories: getPurchaseHistories(),
+    externalEvents,
   });
 }

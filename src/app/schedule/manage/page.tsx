@@ -6,6 +6,7 @@ import CalendarNavigation from "@/components/CalendarNavigation";
 import RoutineScheduleManager from "@/components/RoutineScheduleManager";
 import UserStatusBadge from "@/components/UserStatusBadge";
 import PageHelpButton from "@/components/PageHelpButton";
+import SettingsLinkButton from "@/components/SettingsLinkButton";
 import { getCloudDataSyncedEventName } from "@/lib/dataSyncEvents";
 import { getItems } from "@/lib/storage";
 import { AssistantItem } from "@/types/assistant";
@@ -39,7 +40,7 @@ export default function ScheduleManagePage() {
             확인할 수 있도록 일정 데이터를 정리합니다.
           </p>
         </div>
-        <div className="flex items-center gap-2"><PageHelpButton topic="schedule" /><UserStatusBadge /></div>
+        <div className="flex items-center gap-2"><PageHelpButton topic="schedule" /><SettingsLinkButton /><UserStatusBadge /></div>
       </header>
 
       <div className="mb-5">

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AI_DATA_CONSENT_CHANGED_EVENT, getAiDataConsentChoice } from "@/lib/aiDataConsent";
+import { AI_DATA_CONSENT_CHANGED_EVENT } from "@/lib/aiDataConsent";
 import { FIRST_SIGNUP_GUIDE_SEEN_KEY, shouldShowFirstSignupGuide } from "@/lib/firstSignupGuide";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
@@ -16,7 +16,7 @@ export default function FirstSignupTimeTaskGuide() {
     const check = async () => {
       const { data } = await supabase.auth.getUser();
       const user = data.user;
-      if (!cancelled && user && getAiDataConsentChoice(user.id) !== null && shouldShowFirstSignupGuide(user) && !localStorage.getItem(`my-secretary:${user.id}:${FIRST_SIGNUP_GUIDE_SEEN_KEY}`)) {
+      if (!cancelled && user && shouldShowFirstSignupGuide(user) && !localStorage.getItem(`my-secretary:${user.id}:${FIRST_SIGNUP_GUIDE_SEEN_KEY}`)) {
         setUserId(user.id);
         window.setTimeout(() => !cancelled && setOpen(true), 500);
       }

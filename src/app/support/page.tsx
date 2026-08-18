@@ -49,10 +49,10 @@ export default function SupportPage() {
       </div>
 
       <div className="mt-8 rounded-3xl bg-blue-50 p-5 ring-1 ring-blue-100">
-        <h2 className="font-black text-slate-900">문의 전 확인</h2>
+        <h2 className="font-black text-slate-900">계정과 데이터 삭제</h2>
         <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-          문의 채널을 준비 중입니다. 긴급한 개인정보 삭제는 앱 내부의 계정 삭제
-          기능을 이용하면 즉시 처리됩니다.
+          개인정보 삭제는 문의 없이 앱 안에서 바로 처리됩니다. 설정 → 계정과
+          동기화 → 계정 삭제를 누르면 저장된 기록과 일정이 함께 삭제됩니다.
         </p>
       </div>
 
