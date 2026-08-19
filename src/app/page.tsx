@@ -16,6 +16,15 @@ import { aiClassifyInput } from "@/lib/aiClassifyInput";
 import { classifyInput } from "@/lib/classifyInput";
 import { buildClassificationContext } from "@/lib/classificationContext";
 import {
+  describeMissingRequirements,
+  needsReview,
+} from "@/lib/captureRequirements";
+import {
+  applyAiClassification,
+  captureInstantly,
+  saveReviewedItem,
+} from "@/lib/quickCapture";
+import {
   clearCaptureDraft,
   deleteCaptureReview,
   getCaptureDraft,
@@ -131,6 +140,8 @@ export default function Home() {
   const [inputText, setInputText] = useState("");
   const [classificationResult, setClassificationResult] =
     useState<AssistantItemWithoutId | null>(null);
+  /** 저장이 끝난 뒤 사용자가 열어서 고치는 기록. 저장을 막지는 않는다. */
+  const [reviewingItemId, setReviewingItemId] = useState<string | null>(null);
   const [classificationGemmaCandidate, setClassificationGemmaCandidate] =
     useState<AssistantItemWithoutId | null>(null);
   const [items, setItems] = useState<AssistantItem[]>([]);
@@ -182,6 +193,10 @@ export default function Home() {
 
   const todayItems = useMemo(() => {
     return items.filter(isImportantTodayItem);
+  }, [items]);
+  /** 저장은 이미 끝났고, 값만 덜 찬 기록. */
+  const reviewItems = useMemo(() => {
+    return items.filter(needsReview).slice(0, 5);
   }, [items]);
   const todayScheduleItems = useMemo(() => {
     const todayText = getTodayText();
@@ -266,25 +281,32 @@ export default function Home() {
   }, [items, selectedFilter]);
   const gemmaReadiness = getGemmaClassificationReadiness();
 
+  /**
+   * 던진 즉시 저장한다. 분류를 기다리지 않고, 폼도 띄우지 않는다.
+   * AI 분류는 저장이 끝난 뒤 백그라운드로 돌면서 결과를 덮어쓴다.
+   */
   async function handleClassify(textOverride?: string) {
     const targetText = textOverride ?? inputText;
     const trimmedText = targetText.trim();
 
-    if (!trimmedText) {
-      alert("먼저 기록할 내용을 입력해주세요.");
-      return;
-    }
+    if (!trimmedText) return;
 
-    if (textOverride !== undefined) {
-      setInputText(targetText);
-      saveCaptureDraft(targetText);
-    }
+    // 1) 규칙 기반 분류는 동기 함수라 네트워크를 기다리지 않는다.
+    const savedItem = captureInstantly(trimmedText);
 
-    setSaveMessage(null);
+    setInputText("");
+    clearCaptureDraft();
     setActiveCaptureReviewId(null);
-    setIsClassifying(true);
-    setClassificationSource(null);
+    setClassificationResult(null);
     setClassificationGemmaCandidate(null);
+    setClassificationSource(null);
+    setReviewingItemId(null);
+    setItems(getItems());
+    setSingleSchedules(getSingleSchedules());
+    setSaveMessage("저장했어요. AI가 정리하는 중이에요.");
+
+    // 2) AI 분류는 저장과 무관하게 뒤에서 돈다. 실패해도 기록은 이미 남아 있다.
+    setIsClassifying(true);
 
     try {
       const classificationContext = buildClassificationContext({
@@ -298,17 +320,25 @@ export default function Home() {
         classificationContext
       );
 
-      setClassificationResult(result);
+      const updatedItem = applyAiClassification({
+        itemId: savedItem.id,
+        classification: result,
+        previous: savedItem,
+      });
+
       setClassificationSource(source);
       setClassificationGemmaCandidate(gemmaCandidate);
+      setItems(getItems());
+      setSingleSchedules(getSingleSchedules());
+      setSaveMessage(
+        updatedItem && needsReview(updatedItem)
+          ? "저장했어요. 확인할 것이 하나 있어요."
+          : "저장했어요."
+      );
     } catch (error) {
-      console.error("AI 분류 실패, 규칙 기반 분류로 대체:", error);
-
-      const fallbackResult = classifyInput(trimmedText);
-
-      setClassificationResult(fallbackResult);
+      console.error("AI 분류 실패, 규칙 기반 분류를 유지합니다:", error);
       setClassificationSource("fallback");
-      setClassificationGemmaCandidate(null);
+      setSaveMessage("저장했어요. AI 분류는 나중에 다시 시도할게요.");
     } finally {
       setIsClassifying(false);
     }
@@ -385,6 +415,8 @@ export default function Home() {
 
   function openCaptureReview(review: CaptureReview) {
     if (!review.classification || review.status !== "pending") return;
+    // 저장된 기록 편집 중이었다면 그 상태를 먼저 벗어난다.
+    setReviewingItemId(null);
     setActiveCaptureReviewId(review.id);
     setClassificationResult(review.classification);
     setClassificationSource(review.classificationSource);
@@ -422,7 +454,56 @@ export default function Home() {
     setSaveMessage(null);
   }
 
+  /** 이미 저장된 기록을 고쳐서 다시 저장한다. 미완성이어도 저장을 막지 않는다. */
+  function handleReviewSave() {
+    if (!classificationResult || !reviewingItemId) return false;
+
+    const existing = items.find((item) => item.id === reviewingItemId);
+
+    if (!existing) {
+      setReviewingItemId(null);
+      setClassificationResult(null);
+      return false;
+    }
+
+    const nextItem = saveReviewedItem({
+      ...classificationResult,
+      id: existing.id,
+      createdAt: existing.createdAt,
+      updatedAt: existing.updatedAt,
+    });
+
+    setItems(getItems());
+    setSingleSchedules(getSingleSchedules());
+    setClassificationResult(null);
+    setReviewingItemId(null);
+
+    const remaining = describeMissingRequirements(nextItem);
+    setSaveMessage(
+      remaining ? `저장했어요. 아직 비어 있어요: ${remaining}` : "저장했어요."
+    );
+
+    return true;
+  }
+
+  function openReview(item: AssistantItem) {
+    setReviewingItemId(item.id);
+    setClassificationResult(item);
+    setClassificationGemmaCandidate(null);
+    setSaveMessage(null);
+  }
+
+  function cancelReview() {
+    setReviewingItemId(null);
+    setClassificationResult(null);
+    setSaveMessage(null);
+  }
+
   async function handleSave() {
+    if (reviewingItemId) {
+      return handleReviewSave();
+    }
+
     if (!classificationResult) return false;
 
     const result = classificationResult;
@@ -860,8 +941,39 @@ export default function Home() {
 
             {isClassifying && (
             <p className="app-card p-4 text-sm font-black text-slate-500">
-              AI가 입력 내용을 분류하는 중입니다...
+              저장은 끝났어요. AI가 뒤에서 정리하는 중입니다...
             </p>
+            )}
+
+            {!classificationResult && reviewItems.length > 0 && (
+            <section className="app-card p-4">
+              <h3 className="font-black text-slate-900">확인할 기록</h3>
+              <p className="mt-1 text-xs font-bold leading-5 text-slate-400">
+                이미 저장돼 있어요. 아래 값만 채우면 캘린더에도 올라갑니다.
+              </p>
+              <div className="mt-3 grid gap-2">
+                {reviewItems.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => openReview(item)}
+                    className="flex min-h-14 items-center gap-3 rounded-2xl bg-amber-50 px-3 py-2 text-left ring-1 ring-amber-100 transition hover:bg-amber-100"
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-black text-slate-900">
+                        {item.title}
+                      </span>
+                      <span className="mt-0.5 block truncate text-[11px] font-bold text-amber-700">
+                        {describeMissingRequirements(item)}
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-xs font-black text-amber-700">
+                      채우기
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </section>
             )}
 
             {classificationSource === "ai" && (
@@ -890,12 +1002,28 @@ export default function Home() {
             )}
 
             {classificationResult ? (
-            <ClassificationResult
-              result={classificationResult}
-              onChange={setClassificationResult}
-              onSave={handleSave}
-              gemmaCandidate={classificationGemmaCandidate}
-            />
+            <div className="space-y-2">
+              {reviewingItemId && (
+                <div className="flex items-center justify-between gap-3 rounded-2xl bg-slate-100 px-4 py-2">
+                  <p className="text-xs font-black text-slate-600">
+                    저장된 기록을 고치는 중입니다.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={cancelReview}
+                    className="shrink-0 text-xs font-black text-slate-500 underline"
+                  >
+                    닫기
+                  </button>
+                </div>
+              )}
+              <ClassificationResult
+                result={classificationResult}
+                onChange={setClassificationResult}
+                onSave={handleSave}
+                gemmaCandidate={classificationGemmaCandidate}
+              />
+            </div>
             ) : (
             <section className="app-card p-4">
               <div className="mb-3 flex items-center justify-between">

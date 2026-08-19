@@ -3,6 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { adaptLocationAwareNotificationEvents } from "@/lib/adaptiveTravelNotifications";
 import { buildNotificationEvents } from "@/lib/notificationEventBuilder";
+import {
+  NOTIFICATION_PRESETS,
+  findMatchingPreset,
+} from "@/lib/notificationPresets";
 import { loadEnabledExternalCalendarEvents } from "@/lib/externalCalendar";
 import { getNotificationSearchWindow } from "@/lib/suggestionSearchWindow";
 import {
@@ -511,6 +515,53 @@ export default function NotificationSettingsCard() {
         </p>
       </div>
 
+      <div className="mt-5 grid gap-2">
+        {NOTIFICATION_PRESETS.map((preset) => {
+          const isActive = findMatchingPreset(settings) === preset.id;
+
+          return (
+            <button
+              key={preset.id}
+              type="button"
+              onClick={() => updateSettings(preset.values)}
+              aria-pressed={isActive}
+              className={`flex min-h-16 items-center justify-between gap-3 rounded-2xl px-4 py-3 text-left transition ${
+                isActive
+                  ? "bg-blue-600 text-white shadow-[0_10px_24px_rgba(49,130,246,0.22)]"
+                  : "bg-slate-50 text-slate-700 ring-1 ring-slate-100 hover:bg-slate-100"
+              }`}
+            >
+              <span className="min-w-0">
+                <span className="block text-sm font-black">{preset.label}</span>
+                <span
+                  className={`mt-0.5 block text-xs font-bold leading-5 ${
+                    isActive ? "text-blue-100" : "text-slate-400"
+                  }`}
+                >
+                  {preset.description}
+                </span>
+              </span>
+              {isActive && (
+                <span className="shrink-0 text-xs font-black">사용 중</span>
+              )}
+            </button>
+          );
+        })}
+        {findMatchingPreset(settings) === null && (
+          <p className="px-1 text-xs font-bold text-slate-400">
+            지금은 직접 설정한 상태입니다. 위에서 하나를 고르면 그대로 맞춰집니다.
+          </p>
+        )}
+      </div>
+
+      <details className="mt-5 rounded-3xl bg-slate-50 p-4 ring-1 ring-slate-100">
+        <summary className="cursor-pointer text-sm font-black text-slate-700">
+          고급 설정
+        </summary>
+        <p className="mt-2 text-xs font-bold leading-5 text-slate-400">
+          항목을 직접 바꾸면 위 프리셋 선택이 해제됩니다.
+        </p>
+
       <div className="mt-5 rounded-3xl bg-blue-600 p-4 text-white">
         <div className="flex items-center justify-between gap-4">
           <div>
@@ -779,6 +830,8 @@ export default function NotificationSettingsCard() {
           강한 알람 권한 확인
         </button>
       </div>
+
+      </details>
 
       {message && (
         <p className="mt-4 rounded-2xl bg-blue-50 px-4 py-3 text-sm font-bold text-blue-700 ring-1 ring-blue-100">
