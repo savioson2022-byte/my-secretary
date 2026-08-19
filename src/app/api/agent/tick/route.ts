@@ -37,6 +37,31 @@ function isAuthorized(request: Request) {
   return isVercelCronRequest || hasValidSecret;
 }
 
+/** 미루거나 거절한 제안은 다시 보내지 않는다. */
+async function readDismissedActionIds(
+  supabase: NonNullable<ReturnType<typeof createSupabaseAdminClient>>,
+  userId: string
+): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("agent_decisions")
+    .select("action_id, kind, wake_at")
+    .eq("user_id", userId);
+
+  // 테이블이 아직 없으면 아무것도 제외하지 않는다.
+  if (error) return [];
+
+  const now = Date.now();
+
+  return (data ?? [])
+    .filter((row) => {
+      if (row.kind === "rejected" || row.kind === "approved") return true;
+      if (!row.wake_at) return false;
+
+      return new Date(row.wake_at).getTime() > now;
+    })
+    .map((row) => row.action_id as string);
+}
+
 export async function GET(request: Request) {
   if (!isAuthorized(request)) {
     return NextResponse.json(
@@ -92,7 +117,8 @@ export async function GET(request: Request) {
   for (const [userId, tokens] of tokensByUser) {
     try {
       const data = await readAgentUserData(supabase, userId);
-      const action = decideNextAction({ ...data });
+      const dismissedActionIds = await readDismissedActionIds(supabase, userId);
+      const action = decideNextAction({ ...data, dismissedActionIds });
 
       decidedCount += 1;
 

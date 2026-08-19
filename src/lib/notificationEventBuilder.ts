@@ -4,6 +4,7 @@ import {
   getDayOfWeekFromDateText,
   toDateOnlyString,
 } from "@/lib/availability";
+import { decideNextAction } from "@/lib/agentNextAction";
 import { getSavedPlaces } from "@/lib/placeStorage";
 import { getPurchaseHistories } from "@/lib/purchaseHistoryStorage";
 import { getRoutineSchedules } from "@/lib/routineStorage";
@@ -529,6 +530,16 @@ export function buildNotificationEventsFrom({
             routine.dayOfWeek === dayOfWeek && isRoutineActiveOnDate(routine, dateText)
         ).length;
 
+      // 아침 브리핑은 숫자만 나열하지 않고 "먼저 할 것 하나"를 말한다.
+      const morningAction = decideNextAction({
+        items,
+        routines,
+        singleSchedules,
+        savedPlaces,
+        externalEvents,
+        now: new Date(`${dateText}T09:00:00`),
+      });
+
       events.push({
         id: createEventId({
           eventType: "daily_summary",
@@ -540,9 +551,53 @@ export function buildNotificationEventsFrom({
         sourceId: "daily-summary",
         occurrenceDate: dateText,
         scheduledAt: toDateTimeIso(dateText, settings.dailySummaryTime || "08:00"),
-        title: `${dateText} 오늘의 비서 요약`,
-        body: `일정 ${scheduleCount}개·남은 시간작업 ${activeTimeTasks.length}개가 있어요.`,
-        url: "/",
+        title:
+          morningAction.kind === "clear"
+            ? "오늘은 여유가 있어요"
+            : `먼저 할 것: ${morningAction.title}`,
+        body:
+          morningAction.kind === "clear"
+            ? `일정 ${scheduleCount}개가 있어요. 급한 건 없습니다.`
+            : `${morningAction.body} · 오늘 일정 ${scheduleCount}개`,
+        url: morningAction.url,
+        placeName: "",
+        requiresLocationCheck: false,
+        notificationType: "daily_summary",
+        ...getEventDeliveryOptions(settings),
+      });
+    }
+
+    if (settings.eveningReviewEnabled) {
+      const doneToday = items.filter(
+        (item) => item.status === "완료" && item.updatedAt.slice(0, 10) === dateText
+      ).length;
+      const leftToday = items.filter(
+        (item) =>
+          item.status === "미완료" &&
+          item.dueDate &&
+          item.dueDate.slice(0, 10) <= dateText
+      );
+
+      events.push({
+        id: createEventId({
+          eventType: "evening_review",
+          sourceId: "evening-review",
+          occurrenceDate: dateText,
+        }),
+        eventType: "evening_review",
+        sourceType: "ai",
+        sourceId: "evening-review",
+        occurrenceDate: dateText,
+        scheduledAt: toDateTimeIso(dateText, settings.eveningReviewTime || "21:00"),
+        title:
+          leftToday.length > 0
+            ? `오늘 못 한 게 ${leftToday.length}개 있어요`
+            : "오늘 할 일은 다 정리됐어요",
+        body:
+          leftToday.length > 0
+            ? `${leftToday[0].title} 외 ${Math.max(0, leftToday.length - 1)}개. 내일로 옮길까요?`
+            : `오늘 ${doneToday}개를 끝냈어요.`,
+        url: "/records",
         placeName: "",
         requiresLocationCheck: false,
         notificationType: "daily_summary",

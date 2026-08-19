@@ -1,4 +1,5 @@
 import { getScopedStorageKey } from "@/lib/authScopedStorage";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { STORAGE_KEYS } from "@/lib/storageKeys";
 
 /**
@@ -75,7 +76,35 @@ export function recordAgentDecision({
     decision,
   ]);
 
+  // 서버 루프도 같은 판단을 알아야 다시 푸시하지 않는다. 실패해도 로컬은 남는다.
+  void pushDecisionToServer(decision);
+
   return decision;
+}
+
+async function pushDecisionToServer(decision: AgentDecision) {
+  try {
+    const supabase = createSupabaseBrowserClient();
+    const { data } = (await supabase?.auth.getSession()) ?? { data: { session: null } };
+    const token = data.session?.access_token;
+
+    if (!token) return;
+
+    await fetch("/api/agent/decisions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        actionId: decision.actionId,
+        kind: decision.kind,
+        wakeAt: decision.wakeAt,
+      }),
+    });
+  } catch {
+    // 오프라인이어도 앱 동작을 막지 않는다.
+  }
 }
 
 /** 지금 화면에 올리면 안 되는 판단들. */

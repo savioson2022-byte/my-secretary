@@ -14,6 +14,8 @@ export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
   repeatingNotificationsEnabled: true,
   dailySummaryEnabled: false,
   dailySummaryTime: "08:00",
+  eveningReviewEnabled: false,
+  eveningReviewTime: "21:00",
   defaultSnoozeMinutes: 10,
   travelNotificationsEnabled: true,
   purchaseNotificationsEnabled: true,

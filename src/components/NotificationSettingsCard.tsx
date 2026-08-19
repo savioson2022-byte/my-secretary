@@ -31,6 +31,7 @@ const TOGGLE_OPTIONS: Array<{
     | "aiRecommendationsEnabled"
     | "repeatingNotificationsEnabled"
     | "dailySummaryEnabled"
+    | "eveningReviewEnabled"
     | "travelNotificationsEnabled"
     | "purchaseNotificationsEnabled"
     | "routineReminderEnabled"
@@ -66,8 +67,13 @@ const TOGGLE_OPTIONS: Array<{
   },
   {
     key: "dailySummaryEnabled",
-    title: "오늘 요약",
-    description: "설정한 시간에 오늘 일정과 작업을 요약합니다.",
+    title: "아침 브리핑",
+    description: "아침에 오늘 먼저 할 것 하나를 알려줍니다.",
+  },
+  {
+    key: "eveningReviewEnabled",
+    title: "저녁 회고",
+    description: "저녁에 못 한 일을 모아 내일로 옮길지 물어봅니다.",
   },
   {
     key: "travelNotificationsEnabled",
@@ -774,13 +780,25 @@ export default function NotificationSettingsCard() {
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <label className="text-xs font-black text-slate-500">
-          오늘 요약 시간
+          아침 브리핑 시간
           <input
             type="time"
             value={settings.dailySummaryTime}
             disabled={!settings.dailySummaryEnabled}
             onChange={(event) =>
               updateSettings({ dailySummaryTime: event.target.value })
+            }
+            className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-blue-400 disabled:opacity-50"
+          />
+        </label>
+        <label className="text-xs font-black text-slate-500">
+          저녁 회고 시간
+          <input
+            type="time"
+            value={settings.eveningReviewTime}
+            disabled={!settings.eveningReviewEnabled}
+            onChange={(event) =>
+              updateSettings({ eveningReviewTime: event.target.value })
             }
             className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-blue-400 disabled:opacity-50"
           />

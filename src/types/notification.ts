@@ -11,6 +11,7 @@ export type NotificationEventType =
   | "period_task"
   | "ai_recommendation"
   | "daily_summary"
+  | "evening_review"
   | "sleep"
   | "wake"
   | "custom_alarm";
@@ -97,7 +98,9 @@ export type NotificationSettings = {
   aiRecommendationsEnabled: boolean;
   repeatingNotificationsEnabled: boolean;
   dailySummaryEnabled: boolean;
+  eveningReviewEnabled: boolean;
   dailySummaryTime: string;
+  eveningReviewTime: string;
   defaultSnoozeMinutes: number;
   travelNotificationsEnabled: boolean;
   purchaseNotificationsEnabled: boolean;

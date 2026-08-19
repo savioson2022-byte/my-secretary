@@ -26,6 +26,7 @@ export type NotificationPresetValues = Pick<
   | "aiRecommendationsEnabled"
   | "repeatingNotificationsEnabled"
   | "dailySummaryEnabled"
+  | "eveningReviewEnabled"
   | "persistentAlarmEnabled"
   | "persistentAlarmPrepEnabled"
   | "persistentAlarmTravelEnabled"
@@ -56,6 +57,7 @@ export const NOTIFICATION_PRESETS: NotificationPreset[] = [
       aiRecommendationsEnabled: false,
       repeatingNotificationsEnabled: false,
       dailySummaryEnabled: false,
+      eveningReviewEnabled: false,
       persistentAlarmEnabled: false,
       persistentAlarmPrepEnabled: false,
       persistentAlarmTravelEnabled: false,
@@ -78,6 +80,7 @@ export const NOTIFICATION_PRESETS: NotificationPreset[] = [
       aiRecommendationsEnabled: true,
       repeatingNotificationsEnabled: false,
       dailySummaryEnabled: true,
+      eveningReviewEnabled: true,
       persistentAlarmEnabled: false,
       persistentAlarmPrepEnabled: false,
       persistentAlarmTravelEnabled: false,
@@ -100,6 +103,7 @@ export const NOTIFICATION_PRESETS: NotificationPreset[] = [
       aiRecommendationsEnabled: true,
       repeatingNotificationsEnabled: true,
       dailySummaryEnabled: true,
+      eveningReviewEnabled: true,
       persistentAlarmEnabled: true,
       persistentAlarmPrepEnabled: true,
       persistentAlarmTravelEnabled: true,
