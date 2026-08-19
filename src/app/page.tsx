@@ -160,6 +160,8 @@ export default function Home() {
   /** 저장이 끝난 뒤 사용자가 열어서 고치는 기록. 저장을 막지는 않는다. */
   const [reviewingItemId, setReviewingItemId] = useState<string | null>(null);
   const [dismissedActionIds, setDismissedActionIds] = useState<string[]>([]);
+  /** 담기 딥링크로 들어왔을 때 무슨 일이 있었는지 눈에 보이게 남긴다. */
+  const [captureNotice, setCaptureNotice] = useState<string | null>(null);
   const [contextEvents, setContextEvents] = useState<ContextEvent[]>([]);
   const [classificationGemmaCandidate, setClassificationGemmaCandidate] =
     useState<AssistantItemWithoutId | null>(null);
@@ -198,12 +200,19 @@ export default function Home() {
     setVoiceIntent(searchParams.get("voice") === "1");
 
     // 공유 시트나 단축어에서 넘어온 텍스트는 화면을 거치지 않고 바로 저장한다.
-    const capturedText = searchParams.get("capture");
+    // capture 파라미터가 있었다는 사실 자체를 항상 알려서, 실패해도 눈에 보이게 한다.
+    if (searchParams.has("capture")) {
+      const capturedText = searchParams.get("capture")?.trim() ?? "";
 
-    if (capturedText?.trim()) {
-      captureInstantly(capturedText.trim());
-      refreshLocalData();
-      setSaveMessage("저장했어요.");
+      if (capturedText) {
+        captureInstantly(capturedText);
+        refreshLocalData();
+        setCaptureNotice(`담았어요: ${capturedText}`);
+      } else {
+        setCaptureNotice(
+          "담기 요청은 왔는데 내용이 비어 있었어요. 단축어에서 변수가 제대로 들어갔는지 확인해주세요."
+        );
+      }
 
       const cleanUrl = new URL(window.location.href);
       cleanUrl.searchParams.delete("capture");
@@ -1004,6 +1013,22 @@ export default function Home() {
           </section>
 
           <div className="space-y-4 md:order-1 md:col-span-8">
+            {captureNotice && (
+            <div className="flex items-start justify-between gap-3 rounded-2xl bg-emerald-600 px-4 py-3 text-white shadow-[0_10px_24px_rgba(16,185,129,0.25)]">
+              <p className="min-w-0 flex-1 text-sm font-black leading-5">
+                {captureNotice}
+              </p>
+              <button
+                type="button"
+                onClick={() => setCaptureNotice(null)}
+                aria-label="닫기"
+                className="shrink-0 text-xs font-black text-emerald-100"
+              >
+                닫기
+              </button>
+            </div>
+            )}
+
             <NextActionCard
               action={nextAction}
               onApprove={handleNextActionApprove}
