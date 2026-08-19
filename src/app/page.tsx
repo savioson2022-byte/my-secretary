@@ -8,6 +8,7 @@ import ClassificationResult from "@/components/ClassificationResult";
 import FilterBar from "@/components/FilterBar";
 import InputBox from "@/components/InputBox";
 import ItemCard from "@/components/ItemCard";
+import NextActionCard from "@/components/NextActionCard";
 import NotificationSummaryCard from "@/components/NotificationSummaryCard";
 import UserStatusBadge from "@/components/UserStatusBadge";
 import PageHelpButton from "@/components/PageHelpButton";
@@ -24,6 +25,17 @@ import {
   captureInstantly,
   saveReviewedItem,
 } from "@/lib/quickCapture";
+import { decideNextAction, type AgentNextAction } from "@/lib/agentNextAction";
+import {
+  AGENT_DECISION_CHANGED_EVENT,
+  getDismissedActionIds,
+  pruneAgentDecisions,
+  recordAgentDecision,
+} from "@/lib/agentDecisionStorage";
+import { getSavedPlaces } from "@/lib/placeStorage";
+import { getSuggestionFeedbacks } from "@/lib/suggestionFeedbackStorage";
+import { useExternalCalendarEvents } from "@/lib/useExternalCalendarEvents";
+import { getSuggestionSearchWindow } from "@/lib/suggestionSearchWindow";
 import {
   clearCaptureDraft,
   deleteCaptureReview,
@@ -142,6 +154,7 @@ export default function Home() {
     useState<AssistantItemWithoutId | null>(null);
   /** 저장이 끝난 뒤 사용자가 열어서 고치는 기록. 저장을 막지는 않는다. */
   const [reviewingItemId, setReviewingItemId] = useState<string | null>(null);
+  const [dismissedActionIds, setDismissedActionIds] = useState<string[]>([]);
   const [classificationGemmaCandidate, setClassificationGemmaCandidate] =
     useState<AssistantItemWithoutId | null>(null);
   const [items, setItems] = useState<AssistantItem[]>([]);
@@ -168,6 +181,7 @@ export default function Home() {
       setSingleSchedules(getSingleSchedules());
       setUserProfile(getUserProfile());
       setCaptureReviews(getCaptureReviews());
+      setDismissedActionIds(getDismissedActionIds());
     }
 
     refreshLocalData();
@@ -176,8 +190,11 @@ export default function Home() {
     const searchParams = new URLSearchParams(window.location.search);
     setVoiceIntent(searchParams.get("voice") === "1");
 
+    pruneAgentDecisions();
+
     window.addEventListener(getCloudDataSyncedEventName(), refreshLocalData);
     window.addEventListener(getLocalDataUpdatedEventName(), refreshLocalData);
+    window.addEventListener(AGENT_DECISION_CHANGED_EVENT, refreshLocalData);
 
     return () => {
       window.removeEventListener(
@@ -188,6 +205,7 @@ export default function Home() {
         getLocalDataUpdatedEventName(),
         refreshLocalData
       );
+      window.removeEventListener(AGENT_DECISION_CHANGED_EVENT, refreshLocalData);
     };
   }, []);
 
@@ -198,6 +216,34 @@ export default function Home() {
   const reviewItems = useMemo(() => {
     return items.filter(needsReview).slice(0, 5);
   }, [items]);
+
+  const suggestionWindow = useMemo(() => getSuggestionSearchWindow(), []);
+  const { events: agentExternalEvents } = useExternalCalendarEvents(
+    suggestionWindow.startDate,
+    suggestionWindow.endDate
+  );
+
+  /** 비서가 고른 "지금 할 것 하나". */
+  const nextAction = useMemo(() => {
+    return decideNextAction({
+      items,
+      routines,
+      singleSchedules,
+      savedPlaces: getSavedPlaces(),
+      userProfile,
+      suggestionFeedbacks: getSuggestionFeedbacks(),
+      personalAiMemories: getPersonalAiMemories(),
+      externalEvents: agentExternalEvents,
+      dismissedActionIds,
+    });
+  }, [
+    items,
+    routines,
+    singleSchedules,
+    userProfile,
+    agentExternalEvents,
+    dismissedActionIds,
+  ]);
   const todayScheduleItems = useMemo(() => {
     const todayText = getTodayText();
     const todayDay = getDayOfWeekFromDateText(todayText);
@@ -484,6 +530,73 @@ export default function Home() {
     );
 
     return true;
+  }
+
+  function handleNextActionApprove(action: AgentNextAction) {
+    if (action.kind === "needs_review" && action.sourceItemId) {
+      const target = items.find((item) => item.id === action.sourceItemId);
+      if (target) {
+        openReview(target);
+        return;
+      }
+    }
+
+    if (action.kind === "due_today" && action.sourceItemId) {
+      const target = items.find((item) => item.id === action.sourceItemId);
+      if (target) {
+        updateItem({
+          ...target,
+          status: "완료",
+          updatedAt: new Date().toISOString(),
+        });
+        setItems(getItems());
+        setSaveMessage("끝낸 걸로 표시했어요.");
+        return;
+      }
+    }
+
+    if (
+      action.kind === "suggested_session" &&
+      action.sourceItemId &&
+      action.suggestedDate &&
+      action.suggestedStartTime &&
+      action.suggestedEndTime
+    ) {
+      const target = items.find((item) => item.id === action.sourceItemId);
+
+      if (target) {
+        const now = new Date().toISOString();
+        saveSingleSchedule({
+          id: createId(),
+          title: target.title,
+          date: action.suggestedDate,
+          startTime: action.suggestedStartTime,
+          endTime: action.suggestedEndTime,
+          placeName: target.placeName ?? "",
+          memo: "",
+          sourceItemId: target.id,
+          createdAt: now,
+          updatedAt: now,
+        });
+        setSingleSchedules(getSingleSchedules());
+        setSaveMessage("캘린더에 넣어뒀어요.");
+      }
+    }
+
+    recordAgentDecision({ actionId: action.id, kind: "approved" });
+    setDismissedActionIds(getDismissedActionIds());
+  }
+
+  function handleNextActionSnooze(action: AgentNextAction) {
+    recordAgentDecision({ actionId: action.id, kind: "snoozed" });
+    setDismissedActionIds(getDismissedActionIds());
+    setSaveMessage("나중에 다시 꺼낼게요.");
+  }
+
+  function handleNextActionReject(action: AgentNextAction) {
+    recordAgentDecision({ actionId: action.id, kind: "rejected" });
+    setDismissedActionIds(getDismissedActionIds());
+    setSaveMessage("다시 권하지 않을게요.");
   }
 
   function openReview(item: AssistantItem) {
@@ -846,6 +959,13 @@ export default function Home() {
           </section>
 
           <div className="space-y-4 md:order-1 md:col-span-8">
+            <NextActionCard
+              action={nextAction}
+              onApprove={handleNextActionApprove}
+              onSnooze={handleNextActionSnooze}
+              onReject={handleNextActionReject}
+            />
+
             <InputBox
               value={inputText}
               onChange={handleInputTextChange}
