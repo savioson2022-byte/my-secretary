@@ -134,7 +134,18 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     private func openWebPath(_ path: String) {
-        guard let url = URL(string: "\(appBaseURL)\(path)") else {
+        let fullText = "\(appBaseURL)\(path)"
+
+        // 담기 딥링크에는 한글과 공백이 그대로 들어올 수 있다.
+        // URL(string:)은 그런 문자열에 nil을 돌려주므로, 실패하면 인코딩해서 다시 만든다.
+        // 이미 인코딩된 입력은 첫 시도에서 통과하므로 이중 인코딩되지 않는다.
+        let resolvedUrl =
+            URL(string: fullText)
+            ?? fullText
+                .addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed)
+                .flatMap(URL.init(string:))
+
+        guard let url = resolvedUrl else {
             return
         }
 
