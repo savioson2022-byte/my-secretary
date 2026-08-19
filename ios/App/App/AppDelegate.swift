@@ -98,6 +98,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                 path += "#\(query)"
             }
             openWebPath(path)
+        case "capture":
+            // 공유 시트나 단축어에서 넘긴 텍스트를 화면 없이 바로 저장한다.
+            var path = "/?"
+            if let query = url.query, !query.isEmpty {
+                path += query
+            }
+            openWebPath(path)
         case "voice", "record", "memo":
             openWebPath("/?voice=1")
         case "today", "":

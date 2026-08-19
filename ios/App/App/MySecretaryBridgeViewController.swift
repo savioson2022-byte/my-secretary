@@ -9,5 +9,6 @@ final class MySecretaryBridgeViewController: CAPBridgeViewController {
         bridge?.registerPluginInstance(AlarmKitPlugin())
         bridge?.registerPluginInstance(AlarmPulsePlugin())
         bridge?.registerPluginInstance(CalendarBridgePlugin())
+        bridge?.registerPluginInstance(GeofencePlugin())
     }
 }

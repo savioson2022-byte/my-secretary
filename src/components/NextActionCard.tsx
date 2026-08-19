@@ -23,6 +23,7 @@ const KIND_LABEL: Record<AgentNextAction["kind"], string> = {
   due_today: "오늘까지",
   needs_review: "확인 필요",
   suggested_session: "이때 어때요",
+  here_now: "지금 여기",
   clear: "여유",
 };
 
@@ -43,6 +44,8 @@ export default function NextActionCard({
         return "bg-amber-500";
       case "suggested_session":
         return "bg-violet-500";
+      case "here_now":
+        return "bg-emerald-500";
       default:
         return "bg-slate-400";
     }

@@ -14,6 +14,7 @@ export const STORAGE_KEYS = {
   captureReviews: "my-assistant-capture-reviews",
   externalCalendarSettings: "my-assistant-external-calendar-settings",
   agentDecisions: "my-assistant-agent-decisions",
+  contextEvents: "my-assistant-context-events",
 } as const;
 
 export const LEGACY_STORAGE_KEYS = {
@@ -53,4 +54,5 @@ export const USER_SCOPED_STORAGE_KEYS = [
   STORAGE_KEYS.captureReviews,
   STORAGE_KEYS.externalCalendarSettings,
   STORAGE_KEYS.agentDecisions,
+  STORAGE_KEYS.contextEvents,
 ] as const;

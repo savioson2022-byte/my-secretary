@@ -33,6 +33,10 @@ import {
   recordAgentDecision,
 } from "@/lib/agentDecisionStorage";
 import { getSavedPlaces } from "@/lib/placeStorage";
+import {
+  CONTEXT_EVENT_CHANGED_EVENT,
+  getContextEvents,
+} from "@/lib/contextEventStorage";
 import { getSuggestionFeedbacks } from "@/lib/suggestionFeedbackStorage";
 import { useExternalCalendarEvents } from "@/lib/useExternalCalendarEvents";
 import { getSuggestionSearchWindow } from "@/lib/suggestionSearchWindow";
@@ -72,6 +76,7 @@ import { SingleSchedule } from "@/types/calendar";
 import { DayOfWeek, RoutineSchedule } from "@/types/routine";
 import { UserProfile } from "@/types/userProfile";
 import type { CaptureReview } from "@/types/captureReview";
+import type { ContextEvent } from "@/types/contextEvent";
 
 function createId() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -155,6 +160,7 @@ export default function Home() {
   /** 저장이 끝난 뒤 사용자가 열어서 고치는 기록. 저장을 막지는 않는다. */
   const [reviewingItemId, setReviewingItemId] = useState<string | null>(null);
   const [dismissedActionIds, setDismissedActionIds] = useState<string[]>([]);
+  const [contextEvents, setContextEvents] = useState<ContextEvent[]>([]);
   const [classificationGemmaCandidate, setClassificationGemmaCandidate] =
     useState<AssistantItemWithoutId | null>(null);
   const [items, setItems] = useState<AssistantItem[]>([]);
@@ -182,6 +188,7 @@ export default function Home() {
       setUserProfile(getUserProfile());
       setCaptureReviews(getCaptureReviews());
       setDismissedActionIds(getDismissedActionIds());
+      setContextEvents(getContextEvents());
     }
 
     refreshLocalData();
@@ -190,11 +197,25 @@ export default function Home() {
     const searchParams = new URLSearchParams(window.location.search);
     setVoiceIntent(searchParams.get("voice") === "1");
 
+    // 공유 시트나 단축어에서 넘어온 텍스트는 화면을 거치지 않고 바로 저장한다.
+    const capturedText = searchParams.get("capture");
+
+    if (capturedText?.trim()) {
+      captureInstantly(capturedText.trim());
+      refreshLocalData();
+      setSaveMessage("저장했어요.");
+
+      const cleanUrl = new URL(window.location.href);
+      cleanUrl.searchParams.delete("capture");
+      window.history.replaceState({}, "", cleanUrl.toString());
+    }
+
     pruneAgentDecisions();
 
     window.addEventListener(getCloudDataSyncedEventName(), refreshLocalData);
     window.addEventListener(getLocalDataUpdatedEventName(), refreshLocalData);
     window.addEventListener(AGENT_DECISION_CHANGED_EVENT, refreshLocalData);
+    window.addEventListener(CONTEXT_EVENT_CHANGED_EVENT, refreshLocalData);
 
     return () => {
       window.removeEventListener(
@@ -206,6 +227,7 @@ export default function Home() {
         refreshLocalData
       );
       window.removeEventListener(AGENT_DECISION_CHANGED_EVENT, refreshLocalData);
+      window.removeEventListener(CONTEXT_EVENT_CHANGED_EVENT, refreshLocalData);
     };
   }, []);
 
@@ -234,6 +256,7 @@ export default function Home() {
       suggestionFeedbacks: getSuggestionFeedbacks(),
       personalAiMemories: getPersonalAiMemories(),
       externalEvents: agentExternalEvents,
+      contextEvents,
       dismissedActionIds,
     });
   }, [
@@ -242,6 +265,7 @@ export default function Home() {
     singleSchedules,
     userProfile,
     agentExternalEvents,
+    contextEvents,
     dismissedActionIds,
   ]);
   const todayScheduleItems = useMemo(() => {

@@ -53,6 +53,13 @@ const SETTINGS_GROUPS: SettingsGroup[] = [
         icon: "m13 2-9 12h7l-1 8 9-12h-7l1-8Z",
       },
       {
+        href: "/settings/places/sensing",
+        title: "장소 감지",
+        description: "도착하면 알아채고 지금 할 일을 꺼냄",
+        color: "bg-teal-500",
+        icon: "M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11Zm0-8.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z",
+      },
+      {
         href: "/settings/places",
         title: "장소와 이동",
         description: "저장 장소와 이동시간 기본값",

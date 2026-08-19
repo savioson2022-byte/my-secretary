@@ -13,6 +13,7 @@ export type HelpTopic =
   | "ai"
   | "notifications"
   | "calendar-integration"
+  | "place-sensing"
   | "personal-ai"
   | "shortcuts";
 
@@ -51,6 +52,12 @@ export const PAGE_HELP_CONTENT: Record<HelpTopic, HelpContent> = {
   settings: { title: "설정", summary: "계정, 알림, 장소, AI와 빠른 입력 방식을 내 생활에 맞게 조정합니다.", sections: [{ title: "처음이라면", body: "먼저 알림 권한과 장소를 설정하고, 개인 AI 화면에서 분류 방식을 확인하는 것을 권장합니다." }] },
   account: { title: "계정 설정", summary: "로그인 정보와 동기화 상태를 관리합니다.", sections: [{ title: "동기화", body: "로그인하면 여러 기기에서 일정과 설정을 이어서 사용할 수 있습니다." }] },
   ai: { title: "AI 설정", summary: "입력 분류와 추천에 사용할 AI 및 데이터 동의 상태를 관리합니다.", sections: [{ title: "분류 학습", body: "처음에는 기본 AI가 분류를 돕고, 사용자가 수정한 결과가 쌓이면 개인 AI가 그 패턴을 참고합니다." }] },
+  "place-sensing": { title: "장소 감지", summary: "저장한 장소에 도착하거나 벗어난 것을 앱이 알아채고, 지금 상황에 맞는 것을 먼저 꺼내줍니다.", sections: [
+    { title: "왜 필요한가", body: "말해주지 않아도 아는 것이 늘어야 비서가 됩니다. 마트에 도착하면 사야 할 것을, 사무실에 도착하면 거기서 할 일을 먼저 보여줍니다." },
+    { title: "'항상' 권한이 필요한 이유", body: "앱이 닫혀 있을 때도 도착을 알아채려면 iOS에서 위치 권한을 '항상'으로 두어야 합니다. '앱을 사용하는 동안'만 허용하면 앱이 열려 있을 때만 동작합니다." },
+    { title: "배터리", body: "위치를 계속 확인하지 않습니다. 지정한 장소 근처에 갔을 때만 OS가 앱을 깨웁니다." },
+    { title: "감지 한도", body: "iOS는 한 앱에 최대 20곳까지 허용합니다. 저장 장소가 더 많으면 일부만 감시합니다." },
+  ] },
   "calendar-integration": { title: "캘린더 연동", summary: "iPhone 캘린더의 일정을 읽어 실제로 비어 있는 시간만 추천에 사용합니다.", sections: [
     { title: "왜 필요한가", body: "앱에 일정을 다시 입력하지 않아도 됩니다. 이미 캘린더에 있는 일정을 읽어 그 시간을 제외하고 빈 시간을 계산합니다." },
     { title: "읽기만 합니다", body: "연동은 읽기 전용입니다. 이 앱이 만들지 않은 일정은 수정하거나 삭제하지 않습니다." },

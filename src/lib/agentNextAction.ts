@@ -6,6 +6,7 @@ import {
 import { getMissingRequirements } from "@/lib/captureRequirements";
 import { suggestTimeTaskSchedules } from "@/lib/taskScheduleSuggestion";
 import type { AssistantItem } from "@/types/assistant";
+import type { ContextEvent } from "@/types/contextEvent";
 import type { SavedPlace, SingleSchedule } from "@/types/calendar";
 import type { ExternalCalendarEvent } from "@/types/externalCalendar";
 import type { PersonalAiMemory } from "@/types/personalAi";
@@ -29,6 +30,8 @@ export type AgentNextActionKind =
   | "needs_review"
   /** 빈 시간에 넣기 좋은 시간작업 */
   | "suggested_session"
+  /** 지금 있는 장소에서 할 수 있는 일 */
+  | "here_now"
   /** 지금 급한 것이 없음 */
   | "clear";
 
@@ -57,6 +60,8 @@ export type AgentNextActionInput = {
   suggestionFeedbacks?: SuggestionFeedback[];
   personalAiMemories?: PersonalAiMemory[];
   externalEvents?: ExternalCalendarEvent[];
+  /** 관찰한 사실. 지금 어디에 있는지 등. */
+  contextEvents?: ContextEvent[];
   /** 이미 미루거나 거절한 판단의 id */
   dismissedActionIds?: string[];
   now?: Date;
@@ -78,6 +83,37 @@ function isTodayOrPast(dateText: string | null | undefined, todayText: string) {
   if (!dateText) return false;
 
   return dateText.slice(0, 10) <= todayText;
+}
+
+/** 도착 뒤 이탈이 없으면 아직 그 장소에 있는 것으로 본다. */
+function findCurrentPlace(
+  contextEvents: ContextEvent[],
+  now: Date
+): { placeId: string; placeName: string | null; arrivedAt: string } | null {
+  const recent = [...contextEvents]
+    .filter(
+      (event) =>
+        now.getTime() - new Date(event.occurredAt).getTime() < 6 * 60 * 60_000
+    )
+    .sort(
+      (left, right) =>
+        new Date(right.occurredAt).getTime() -
+        new Date(left.occurredAt).getTime()
+    );
+
+  for (const event of recent) {
+    if (event.type === "place_left") return null;
+
+    if (event.type === "place_arrived" && event.placeId) {
+      return {
+        placeId: event.placeId,
+        placeName: event.placeName,
+        arrivedAt: event.occurredAt,
+      };
+    }
+  }
+
+  return null;
 }
 
 const CLEAR_ACTION: AgentNextAction = {
@@ -102,6 +138,7 @@ export function decideNextAction({
   suggestionFeedbacks = [],
   personalAiMemories = [],
   externalEvents = [],
+  contextEvents = [],
   dismissedActionIds = [],
   now = new Date(),
 }: AgentNextActionInput): AgentNextAction {
@@ -141,6 +178,34 @@ export function decideNextAction({
       suggestedStartTime: upcoming.schedule.startTime,
       suggestedEndTime: upcoming.schedule.endTime,
     });
+  }
+
+  // 1.5순위. 지금 그 장소에 와 있다면, 거기서만 할 수 있는 일을 먼저 꺼낸다.
+  // 사용자가 알려주지 않은 사실로 만드는 제안이라 이 앱이 비서다워지는 지점이다.
+  const currentPlace = findCurrentPlace(contextEvents, now);
+
+  if (currentPlace) {
+    const hereTask = items.find(
+      (item) =>
+        item.status === "미완료" &&
+        item.placePreference === "specific" &&
+        item.placeId === currentPlace.placeId
+    );
+
+    if (hereTask) {
+      candidates.push({
+        id: `here:${hereTask.id}:${currentPlace.arrivedAt.slice(0, 13)}`,
+        kind: "here_now",
+        title: hereTask.title,
+        body: `${currentPlace.placeName ?? "여기"}에 계시네요. 지금 하기 좋아요.`,
+        approveLabel: "끝냈어요",
+        url: "/records",
+        sourceItemId: hereTask.id,
+        suggestedDate: null,
+        suggestedStartTime: null,
+        suggestedEndTime: null,
+      });
+    }
   }
 
   // 2순위. 오늘까지인데 아직 안 끝난 일.

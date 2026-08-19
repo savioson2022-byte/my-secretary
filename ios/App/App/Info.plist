@@ -40,6 +40,13 @@
 	<false/>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>일정 장소와 현재 위치를 비교해 준비와 이동 시작 알림을 더 정확하게 보내기 위해 사용합니다.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>저장한 장소에 도착하거나 벗어날 때를 알아채서, 묻지 않아도 지금 상황에 맞는 것을 먼저 알려주기 위해 사용합니다.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+		<string>remote-notification</string>
+	</array>
 	<key>NSCalendarsFullAccessUsageDescription</key>
 	<string>이미 일정이 잡혀 있는 시간을 제외하고 진짜 비어 있는 시간을 찾기 위해 캘린더를 읽습니다.</string>
 	<key>NSCalendarsUsageDescription</key>

@@ -3,6 +3,7 @@ import AlarmModeOverlay from "@/components/AlarmModeOverlay";
 import FirstSignupTimeTaskGuide from "@/components/FirstSignupTimeTaskGuide";
 import AiDataConsentGate from "@/components/AiDataConsentGate";
 import CloudDataSyncBridge from "@/components/CloudDataSyncBridge";
+import GeofenceBridge from "@/components/GeofenceBridge";
 import PurchaseMailAutoSyncBridge from "@/components/PurchaseMailAutoSyncBridge";
 import SmartReminderAgent from "@/components/SmartReminderAgent";
 import "./globals.css";
@@ -67,6 +68,7 @@ export default function RootLayout({
         <AiDataConsentGate />
         <FirstSignupTimeTaskGuide />
         <CloudDataSyncBridge />
+        <GeofenceBridge />
         <PurchaseMailAutoSyncBridge />
         <SmartReminderAgent />
         <AlarmModeOverlay />
