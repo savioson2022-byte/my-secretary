@@ -347,8 +347,29 @@ export default function Home() {
   }, [items]);
 
   const filteredItems = useMemo(() => {
-    return items.filter((item) => matchesFilter(item, selectedFilter));
+    // 방금 담은 것이 맨 위에 보여야 한다.
+    return items
+      .filter((item) => matchesFilter(item, selectedFilter))
+      .sort(
+        (left, right) =>
+          new Date(right.createdAt).getTime() -
+          new Date(left.createdAt).getTime()
+      );
   }, [items, selectedFilter]);
+
+  /** 방금 담은 것. 공유 시트나 단축어로 들어왔을 때 바로 확인하기 위한 목록. */
+  const justCapturedItems = useMemo(() => {
+    const cutoff = Date.now() - 10 * 60_000;
+
+    return items
+      .filter((item) => new Date(item.createdAt).getTime() >= cutoff)
+      .sort(
+        (left, right) =>
+          new Date(right.createdAt).getTime() -
+          new Date(left.createdAt).getTime()
+      )
+      .slice(0, 3);
+  }, [items]);
   const gemmaReadiness = getGemmaClassificationReadiness();
 
   /**
@@ -989,6 +1010,46 @@ export default function Home() {
               onSnooze={handleNextActionSnooze}
               onReject={handleNextActionReject}
             />
+
+            {justCapturedItems.length > 0 && (
+            <section className="app-card border-l-4 border-emerald-400 p-4">
+              <p className="text-xs font-black text-emerald-600">방금 담은 것</p>
+              <div className="mt-2 grid gap-2">
+                {justCapturedItems.map((item) => (
+                  <div
+                    key={item.id}
+                    className="rounded-2xl bg-slate-50 p-3 ring-1 ring-slate-100"
+                  >
+                    <p className="text-sm font-black leading-5 text-slate-900">
+                      {item.title}
+                    </p>
+                    <p className="mt-1 text-[11px] font-bold text-slate-400">
+                      {item.category} · {item.processType}
+                      {describeMissingRequirements(item)
+                        ? ` · ${describeMissingRequirements(item)}`
+                        : ""}
+                    </p>
+                    <div className="mt-2 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => openReview(item)}
+                        className="rounded-full bg-white px-3 py-1.5 text-[11px] font-black text-slate-600 ring-1 ring-slate-200"
+                      >
+                        고치기
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(item.id)}
+                        className="rounded-full bg-white px-3 py-1.5 text-[11px] font-black text-rose-500 ring-1 ring-rose-100"
+                      >
+                        삭제
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+            )}
 
             <InputBox
               value={inputText}
