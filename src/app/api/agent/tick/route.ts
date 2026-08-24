@@ -4,6 +4,7 @@ import { sendApplePushNotification, isApnsConfigured } from "@/lib/apns";
 import { isFcmConfigured, sendAndroidPushNotification } from "@/lib/fcm";
 import { readAgentUserData } from "@/lib/server/agentDataReader";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
+import { isCronRequestAuthorized } from "@/lib/cronAuthorization";
 
 /**
  * 에이전트 루프.
@@ -19,23 +20,6 @@ type NativeTokenRow = {
   token: string;
   platform: string;
 };
-
-function isAuthorized(request: Request) {
-  const expectedSecret = process.env.CRON_SECRET;
-  const requestSecret = request.headers.get("x-cron-secret");
-  const authorization = request.headers.get("authorization") ?? "";
-  const userAgent = request.headers.get("user-agent") ?? "";
-  const vercelCronSchedule = request.headers.get("x-vercel-cron-schedule");
-
-  const isVercelCronRequest =
-    Boolean(vercelCronSchedule) && userAgent.includes("vercel-cron/1.0");
-  const hasValidSecret =
-    Boolean(expectedSecret) &&
-    (requestSecret === expectedSecret ||
-      authorization === `Bearer ${expectedSecret}`);
-
-  return isVercelCronRequest || hasValidSecret;
-}
 
 /** 미루거나 거절한 제안은 다시 보내지 않는다. */
 async function readDismissedActionIds(
@@ -63,7 +47,7 @@ async function readDismissedActionIds(
 }
 
 export async function GET(request: Request) {
-  if (!isAuthorized(request)) {
+  if (!isCronRequestAuthorized(request.headers)) {
     return NextResponse.json(
       { error: "잘못된 예약 실행 요청입니다." },
       { status: 401 }

@@ -198,10 +198,11 @@ export function isRepurchaseDue(history: PurchaseHistoryItem, now = new Date()) 
 
 export function getDueRepurchaseHistories(
   histories: PurchaseHistoryItem[],
-  limit = 3
+  limit = 3,
+  now = new Date()
 ) {
   return histories
-    .filter((history) => isRepurchaseDue(history))
+    .filter((history) => isRepurchaseDue(history, now))
     .sort((left, right) => {
       return String(left.nextPurchaseCheckDate).localeCompare(
         String(right.nextPurchaseCheckDate)

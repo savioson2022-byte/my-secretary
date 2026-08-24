@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { syncGmailPurchaseMails } from "@/lib/gmailPurchaseSync";
 import { syncNaverPurchaseMails } from "@/lib/naverPurchaseSync";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
+import { isCronRequestAuthorized } from "@/lib/cronAuthorization";
 import type { PurchaseHistoryItem } from "@/types/purchaseHistory";
 
 type PurchaseHistoryRow = {
@@ -45,19 +46,7 @@ function rowToHistory(row: PurchaseHistoryRow): PurchaseHistoryItem {
 }
 
 export async function GET(request: Request) {
-  const expectedSecret = process.env.CRON_SECRET;
-  const requestSecret = request.headers.get("x-cron-secret");
-  const authorization = request.headers.get("authorization") ?? "";
-  const userAgent = request.headers.get("user-agent") ?? "";
-  const vercelCronSchedule = request.headers.get("x-vercel-cron-schedule");
-  const isVercelCronRequest =
-    Boolean(vercelCronSchedule) && userAgent.includes("vercel-cron/1.0");
-  const hasValidSecret =
-    Boolean(expectedSecret) &&
-    (requestSecret === expectedSecret ||
-      authorization === `Bearer ${expectedSecret}`);
-
-  if (!isVercelCronRequest && !hasValidSecret) {
+  if (!isCronRequestAuthorized(request.headers)) {
     return NextResponse.json(
       {
         error: "잘못된 예약 실행 요청입니다.",

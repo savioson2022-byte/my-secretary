@@ -6,6 +6,7 @@ import {
 import { sendPushNotification } from "@/lib/push";
 import { isFcmConfigured, sendAndroidPushNotification } from "@/lib/fcm";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
+import { isCronRequestAuthorized } from "@/lib/cronAuthorization";
 
 type ScheduleEntryRecord = {
   id: string;
@@ -92,16 +93,6 @@ function getDispatchWindow() {
   };
 }
 
-function isAuthorized(request: NextRequest) {
-  const cronSecret = process.env.CRON_SECRET;
-
-  if (!cronSecret) {
-    return true;
-  }
-
-  return request.headers.get("authorization") === `Bearer ${cronSecret}`;
-}
-
 async function sendNativePushesForEvent({
   supabase,
   event,
@@ -184,7 +175,7 @@ async function sendNativePushesForEvent({
 }
 
 export async function GET(request: NextRequest) {
-  if (!isAuthorized(request)) {
+  if (!isCronRequestAuthorized(request.headers)) {
     return NextResponse.json(
       { ok: false, reason: "권한이 없습니다." },
       { status: 401 }

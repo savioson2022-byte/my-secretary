@@ -10,6 +10,7 @@
     "check:supabase": "node --env-file=.env.local scripts/check-supabase-connection.mjs",
     "test:token-encryption": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/test-token-encryption.mjs",
     "test:persistent-alarm": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/test-persistent-alarm-schedule.mjs",
+    "test:cron-authorization": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/test-cron-authorization.mjs",
     "check:purchase": "node scripts/verify-purchase-automation.mjs",
     "purchase:coupang": "node scripts/coupang-repurchase-assistant.mjs",
     "android:sync": "cap sync android",

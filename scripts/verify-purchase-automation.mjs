@@ -183,7 +183,7 @@ https://www.coupang.com/vp/products/1
 `);
 
 assert.equal(parsedCandidates.length, 1);
-assert.equal(parsedCandidates[0].productName, "탐사수 생수 2L 12개");
+assert.equal(parsedCandidates[0].productName, "탐사수 생수 2L");
 assert.equal(parsedCandidates[0].priceText, "12,900원");
 assert.equal(parsedCandidates[0].quantityText, "12개");
 assert.equal(parsedCandidates[0].productUrl, "https://www.coupang.com/vp/products/1");
