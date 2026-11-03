@@ -862,7 +862,7 @@ export default function Home() {
   }
 
   return (
-    <main className="mx-auto min-h-screen max-w-[1440px] px-0 py-0 sm:px-5 sm:py-6 md:px-6 md:pl-[7.5rem] xl:grid xl:grid-cols-[minmax(0,1.45fr)_minmax(320px,0.55fr)] xl:items-start xl:gap-5 xl:px-6 xl:pl-[7.5rem]">
+    <main className="home-page mx-auto min-h-screen">
       <section className="hidden">
         <p className="text-sm font-black text-blue-600">나를 위한 AI 비서</p>
         <div className="mt-4 flex items-center gap-4">
@@ -910,10 +910,6 @@ export default function Home() {
       </section>
 
       <section className="home-workspace mx-auto min-h-screen w-full bg-white px-4 pb-0 pt-[max(1rem,env(safe-area-inset-top))] sm:phone-shell sm:min-h-0 sm:max-w-[430px] sm:overflow-hidden sm:p-4 md:max-w-none md:overflow-visible md:bg-transparent md:p-0 md:shadow-none">
-        <div className="flex items-center justify-between px-1 pb-5 pt-1 text-xs font-black text-slate-900 md:hidden">
-          <span>9:41</span>
-        </div>
-
         <header className="flex items-start justify-between md:rounded-3xl md:bg-white md:px-6 md:py-5 md:shadow-soft md:ring-1 md:ring-slate-100">
           <div>
             <p className="mb-1 hidden text-sm font-black text-blue-600 md:block">
@@ -1355,7 +1351,7 @@ export default function Home() {
 
           {filteredItems.length === 0 ? (
             <div className="rounded-[24px] bg-slate-50 p-5 text-sm leading-6 text-slate-500">
-              아직 저장된 기록이 없습니다. 휴대폰 화면에서 생각을 입력해
+              아직 저장된 기록이 없습니다. 입력창에 생각을 입력해
               분류하고 저장해보세요.
             </div>
           ) : (

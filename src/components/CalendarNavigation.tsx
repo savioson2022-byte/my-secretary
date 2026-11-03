@@ -26,7 +26,7 @@ export default function CalendarNavigation() {
   const pathname = usePathname();
 
   return (
-    <nav className="app-card p-2">
+    <nav aria-label="캘린더 보기" className="app-card p-2">
       <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
         {LINKS.map((link) => {
           const isActive = pathname === link.href;
@@ -35,6 +35,7 @@ export default function CalendarNavigation() {
             <Link
               key={link.href}
               href={link.href}
+              aria-current={isActive ? "page" : undefined}
               className={
                 isActive
                   ? "rounded-2xl bg-blue-600 px-4 py-3 text-center text-sm font-black text-white shadow-[0_10px_22px_rgba(49,130,246,0.22)]"

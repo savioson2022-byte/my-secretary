@@ -19,6 +19,8 @@ const LINKS = [
     label: "기록",
     icon: "M7 4h10a2 2 0 0 1 2 2v15l-7-3-7 3V6a2 2 0 0 1 2-2Z",
   },
+  { href: "/schedule/manage", label: "일정관리", icon: "M12 5v14M5 12h14" },
+  { href: "/settings", label: "설정", icon: "M4 7h16M4 17h16M8 4v6M16 14v6" },
 ];
 
 export default function BottomNavigation() {
@@ -26,21 +28,24 @@ export default function BottomNavigation() {
 
   return (
     <>
-      <nav className="desktop-side-nav fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-[430px] border-t border-slate-100 bg-white/95 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2 shadow-[0_-14px_38px_rgba(15,23,42,0.08)] backdrop-blur md:bottom-auto md:right-auto md:top-1/2 md:mx-0 md:w-[88px] md:-translate-y-1/2 md:rounded-2xl md:border md:border-slate-100 md:px-2 md:py-3 md:shadow-soft">
-        <div className="grid grid-cols-3 gap-1 md:grid-cols-1">
+      <nav aria-label="주 메뉴" className="app-navigation">
+        <Link href="/" className="nav-brand">나의 비서<span>일상과 업무를 한곳에서</span></Link>
+        <div className="nav-links">
           {LINKS.map((link) => {
             const isActive =
               pathname === link.href ||
               (link.href === "/calendar/monthly" &&
                 pathname.startsWith("/calendar")) ||
-              (link.href === "/records" && pathname.startsWith("/records"));
+              (link.href === "/records" && pathname.startsWith("/records")) ||
+              (link.href === "/settings" && pathname.startsWith("/settings"));
 
             return (
               <Link
                 key={link.href}
                 href={link.href}
                 scroll
-                className={`flex min-h-[54px] flex-col items-center justify-center gap-1 rounded-2xl px-2 py-2 text-[11px] font-black transition ${
+                aria-current={isActive ? "page" : undefined}
+                className={`nav-link ${
                   isActive
                     ? "bg-blue-50 text-blue-600"
                     : "text-slate-400 hover:bg-slate-50 hover:text-slate-600"
@@ -64,10 +69,7 @@ export default function BottomNavigation() {
           })}
         </div>
       </nav>
-      <div
-        aria-hidden="true"
-        className="h-[var(--app-bottom-nav-height)] md:hidden"
-      />
+
     </>
   );
 }

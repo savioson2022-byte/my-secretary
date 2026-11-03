@@ -1,5 +1,7 @@
 "use client";
 
+import RoutineQuickEditor from "@/components/RoutineQuickEditor";
+import { changeRoutineTiming } from "@/lib/routineTiming";
 import TimeTaskSuggestionView from "@/components/TimeTaskSuggestionView";
 import WeeklyAvailabilityView from "@/components/WeeklyAvailabilityView";
 import SingleScheduleList from "@/components/SingleScheduleList";
@@ -360,6 +362,7 @@ function RoutineScheduleManager({
   const [singleSchedules, setSingleSchedules] = useState<SingleSchedule[]>([]);
   const [savedPlaces, setSavedPlaces] = useState<SavedPlace[]>([]);
 
+  const [routineSearch, setRoutineSearch] = useState("");
   const [title, setTitle] = useState("");
   const [timeSlots, setTimeSlots] = useState<RoutineTimeSlot[]>(() => [
     createDefaultTimeSlot(),
@@ -727,7 +730,7 @@ function RoutineScheduleManager({
     const now = new Date().toISOString();
 
     const invalidSlot = timeSlots.find((slot) => {
-      return slot.days.length === 0 || slot.startTime >= slot.endTime;
+      return slot.days.length === 0 || !slot.startTime || !slot.endTime || slot.startTime >= slot.endTime;
     });
 
     if (invalidSlot) {
@@ -831,7 +834,7 @@ function RoutineScheduleManager({
     }
 
     const invalidSlot = editRoutineTimeSlots.find((slot) => {
-      return slot.days.length === 0 || slot.startTime >= slot.endTime;
+      return slot.days.length === 0 || !slot.startTime || !slot.endTime || slot.startTime >= slot.endTime;
     });
 
     if (invalidSlot) {
@@ -1805,7 +1808,7 @@ function RoutineScheduleManager({
       )}
 
       {showScheduleManagement && (
-      <>
+      <div className="schedule-workspace">
       <section
         id="schedule-manager"
         className="rounded-3xl bg-white p-5 shadow-soft ring-1 ring-slate-100"
@@ -1813,8 +1816,9 @@ function RoutineScheduleManager({
         <div>
           <h2 className="text-lg font-black text-slate-900">나의 일정 관리</h2>
           <p className="mt-1 text-sm text-slate-500">
-            정기 일정은 새로 입력하고, 단기 일정은 아래 목록에서 수정합니다.
+            정기 일정을 입력하거나, 아래 목록에서 수업별 요일·시간을 바로 변경하세요.
           </p>
+          <a href="#routine-groups" className="mt-3 inline-block rounded-xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800">기존 수업 찾기·수정 ↓</a>
         </div>
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
@@ -1837,8 +1841,7 @@ function RoutineScheduleManager({
                   요일 및 시간
                 </label>
                 <p className="mt-1 text-xs font-bold leading-5 text-slate-500">
-                  제목, 장소, 기간은 한 번만 쓰고 시간대만 여러 줄로 추가할 수
-                  있습니다.
+                  같은 시간은 요일을 여러 개 선택하세요. 시간이 다른 수업은 시간대를 추가하거나 복사한 뒤 요일을 골라주세요.
                 </p>
               </div>
               <button
@@ -1862,6 +1865,7 @@ function RoutineScheduleManager({
                     <p className="text-xs font-black text-slate-500">
                       시간대 {index + 1}
                     </p>
+                    <button type="button" onClick={() => setTimeSlots(current => [...current, { ...slot, id: createId(), days: [] }])} className="rounded-full bg-emerald-50 px-3 py-2 text-xs font-bold text-emerald-800">시간대 복사</button>
                     {timeSlots.length > 1 && (
                       <button
                         type="button"
@@ -2081,7 +2085,7 @@ function RoutineScheduleManager({
       <section className="rounded-3xl bg-white p-5 shadow-soft ring-1 ring-slate-100">
         <div className="space-y-3">
           <div>
-            <h3 className="text-sm font-black text-slate-800">
+            <h3 id="routine-groups" className="scroll-mt-24 text-sm font-black text-slate-800">
               정기 일정 묶음
             </h3>
             <p className="mt-1 text-xs font-bold leading-5 text-slate-500">
@@ -2090,12 +2094,23 @@ function RoutineScheduleManager({
             </p>
           </div>
 
+          <input
+            type="search"
+            aria-label="정기 일정 제목 검색"
+            placeholder="수업·일정 검색 (예: 고1 2반)"
+            value={routineSearch}
+            onChange={event => setRoutineSearch(event.target.value)}
+            className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm"
+          />
+          {activeRoutineGroups.length > 0 && !activeRoutineGroups.some(group => group.title.toLowerCase().includes(routineSearch.trim().toLowerCase())) && (
+            <p role="status" className="p-3 text-sm text-slate-500">검색 결과가 없습니다.</p>
+          )}
           {activeRoutineGroups.length === 0 ? (
             <p className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-500">
               현재 활성화된 정기 일정이 없습니다.
             </p>
           ) : (
-            activeRoutineGroups.map((group) => {
+            activeRoutineGroups.filter(group => group.title.toLowerCase().includes(routineSearch.trim().toLowerCase())).map((group) => {
               const firstRoutine = group.routines[0];
               const isEditingGroup = editingRoutineGroupKey === group.key;
               const cancelledDates = getCancelledDatesForGroup(group);
@@ -2341,18 +2356,16 @@ function RoutineScheduleManager({
                       </div>
 
                       <div className="grid gap-2 md:grid-cols-2">
-                        {getTimeSlotsFromRoutines(group.routines).map((slot) => (
-                          <div
-                            key={`${group.key}-${slot.startTime}-${slot.endTime}`}
-                            className="rounded-2xl bg-white p-3 text-sm font-bold text-slate-600 ring-1 ring-slate-100"
-                          >
-                            <p className="text-slate-900">
-                              {slot.days.join(", ")}요일
-                            </p>
-                            <p className="mt-1">
-                              {slot.startTime} ~ {slot.endTime}
-                            </p>
-                          </div>
+                        {group.routines.map((routine) => (
+                          <RoutineQuickEditor
+                            key={routine.id}
+                            routine={routine}
+                            onSave={(timing) => {
+                              const updated = changeRoutineTiming(getRoutineSchedules(), routine, timing);
+                              updateRoutineSchedule(updated);
+                              setRoutines(getRoutineSchedules());
+                            }}
+                          />
                         ))}
                       </div>
 
@@ -2474,7 +2487,7 @@ function RoutineScheduleManager({
           </div>
         )}
       </section>
-      </>
+      </div>
       )}
     </section>
   );
