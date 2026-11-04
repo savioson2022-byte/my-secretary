@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 const LINKS = [
   {
@@ -25,8 +27,14 @@ const LINKS = [
 
 export default function BottomNavigation() {
   const pathname = usePathname();
+  const [mounted, setMounted] = useState(false);
 
-  return (
+  useEffect(() => setMounted(true), []);
+  if (!mounted) return null;
+
+  // Keep fixed navigation outside ancestors whose backdrop-filter or transform
+  // would otherwise make it fixed to a page card instead of the viewport.
+  return createPortal(
     <>
       <nav aria-label="주 메뉴" className="app-navigation">
         <Link href="/" className="nav-brand">나의 비서<span>일상과 업무를 한곳에서</span></Link>
@@ -70,6 +78,7 @@ export default function BottomNavigation() {
         </div>
       </nav>
 
-    </>
+    </>,
+    document.body
   );
 }

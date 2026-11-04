@@ -156,3 +156,12 @@ textarea {
 @media (pointer: coarse) {
   button, .app-page a { min-height: 44px; }
 }
+
+/* Calendar cards must not clip content or establish desktop navigation bounds. */
+.calendar-page-shell { min-width: 0; }
+@media (min-width: 768px) {
+  .calendar-page-shell.phone-shell {
+    border: 0; border-radius: 0; background: transparent;
+    box-shadow: none; backdrop-filter: none; padding: 0;
+  }
+}
