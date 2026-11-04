@@ -12,7 +12,7 @@ import {
  * 외부 브리핑 봇용 읽기 전용 API.
  *
  * - 인증: Authorization: Bearer <BRIEFING_API_TOKEN> (쿼리스트링 토큰 금지)
- * - 대상: BRIEFING_LOGIN_ID(예: newchoee) 계정 하나의 데이터만 반환
+ * - 대상: BRIEFING_USER_ID로 지정한 사용자 또는 BRIEFING_LOGIN_ID의 통합계정
  * - GET 외 메서드는 405. 쓰기·수정·삭제 기능은 없다.
  * 문서: 옵시디언 01_Projects/나의 비서/11_BriefingAPI.md
  */
@@ -38,8 +38,18 @@ function errorResponse(status: number, message: string, extraHeaders?: Record<st
 /** 로그인 아이디 → 연결된 auth 사용자 id 전체(같은 통합계정에 묶인 로그인 경로 포함) */
 async function resolveBriefingUserIds(
   supabase: SupabaseClient,
-  loginId: string
+  loginId: string,
+  pinnedUserId?: string
 ): Promise<string[] | null> {
+  // A server-configured UUID is an explicit account boundary. Do not fall back
+  // to display names or user-editable metadata when credential links are absent.
+  if (pinnedUserId) {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(pinnedUserId)) return null;
+    const { data, error } = await supabase.auth.admin.getUserById(pinnedUserId);
+    if (error || !data.user || data.user.id !== pinnedUserId) return null;
+    return [pinnedUserId];
+  }
+
   const { data: credential, error } = await supabase
     .from("app_login_credentials")
     .select("auth_user_id, app_account_id")
@@ -96,9 +106,10 @@ export async function GET(request: Request) {
   }
 
   const loginId = process.env.BRIEFING_LOGIN_ID?.trim();
+  const pinnedUserId = process.env.BRIEFING_USER_ID?.trim();
   const supabase = createSupabaseAdminClient();
 
-  if (!loginId || !supabase) {
+  if ((!loginId && !pinnedUserId) || !supabase) {
     console.error("briefing: 서버 설정 누락", {
       hasLoginId: Boolean(loginId),
       hasSupabaseAdmin: Boolean(supabase),
@@ -107,7 +118,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const userIds = await resolveBriefingUserIds(supabase, loginId);
+    const userIds = await resolveBriefingUserIds(supabase, loginId ?? "", pinnedUserId);
 
     if (!userIds || userIds.length === 0) {
       console.error("briefing: 대상 계정을 찾지 못함");
